@@ -3,7 +3,9 @@ import { REGIONS } from './regions.js';
 // Macera modu haritaları. Izgara karakterleri:
 //   '.' çim      'p' patika   'f' çiçekli çim   'g' uzun çim   's' kum
 //   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
+//   'H' gizli çalı: çalıyla birebir aynı görünür ama içinden GEÇİLEBİLİR
 //   'M' tüccar tezgahı (engel; Kecleon'un satış yeri, bölge merkezlerinde durur)
+//   'b' boss arenası zemini (boss uyanınca ortalığı dağıtır, zemin onun temasına döner)
 //   Rakamlar o haritanın portalDefs tanımındaki portallardır ('0' çıkış geleneğidir).
 // Bir haritanın tüm satırları eşit uzunlukta olmalıdır. 20x10 (50px karo) tam bir
 // ekran doldurur; daha geniş/yüksek haritalarda kamera oyuncuyu takip eder.
@@ -83,32 +85,34 @@ export const MAPS = {
         theme: 'dark', // derin orman: loş palet + vinyet + ateşböcekleri
         start: { col: 2, row: 7 },
         grid: [
-            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-            'T.g....f.......T.......g...gs.T..f.....T',
-            'Tff..g....s..g.T.....g.......gT...f...gT',
-            'T..TTTTg.TTTT..Ts.Tg.TTTT..T..TTTT..Ts.T',
-            'T..T.g...Tf..gfT.gf..gf.T.fT..T...g.T.gT',
-            'T..Tf....T.....Tg...gs..T.fTg.T..f..T..T',
-            'TTTT..TTTTg.TTTT..TTTTTTT.gT..Tf.TTTT..T',
-            'T0.Tf...gT..Ts..g.T.....g..T....gT..Tf.T',
-            'T..T...s.Tg.T.gf..T........T.....T.gT..T',
-            'T..Tg.T.gT..TTTTTTT..TTTTTTTTTTTTT..Tg.T',
-            'T..T.....T.....g..Tgs..gTf.g....f...T..T',
-            'Tf.Tg....T.......gT..gs.T..f.g...g..T.fT',
-            'T.gT..TTTT.gTTTTs.TTTT..T..T..TTTTTTT..T',
-            'T..T.gT..T...g.T..T..g.fT.fT..g...g....T',
-            'T..T..Tg.T.g...T..T.g...Ts.Tgsf.gsf.gsfT',
-            'T.fT..T..T..T.gT..Ts.TTTT.gTTTTf.T.....T',
-            'T..g..T.f...T...g...gT..gf..gsT...f....T',
-            'T.....T...g.T.g...gs.Tgff.....T....g...T',
-            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'T.g....f.......T.......g...gs.T..f.....TTTTT',
+            'Tff..g....s..g.T.....g.......gT...f...gTTTTT',
+            'T..TTTTg.TTTT..Ts.Tg.TTTT..T..TTTT..Ts.TTssT',
+            'T..T.g...Tf..gfT.gf..gf.T.fT..T...g.T.gHsssT',
+            'T..Tf....T.....Tg...gs..T.fTg.T..f..T..TTssT',
+            'TTTT..TTTTg.TTTT..TTTTTTT.gT..Tf.TTTT..TTTTT',
+            'T0.Tf...gT..Ts..g.T.....g..T....gT..Tf.TTTTT',
+            'T..T...s.Tg.T.gf..T........T.....T.gT..TTTTT',
+            'T..Tg.T.gT..TTTTTTT..TTTTTTTTTTTTT..Tg.TTTTT',
+            'T..T.....T.....g..Tgs..gTf.g....f...T..TTTTT',
+            'Tf.Tg....T.......gT..gs.T..f.g...g..T.fTTTTT',
+            'T.gT..TTTT.gTTTTs.TTTT..T..T..TTTTTTT..TTTTT',
+            'T..T.gT..T...g.T..T..g.fT.fT..g...g....TTTTT',
+            'T..T..Tg.T.g...T..T.g...Ts.Tgsf.gsf.gsfTTTTT',
+            'T.fT..T..T..T.gT..Ts.TTTT.gTTTTf.T.....TTTTT',
+            'T..g..T.f...T...g...gT..gf..gsT...f....TTTTT',
+            'T.....T...g.T.g...gs.Tgff.....T....g...TTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
         ],
         portalDefs: {
             '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }
         },
+        // Boss uyanınca ortalığı dağıtıp burayı açık arenaya çevirir
+        bossArena: { col0: 25, row0: 11, col1: 38, row1: 17 },
         // Haritaya dağılmış düşmanlar (regions.js'teki mekan listesinden).
-        // kind: common (yaygın, 3'er adet), hidden (gizli, uzak köşede), boss (meydanda)
+        // kind: common (yaygın), hidden (gizli mağarasını korur), boss (uyuyan)
         spawns: [
             { id: 127, kind: 'common', col: 6, row: 1 },
             { id: 127, kind: 'common', col: 20, row: 8 },
@@ -119,8 +123,9 @@ export const MAPS = {
             { id: 709, kind: 'common', col: 16, row: 7 },
             { id: 709, kind: 'common', col: 30, row: 10 },
             { id: 709, kind: 'common', col: 8, row: 17 },
-            { id: 545, kind: 'hidden', col: 38, row: 4 },
-            { id: 768, kind: 'boss', col: 36, row: 15 }
+            // Gizli Scolipede: sağdaki gizli çalının (H) ardındaki mağarada
+            { id: 545, kind: 'hidden', col: 41, row: 4 },
+            { id: 768, kind: 'boss', col: 34, row: 15 }
         ]
     }
 };

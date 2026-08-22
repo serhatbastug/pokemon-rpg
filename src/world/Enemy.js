@@ -4,8 +4,10 @@ import { TILE_SIZE } from '../config/worldMap.js';
 // kaç karo mesafede oyuncuyu fark eder (duvar arkasından fark etmez).
 const KIND_STATS = {
     common: { hp: 35, speed: 2.2, size: 60, aggroTiles: 6 },
-    hidden: { hp: 70, speed: 2.6, size: 66, aggroTiles: 7 },
-    boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8 }
+    // Gizli: mağarasını korur, peşinden gelmez (guardRadius dışına çıkmaz)
+    hidden: { hp: 70, speed: 2.6, size: 66, aggroTiles: 5, guardRadius: 190 },
+    // Boss: uyanana kadar hareketsiz uyur
+    boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8, sleeps: true }
 };
 
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
@@ -34,6 +36,10 @@ export class Enemy {
 
         this.x = col * TILE_SIZE + TILE_SIZE / 2;
         this.y = row * TILE_SIZE + TILE_SIZE / 2;
+        this.homeX = this.x;   // gizli Pokemon buradan uzaklaşmaz
+        this.homeY = this.y;
+        this.guardRadius = stats.guardRadius || 0;
+        this.asleep = !!stats.sleeps; // boss uyanana kadar uyur
         this.maxHp = stats.hp;
         this.hp = stats.hp;
         this.speed = stats.speed;
@@ -54,20 +60,35 @@ export class Enemy {
         this.strafePhase = Math.random() * Math.PI * 2;
     }
 
+    // Boss uyanışı: çok yaklaşınca ya da yakınında ateş edilince
+    wakeUp() {
+        if (!this.asleep) return;
+        this.asleep = false;
+        this.aggro = true;
+        this.world.onBossWake(this);
+    }
+
     update() {
         if (this.fainted) return;
 
         if (this.attackCooldown > 0) this.attackCooldown--;
         if (this.contactCooldown > 0) this.contactCooldown--;
         if (this.hitFlash > 0) this.hitFlash--;
+
+        const player = this.world.player;
+        const dist = Math.hypot(player.x - this.x, player.y - this.y);
+
+        // Uyuyan boss: yaklaşılınca uyanır, o ana kadar hareketsiz
+        if (this.asleep) {
+            if (dist < 150) this.wakeUp();
+            return;
+        }
+
         if (this.stunTimer > 0) {
             this.stunTimer--;
             this.windup = 0;
             return;
         }
-
-        const player = this.world.player;
-        const dist = Math.hypot(player.x - this.x, player.y - this.y);
 
         // Fark etme: labirent yolu üzerinden mesafe (duvar arkasını görmez)
         const pathDist = this.world.tileDistAt(
@@ -79,6 +100,25 @@ export class Enemy {
         } else if (pathDist > this.aggroTiles + 5) {
             this.aggro = false;
             this.windup = 0;
+        }
+
+        // Gizli Pokemon bölgesini korur: oyuncu mağaradan çıkınca peşinden gitmez
+        if (this.guardRadius) {
+            const playerHomeDist = Math.hypot(player.x - this.homeX, player.y - this.homeY);
+            if (playerHomeDist > this.guardRadius) {
+                this.aggro = false;
+                this.windup = 0;
+                // Yuvasına dön
+                const back = Math.hypot(this.homeX - this.x, this.homeY - this.y);
+                if (back > 6) {
+                    const hw = this.size * 0.28, hh = this.size * 0.18;
+                    const sx = this.x + ((this.homeX - this.x) / back) * this.speed;
+                    const sy = this.y + ((this.homeY - this.y) / back) * this.speed;
+                    if (this.world.canBoxMoveTo(sx, this.y, hw, hh)) this.x = sx;
+                    if (this.world.canBoxMoveTo(this.x, sy, hw, hh)) this.y = sy;
+                }
+                return;
+            }
         }
 
         // Temas hasarı (oyuncu üstüne yapışırsa)
@@ -168,6 +208,7 @@ export class Enemy {
     takeDamage(amount) {
         if (this.fainted) return;
 
+        this.wakeUp(); // vurulan boss uyanır
         this.hp -= amount;
         this.hitFlash = 12;
         this.aggro = true; // vurulunca uyanır
@@ -193,7 +234,7 @@ export class Enemy {
             ctx.globalAlpha = 0.3;
         }
 
-        const bob = (!this.fainted && this.stunTimer === 0) ? Math.sin(Date.now() / 300 + this.x) * 2 : 0;
+        const bob = (!this.fainted && this.stunTimer === 0) ? Math.sin(Date.now() / (this.asleep ? 700 : 300) + this.x) * 2 : 0;
         // Saldırı hazırlığında hafif titreme
         const shake = this.windup > 0 ? (Math.random() - 0.5) * 3 : 0;
         ctx.translate(this.x + shake, this.y + bob);
@@ -230,6 +271,20 @@ export class Enemy {
             ctx.restore();
         }
 
+        // Uyuyan boss: yükselen "Z" baloncukları
+        if (this.asleep) {
+            ctx.save();
+            ctx.font = "bold 20px 'Space Grotesk', sans-serif";
+            ctx.textAlign = 'center';
+            for (let i = 0; i < 3; i++) {
+                const t = ((Date.now() / 1200) + i / 3) % 1;
+                ctx.globalAlpha = 1 - t;
+                ctx.fillStyle = '#93c5fd';
+                ctx.fillText('Z', this.x + 22 + t * 18, this.y - this.size / 2 - t * 34);
+            }
+            ctx.restore();
+        }
+
         // Sersemletildi göstergesi
         if (this.stunTimer > 0 && !this.fainted) {
             ctx.save();
@@ -261,9 +316,9 @@ export class Enemy {
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 3;
-            const label = `BOSS ${this.name}`;
+            const label = this.asleep ? `${this.name} uyuyor...` : `BOSS ${this.name}`;
             ctx.strokeText(label, this.x, this.y - this.size / 2 - 18);
-            ctx.fillStyle = '#f97316';
+            ctx.fillStyle = this.asleep ? '#93c5fd' : '#f97316';
             ctx.fillText(label, this.x, this.y - this.size / 2 - 18);
             ctx.restore();
         }

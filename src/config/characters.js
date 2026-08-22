@@ -12,7 +12,7 @@ export const MERCHANT = { id: 352, className: 'Tüccar' };
 // type, projectileSprites.js'teki sprite anahtarıdır; 'sleep' alan etkisidir.
 export const STARTER_ABILITIES = [
     { key: 'K', name: 'Razor Leaf', type: 'leaf', cooldown: 30, damage: 10, speed: 9, life: 55 },
-    { key: 'O', name: 'Seed Bomb', type: 'seedbomb', cooldown: 120, damage: 25, speed: 7, life: 65 },
+    { key: 'O', name: 'Seed Bomb', type: 'seedbomb', cooldown: 120, damage: 25, speed: 7, life: 80, pierce: true }, // duvarların arkasına da işler
     { key: 'Ş', name: 'Sleep Powder', type: 'sleep', cooldown: 420, radius: 150, stun: 150 }
 ];
 

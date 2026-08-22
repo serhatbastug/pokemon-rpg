@@ -59,6 +59,10 @@ export class Overworld {
         this.enemyDataCache = new Map(); // PokeAPI verisi (id -> Promise)
         this.flow = null;       // oyuncuya BFS mesafe alanı (labirent takibi için)
         this.fireflies = [];    // atmosfer: ateşböcekleri
+        this.debris = [];       // boss uyanışında savrulan enkaz
+        this.shake = 0;         // ekran sarsıntısı
+        this.arenaOpened = false;
+        this.victory = null;    // boss yakalandığında zafer sahnesi
 
         // Atmosfer: kenarları karartan vinyet (bir kez oluşturulur)
         const vg = this.ctx.createRadialGradient(
@@ -73,6 +77,7 @@ export class Overworld {
             if (!this.running) return;
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
+            if (this.victory) return; // zafer sahnesinde oynanış durur
 
             // Yetenekler: K, O, Ş (Ş Türkçe klavyede Semicolon konumundadır)
             if (e.code === 'KeyK') this.castAbility(0);
@@ -138,6 +143,10 @@ export class Overworld {
         this.spores = [];
         this.ballAnim = null;
         this.flow = null;
+        this.debris = [];
+        this.shake = 0;
+        this.arenaOpened = false;
+        this.victory = null;
 
         // Orman atmosferli haritalarda ateşböcekleri
         this.fireflies = [];
@@ -364,18 +373,23 @@ export class Overworld {
     }
 
     update() {
-        this.movePlayer();
-        this.checkPortals();
-        this.updateCombat();
-        this.updateCamera();
+        // Zafer sahnesinde dünya donar, sadece kutlama oynar
+        if (!this.victory) {
+            this.movePlayer();
+            this.checkPortals();
+            this.updateCombat();
+            this.updateCamera();
+        }
 
         const { ctx, canvas } = this;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
 
-        // Dünya, kamera kadar kaydırılarak çizilir
+        // Dünya, kamera kadar kaydırılarak çizilir (boss uyanışında sarsılır)
         ctx.save();
-        ctx.translate(-Math.round(this.camera.x), -Math.round(this.camera.y));
+        const sx = this.shake ? (Math.random() - 0.5) * this.shake : 0;
+        const sy = this.shake ? (Math.random() - 0.5) * this.shake : 0;
+        ctx.translate(-Math.round(this.camera.x) + sx, -Math.round(this.camera.y) + sy);
 
         this.drawTiles();
         this.drawPortals();
@@ -389,6 +403,7 @@ export class Overworld {
         this.drawPlayer();
         this.drawSpores();
         this.drawBallAnim();
+        this.drawDebris();
         this.drawFireflies();
         this.drawPortalLabels();
         this.drawShopLabels();
@@ -409,6 +424,82 @@ export class Overworld {
 
         // Ekran sabiti arayüz (HP, yetenekler, yakalananlar)
         this.drawHud();
+        this.drawVictory();
+    }
+
+    drawDebris() {
+        const { ctx } = this;
+        ctx.save();
+        for (const d of this.debris) {
+            ctx.globalAlpha = Math.min(1, d.life / 25);
+            ctx.fillStyle = d.color;
+            ctx.fillRect(d.x - d.size / 2, d.y - d.size / 2, d.size, d.size);
+        }
+        ctx.restore();
+    }
+
+    // Boss yakalandı: konfeti yağmuru, zıplayan karakter ve zafer yazısı
+    drawVictory() {
+        if (!this.victory) return;
+        const { ctx, canvas, player } = this;
+        const v = this.victory;
+        v.frame++;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(5, 10, 8, 0.55)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Konfeti
+        for (const c of v.confetti) {
+            c.y += c.vy;
+            c.x += c.vx;
+            if (c.y > canvas.height) c.y = -c.size;
+            ctx.fillStyle = c.color;
+            ctx.fillRect(c.x, c.y, c.size, c.size);
+        }
+
+        // Sevinç: karakter zıplayıp dönerek kutlama yapar
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2 + 30;
+        const jump = Math.abs(Math.sin(v.frame / 14)) * 46;
+        const tilt = Math.sin(v.frame / 9) * 0.28;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(cx, cy - jump);
+        ctx.rotate(tilt);
+        ctx.drawImage(player.img, -60, -60, 120, 120);
+        ctx.restore();
+
+        // Zıplarken çevreye saçılan ışık pikselleri
+        for (let i = 0; i < 8; i++) {
+            const a = (v.frame / 20) + (i / 8) * Math.PI * 2;
+            const r = 80 + Math.sin(v.frame / 12 + i) * 12;
+            ctx.fillStyle = i % 2 === 0 ? '#fde047' : '#4ade80';
+            ctx.fillRect(cx + Math.cos(a) * r - 3, cy - jump + Math.sin(a) * r * 0.6 - 3, 6, 6);
+        }
+
+        // Yazılar
+        ctx.textAlign = 'center';
+        ctx.font = "bold 46px 'Space Grotesk', sans-serif";
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 6;
+        ctx.strokeText('ZAFER!', cx, cy - 130);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('ZAFER!', cx, cy - 130);
+
+        ctx.font = "bold 20px 'Space Grotesk', sans-serif";
+        ctx.lineWidth = 4;
+        const sub = `Boss ${v.name} yakalandı!`;
+        ctx.strokeText(sub, cx, cy - 96);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(sub, cx, cy - 96);
+
+        ctx.font = "15px 'Space Grotesk', sans-serif";
+        ctx.strokeText('Fısıltılı Orman Girişi tamamlandı — ESC ile menüye dön', cx, cy + 110);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('Fısıltılı Orman Girişi tamamlandı — ESC ile menüye dön', cx, cy + 110);
+
+        ctx.restore();
     }
 
     // Atmosfer: yavaşça süzülen, parlaklığı nefes alan ateşböcekleri
@@ -477,7 +568,8 @@ export class Overworld {
             p.y += p.vy;
             p.life--;
 
-            if (p.life <= 0 || !this.isWalkable(p.x, p.y)) {
+            // Duvar delen hamleler engellerde durmaz
+            if (p.life <= 0 || (!p.pierce && !this.isWalkable(p.x, p.y))) {
                 this.projectiles.splice(i, 1);
                 continue;
             }
@@ -511,11 +603,27 @@ export class Overworld {
             }
             if (ball.frame >= 55) {
                 // Yakalandı
-                this.captures.push({ id: ball.enemy.id, name: ball.enemy.name });
-                this.spawnMapText(ball.enemy.x, ball.enemy.y - 30, `${ball.enemy.name} yakalandı!`, '#4ade80');
-                this.enemies = this.enemies.filter(e => e !== ball.enemy);
+                const caught = ball.enemy;
+                this.captures.push({ id: caught.id, name: caught.name });
+                this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
+                this.enemies = this.enemies.filter(e => e !== caught);
                 this.ballAnim = null;
+
+                // Bossu yakalamak mekanı tamamlar: zafer sahnesi
+                if (caught.kind === 'boss') this.onBossCaptured(caught);
             }
+        }
+
+        // Boss uyanışı enkazı ve ekran sarsıntısı
+        if (this.shake > 0) this.shake *= 0.9;
+        if (this.shake < 0.3) this.shake = 0;
+        for (let i = this.debris.length - 1; i >= 0; i--) {
+            const d = this.debris[i];
+            d.vy += d.gravity;
+            d.x += d.vx;
+            d.y += d.vy;
+            d.life--;
+            if (d.life <= 0) this.debris.splice(i, 1);
         }
 
         // Uçan yazılar
@@ -545,9 +653,18 @@ export class Overworld {
             this.spores.push({ x: player.x, y: player.y, r: 20, life: 30 });
             if (hit > 0) this.spawnMapText(player.x, player.y - 50, `${hit} Pokemon uyudu!`, '#a78bfa');
         } else {
-            // Mermi: son hareket yönüne (dururken bakılan yöne) atılır
-            let { x: ax, y: ay } = player.aim;
-            if (ax === 0 && ay === 0) ax = player.facing;
+            // Nişan: en yakın ayakta düşmanın ATIŞ ANINDAKİ konumuna kilitlenir.
+            // Duvar delen hamleler (Seed Bomb) hedefi duvar arkasında da seçer.
+            let ax, ay;
+            const target = this.findAimTarget(ability.pierce);
+            if (target) {
+                ax = target.x - player.x;
+                ay = target.y - player.y;
+            } else {
+                ax = player.aim.x;
+                ay = player.aim.y;
+                if (ax === 0 && ay === 0) ax = player.facing;
+            }
             const len = Math.hypot(ax, ay) || 1;
             this.projectiles.push({
                 x: player.x,
@@ -556,11 +673,36 @@ export class Overworld {
                 vy: (ay / len) * ability.speed,
                 type: ability.type,
                 damage: ability.damage,
-                life: ability.life
+                life: ability.life,
+                pierce: !!ability.pierce
             });
         }
 
+        // Uyuyan bossun yakınında ateş etmek onu uyandırır
+        for (const enemy of this.enemies) {
+            if (enemy.asleep && Math.hypot(enemy.x - player.x, enemy.y - player.y) < 320) {
+                enemy.wakeUp();
+            }
+        }
+
         player.cooldowns[index] = ability.cooldown;
+    }
+
+    // Nişan için en yakın uygun düşman. pierce false ise görüş hattı şart.
+    findAimTarget(pierce) {
+        const { player } = this;
+        let best = null;
+        let bestDist = 420;
+
+        for (const enemy of this.enemies) {
+            if (enemy.fainted) continue;
+            const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+            if (dist >= bestDist) continue;
+            if (!pierce && !this.hasLineOfSight(player.x, player.y, enemy.x, enemy.y)) continue;
+            bestDist = dist;
+            best = enemy;
+        }
+        return best;
     }
 
     tryCatch() {
@@ -626,6 +768,63 @@ export class Overworld {
         this.mapTexts.push({ x, y, text, color, life: 70 });
     }
 
+    // Boss uyandı: arena bölgesindeki ağaç/çalıları paramparça edip
+    // zemini bossun temasına (kavrulmuş toprak) çevirir.
+    onBossWake(boss) {
+        const map = this.currentMap;
+        const arena = map.bossArena;
+        this.shake = 26;
+        this.spawnMapText(boss.x, boss.y - 70, `${boss.name} UYANDI!`, '#f97316');
+        if (!arena || this.arenaOpened) return;
+        this.arenaOpened = true;
+
+        // Izgara kopyası üzerinde çalış (orijinal harita verisi bozulmasın)
+        const grid = map.grid.map(row => row.split(''));
+        for (let row = arena.row0; row <= arena.row1; row++) {
+            for (let col = arena.col0; col <= arena.col1; col++) {
+                if (!grid[row] || grid[row][col] === undefined) continue;
+                const tile = grid[row][col];
+                if (map.portalDefs[tile]) continue; // portallar korunur
+
+                // Yıkılan engellerden enkaz fışkırır
+                if (tile === 'T' || tile === 'h' || tile === 'H' || tile === 'R') {
+                    const px = col * TILE_SIZE + TILE_SIZE / 2;
+                    const py = row * TILE_SIZE + TILE_SIZE / 2;
+                    for (let i = 0; i < 5; i++) {
+                        this.debris.push({
+                            x: px, y: py,
+                            vx: (Math.random() - 0.5) * 9,
+                            vy: -Math.random() * 8 - 2,
+                            size: 6 + Math.random() * 6,
+                            color: tile === 'R' ? '#64748b' : (Math.random() < 0.5 ? '#14532d' : '#4a2800'),
+                            life: 45 + Math.random() * 30,
+                            gravity: 0.4
+                        });
+                    }
+                }
+                grid[row][col] = 'b';
+            }
+        }
+
+        // Değiştirilmiş ızgarayı bu oturum için kullan
+        this.currentMap = { ...map, grid: grid.map(row => row.join('')) };
+        this.flow = null;
+    }
+
+    onBossCaptured(boss) {
+        this.victory = { frame: 0, name: boss.name, confetti: [] };
+        for (let i = 0; i < 90; i++) {
+            this.victory.confetti.push({
+                x: Math.random() * this.canvas.width,
+                y: -Math.random() * this.canvas.height,
+                vy: 1.5 + Math.random() * 3,
+                vx: (Math.random() - 0.5) * 1.5,
+                size: 5 + Math.random() * 6,
+                color: ['#fbbf24', '#4ade80', '#60a5fa', '#f472b6', '#f8fafc'][Math.floor(Math.random() * 5)]
+            });
+        }
+    }
+
     // ---- Çizim ----
 
     drawTiles() {
@@ -658,13 +857,15 @@ export class Overworld {
             'p': ['#4a2c0a', '#5b370d', '#66400f', '#5b370d'],
             's': ['#6b4a08', '#7c5306', '#6b4a08', '#5b420a'],
             'R': ['#26303f', '#333e4f', '#455267', '#333e4f'],
-            'W': ['#082f49', '#0a3a5c', '#0c4a6e', '#0a3a5c']
+            'W': ['#082f49', '#0a3a5c', '#0c4a6e', '#0a3a5c'],
+            'b': ['#4a2f14', '#5a3a19', '#3d2610', '#523318']
         } : {
             '.': ['#14532d', '#15803d', '#166534', '#15803d'],
             'p': ['#713f12', '#854d0e', '#92400e', '#854d0e'],
             's': ['#a16207', '#ca8a04', '#a16207', '#92400e'],
             'R': ['#334155', '#475569', '#64748b', '#475569'],
-            'W': ['#0c4a6e', '#075985', '#0369a1', '#075985']
+            'W': ['#0c4a6e', '#075985', '#0369a1', '#075985'],
+            'b': ['#5a3a19', '#6b4520', '#4a2f14', '#63401c']
         };
 
         // Çiçek, uzun çim, çalı ve portal karoları çim zemin üzerine çizilir
@@ -739,7 +940,24 @@ export class Overworld {
             }
         }
 
-        if (tile === 'h') {
+        if (tile === 'b') {
+            // Boss arenası: parçalanmış zemin, kırık dallar ve kavlamış toprak
+            const scarColors = ['#3f2a12', '#4a3218', '#2e1d0c'];
+            for (let i = 0; i < 4; i++) {
+                const sx = ((col * 5 + row * 11 + i * 13) % 4) * PX;
+                const sy = ((col * 7 + row * 3 + i * 17) % 4) * PX;
+                ctx.fillStyle = scarColors[(col + row + i) % scarColors.length];
+                ctx.fillRect(x0 + sx, y0 + sy, PX, PX);
+            }
+            // Yerdeki kırık dal parçaları
+            if ((col * 3 + row * 5) % 4 === 0) {
+                ctx.fillStyle = '#1f1408';
+                ctx.fillRect(x0 + PX, y0 + PX * 3, PX * 3, 4);
+            }
+        }
+
+        // Gizli çalı normal çalıyla birebir aynı çizilir (içinden geçilebilir)
+        if (tile === 'h' || tile === 'H') {
             // Çalı: yuvarlak hatlı yoğun yaprak kümesi
             const bushColors = ['#14532d', '#166534', '#16a34a'];
             for (let by = 0; by < 5; by++) {

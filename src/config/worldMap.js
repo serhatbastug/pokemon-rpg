@@ -3,6 +3,7 @@ import { REGIONS } from './regions.js';
 // Macera modu haritaları. Izgara karakterleri:
 //   '.' çim      'p' patika   'f' çiçekli çim   'g' uzun çim   's' kum
 //   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
+//   'M' tüccar tezgahı (engel; Kecleon'un satış yeri, bölge merkezlerinde durur)
 //   Rakamlar o haritanın portalDefs tanımındaki portallardır ('0' çıkış geleneğidir).
 // Bir haritanın tüm satırları eşit uzunlukta olmalıdır. 20x10 (50px karo) tam bir
 // ekran doldurur; daha geniş/yüksek haritalarda kamera oyuncuyu takip eder.
@@ -12,7 +13,7 @@ import { REGIONS } from './regions.js';
 
 export const TILE_SIZE = 50;
 
-export const SOLID_TILES = new Set(['T', 'W', 'R', 'h']);
+export const SOLID_TILES = new Set(['T', 'W', 'R', 'h', 'M']);
 
 const EXIT_COLORS = ['#64748b', '#94a3b8', '#e2e8f0'];
 
@@ -56,7 +57,7 @@ export const MAPS = {
             'T.1...TT.p.TT...2..T',
             'T.p.f.TT.p.TT.f.p..T',
             'T.ppppppppppppppp..T',
-            'T..g..h..p..h..g...T',
+            'T..g..h..p..h.Mg...T',
             'T.f......p......f..T',
             'T...g....0....g....T',
             'TTTTTTTTTTTTTTTTTTTT'
@@ -70,23 +71,34 @@ export const MAPS = {
     },
 
     // 1. Bölge / 1. Mekan: Fısıltılı Orman Girişi
-    // Ekrandan geniş (40x10 = 2 ekran) yatay harita; kamera oyuncuyu takip eder.
-    // Giriş/çıkış solda, sağ uç ilerideki mekan bossunun alanı olacak.
+    // Her yöne uzanan labirent (40x20 = 2x2 ekran); kamera oyuncuyu takip eder.
+    // Izgara scratchpad'deki gen-maze.mjs betiğiyle üretildi (seed: 20260822).
+    // Giriş/çıkış sol ortada; sağ-alttaki açık meydan mekan bossunun alanı olacak.
     // (Pokemonlar henüz haritada değil; liste regions.js'te hazır)
     'loc-1-1': {
         id: 'loc-1-1',
         name: region1.locations[0].name,
-        start: { col: 3, row: 5 },
+        start: { col: 2, row: 7 },
         grid: [
             'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-            'TTg.f...TT..gg....f..TT...g...f....gg..T',
-            'Tg...g....f......gg......f......g....f.T',
-            'T..f..TT..g..gg..f..g...TT...g.f.......T',
-            'T..pppppppppppppppppppppppppppppppppp..T',
-            'T..p.f.....sWWWWs.....g...g.....f....g.T',
-            'T..0.g.....sWWWWs...g...f......g.....f.T',
-            'T.g...f.....ssss.......g...gg.....gg...T',
-            'T..g....h...f....g...h....f....g....hg.T',
+            'T.g....f.......T.......g...gs.T..f.....T',
+            'Tff..g....s..g.T.....g.......gT...f...gT',
+            'T..TTTTg.TTTT..Ts.Tg.TTTT..T..TTTT..Ts.T',
+            'T..T.g...Tf..gfT.gf..gf.T.fT..T...g.T.gT',
+            'T..Tf....T.....Tg...gs..T.fTg.T..f..T..T',
+            'TTTT..TTTTg.TTTT..TTTTTTT.gT..Tf.TTTT..T',
+            'T0.Tf...gT..Ts..g.T.....g..T....gT..Tf.T',
+            'T..T...s.Tg.T.gf..T........T.....T.gT..T',
+            'T..Tg.T.gT..TTTTTTT..TTTTTTTTTTTTT..Tg.T',
+            'T..T.....T.....g..Tgs..gTf.g....f...T..T',
+            'Tf.Tg....T.......gT..gs.T..f.g...g..T.fT',
+            'T.gT..TTTT.gTTTTs.TTTT..T..T..TTTTTTT..T',
+            'T..T.gT..T...g.T..T..g.fT.fT..g...g....T',
+            'T..T..Tg.T.g...T..T.g...Ts.Tgsf.gsf.gsfT',
+            'T.fT..T..T..T.gT..Ts.TTTT.gTTTTf.T.....T',
+            'T..g..T.f...T...g...gT..gf..gsT...f....T',
+            'T.....T...g.T.g...gs.Tgff.....T....g...T',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
             'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
         ],
         portalDefs: {

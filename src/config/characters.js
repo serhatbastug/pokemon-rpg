@@ -3,6 +3,11 @@
 // ileride eklenecek evrim mekaniği bu zinciri kullanacak.
 export const ADVENTURE_STARTER = { id: 1, className: 'Başlangıç' };
 
+// Tüccar Pokemon: Kecleon (#352) - Pokemon Mystery Dungeon serisinin resmi
+// dükkan sahibi. Her bölgenin merkezinde (mekan portallarının olduğu haritada)
+// satış yeri bulunur. Alışveriş mekanikleri sonraki güncellemelerde gelecek.
+export const MERCHANT = { id: 352, className: 'Tüccar' };
+
 // Karakter sınıfları ve karşılık gelen Pokemon ID'leri.
 // Yeni bir sınıf eklemek için buraya bir kayıt ekleyin ve
 // src/game/abilities.js içinde yeteneklerini tanımlayın.

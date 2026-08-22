@@ -1,4 +1,6 @@
 import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
+import { MERCHANT } from '../config/characters.js';
+import { fetchCharacter } from '../services/pokeapi.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 
 // Kuşbakışı harita motoru: karo tabanlı pixel art haritalar, gezinen oyuncu ve
@@ -13,10 +15,17 @@ export class Overworld {
 
         this.currentMap = null;
         this.portals = [];
+        this.shops = [];
         this.portalCooldown = 0; // haritaya girişte anında geri ışınlanmayı önler
         this.camera = { x: 0, y: 0 };
         this.interval = null;
         this.running = false;
+
+        // Tüccar (Kecleon) ilk maceraya girişte bir kez yüklenir
+        this.merchantImg = new Image();
+        this.merchantReady = false;
+        this.merchantRequested = false;
+        this.merchantLabel = 'Tüccar';
 
         // Oyuncu durumu
         this.player = {
@@ -42,6 +51,17 @@ export class Overworld {
         this.player.facing = 1;
         this.loadMap('main');
 
+        if (!this.merchantRequested) {
+            this.merchantRequested = true;
+            fetchCharacter(MERCHANT)
+                .then(merchant => {
+                    this.merchantLabel = `Tüccar ${merchant.name}`;
+                    this.merchantImg.onload = () => { this.merchantReady = true; };
+                    this.merchantImg.src = merchant.battleSprite || merchant.sprite;
+                })
+                .catch(error => console.error('Tüccar yüklenemedi:', error));
+        }
+
         this.ctx.imageSmoothingEnabled = false;
         this.running = true;
 
@@ -58,6 +78,12 @@ export class Overworld {
 
         this.currentMap = map;
         this.portals = extractPortals(map);
+        this.shops = [];
+        map.grid.forEach((rowStr, row) => {
+            for (let col = 0; col < rowStr.length; col++) {
+                if (rowStr[col] === 'M') this.shops.push({ col, row });
+            }
+        });
         this.portalCooldown = 45;
         this.player.x = map.start.col * TILE_SIZE + TILE_SIZE / 2;
         this.player.y = map.start.row * TILE_SIZE + TILE_SIZE / 2;
@@ -173,8 +199,10 @@ export class Overworld {
 
         this.drawTiles();
         this.drawPortals();
+        this.drawShops();
         this.drawPlayer();
         this.drawPortalLabels();
+        this.drawShopLabels();
 
         ctx.restore();
     }
@@ -352,6 +380,73 @@ export class Overworld {
             ctx.strokeText(portal.label, cx, cy);
             ctx.fillStyle = portal.colors[1];
             ctx.fillText(portal.label, cx, cy);
+        }
+
+        ctx.restore();
+    }
+
+    // Tüccar tezgahı: ahşap tezgah + kırmızı-beyaz tente; Kecleon arkasında durur
+    drawShops() {
+        const { ctx } = this;
+
+        for (const shop of this.shops) {
+            const x0 = shop.col * TILE_SIZE;
+            const y0 = shop.row * TILE_SIZE;
+            const cx = x0 + TILE_SIZE / 2;
+
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+
+            // Tüccar (tezgahın arkasında, hafifçe sallanır)
+            if (this.merchantReady) {
+                const bob = Math.sin(Date.now() / 400) * 2;
+                ctx.drawImage(this.merchantImg, cx - 26, y0 - 28 + bob, 52, 52);
+            }
+
+            // Ahşap tezgah
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x0 + 2, y0 + 18, TILE_SIZE - 4, 28);
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(x0 + 2, y0 + 18, TILE_SIZE - 4, 6);
+            ctx.fillStyle = '#451a03';
+            for (let i = 0; i < 4; i++) {
+                ctx.fillRect(x0 + 6 + i * 11, y0 + 28, 3, 16);
+            }
+
+            // Tente direkleri
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(x0 + 1, y0 - 34, 4, 52);
+            ctx.fillRect(x0 + TILE_SIZE - 5, y0 - 34, 4, 52);
+
+            // Kırmızı-beyaz şeritli tente
+            for (let i = 0; i < 5; i++) {
+                ctx.fillStyle = i % 2 === 0 ? '#dc2626' : '#f8fafc';
+                ctx.fillRect(x0 - 2 + i * 11, y0 - 44, 11, 10);
+            }
+            for (let i = 0; i < 5; i++) {
+                ctx.fillStyle = i % 2 === 0 ? '#b91c1c' : '#e2e8f0';
+                ctx.fillRect(x0 - 2 + i * 11, y0 - 34, 11, 4);
+            }
+
+            ctx.restore();
+        }
+    }
+
+    drawShopLabels() {
+        const { ctx } = this;
+        ctx.save();
+        ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'center';
+
+        for (const shop of this.shops) {
+            const cx = shop.col * TILE_SIZE + TILE_SIZE / 2;
+            const cy = shop.row * TILE_SIZE - 52;
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(this.merchantLabel, cx, cy);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText(this.merchantLabel, cx, cy);
         }
 
         ctx.restore();

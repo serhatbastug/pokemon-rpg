@@ -16,9 +16,10 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 ## Testler
 
-Puppeteer ile uçtan uca UI testleri (32 test): ekran geçişleri, karakter seçimi,
-savaş, harita gezinme, portallar, yetenekler, yakalama, gizli oda, boss uyanışı,
-zafer sahnesi ve her ekranda FPS ölçümü.
+Puppeteer ile uçtan uca UI testleri (67 test): ekran geçişleri, karakter seçimi,
+savaş, harita gezinme, portallar, yetenekler, ekip ve poke top fırlatma, yakalama,
+jetonlar, evrim, kayıt, gizli odalar, rozetler ve saha hamleleri, tüccar ve her
+ekranda FPS ölçümü.
 
 ```
 npm start           # ayrı bir terminalde sunucu çalışıyor olmalı
@@ -63,8 +64,6 @@ src/
     effects.js          Parçacıklar, sarsıntı, flaş, uçan yazılar
     projectileSprites.js Kare kare pixel art mermi sprite desenleri
   world/
-    Overworld.js        Macera modu: kuşbakışı harita motoru
-  world/
     Overworld.js        Macera motoru: yaşam döngüsü, harita yükleme, girdi
     ActivePokemon.js    Sahadaki Pokemon: statlar, hasar, tutuş davranışı
     Enemy.js            Düşman Pokemon: AI, saldırı, durum
@@ -100,13 +99,13 @@ boss savaşı hazır; her mekan farklı bir harita tarzında:
 | Kadim Ağaç Meydanı | tapınak meydanı (48x24) | Gyarados, Hydreigon, Slaking | Snorlax | **Zarude** (bölge bossu) |
 
 Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
-uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sahnesi.
+uyuyan ve uyanınca arenayı parçalayan boss, bossu yenince rozet ve zafer sahnesi.
 
 ### Antrenör, ekip ve ilerleme
 
 - **Antrenör:** Haritada gezdirdiğiniz karakter bir antrenördür (elle çizilmiş
-  piksel sprite) ve **vurulmaz**. Sahadaki Pokemonunuz peşinizden gelir,
-  saldırıları o yapar ve hasarı o alır.
+  piksel sprite) ve **vurulmaz**. Saldırıları sahadaki Pokemonunuz yapar,
+  hasarı da o alır.
 - **Poke top fırlatma:** Pokemonlar peşinizden gelmez. **1-6** tuşlarıyla o
   ekip üyesinin topunu baktığınız yöne fırlatırsınız; Pokemon orada açılır ve
   o noktayı tutarak savaşır. Aynı tuşa tekrar basmak onu topuna geri çağırır.

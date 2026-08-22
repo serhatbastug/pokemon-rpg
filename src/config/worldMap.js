@@ -1,40 +1,104 @@
-// Ana harita verisi. Izgara karakterleri:
+import { REGIONS } from './regions.js';
+
+// Macera modu haritaları. Izgara karakterleri:
 //   '.' çim      'p' patika   'f' çiçekli çim   'g' uzun çim   's' kum
 //   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
-//   '1'-'5' bölge portalı (regions.js'teki bölge numarası; zemin çim sayılır)
+//   Rakamlar o haritanın portalDefs tanımındaki portallardır ('0' çıkış geleneğidir).
 // Her satır tam 20 karakter olmalıdır (20 sütun x 10 satır, 50px karo = 1000x500).
+//
+// portalDefs: { karo karakteri: { target, label, colors } }
+//   target null ise portal görünür ama pasiftir (henüz açılmamış içerik).
 
 export const TILE_SIZE = 50;
 
 export const SOLID_TILES = new Set(['T', 'W', 'R', 'h']);
 
-export const PLAYER_START = { col: 10, row: 8 };
+const EXIT_COLORS = ['#64748b', '#94a3b8', '#e2e8f0'];
 
-export const MAIN_MAP = {
-    name: 'Ana Harita',
-    grid: [
-        'TTTTTTTTTTTTTTTTTTTT',
-        'T.f......s5s....hf.T',
-        'T.1......gpg.....2.T',
-        'T.p.hRR..gpg.RRh.p.T',
-        'T.pppppppppppppppp.T',
-        'T.p.fWWs..p..sWWfp.T',
-        'T.p.sWWg..p..gWWsp.T',
-        'T.3..f...gpg..f..4.T',
-        'T.g.hR.f..p..f.Rh.gT',
-        'TTTTTTTTTTTTTTTTTTTT'
-    ]
+const region1 = REGIONS[1];
+
+export const MAPS = {
+    'main': {
+        id: 'main',
+        name: 'Ana Harita',
+        start: { col: 10, row: 8 },
+        grid: [
+            'TTTTTTTTTTTTTTTTTTTT',
+            'T.f......s5s....hf.T',
+            'T.1......gpg.....2.T',
+            'T.p.hRR..gpg.RRh.p.T',
+            'T.pppppppppppppppp.T',
+            'T.p.fWWs..p..sWWfp.T',
+            'T.p.sWWg..p..gWWsp.T',
+            'T.3..f...gpg..f..4.T',
+            'T.g.hR.f..p..f.Rh.gT',
+            'TTTTTTTTTTTTTTTTTTTT'
+        ],
+        portalDefs: {
+            '1': { target: 'region-1', label: REGIONS[1].name, colors: REGIONS[1].colors },
+            '2': { target: null, label: REGIONS[2].name, colors: REGIONS[2].colors },
+            '3': { target: null, label: REGIONS[3].name, colors: REGIONS[3].colors },
+            '4': { target: null, label: REGIONS[4].name, colors: REGIONS[4].colors },
+            '5': { target: null, label: REGIONS[5].name, colors: REGIONS[5].colors }
+        }
+    },
+
+    // 1. Bölge: Vahşi Orman - 3 mekan portalı + ana haritaya çıkış
+    'region-1': {
+        id: 'region-1',
+        name: region1.name,
+        start: { col: 9, row: 7 },
+        grid: [
+            'TTTTTTTTTTTTTTTTTTTT',
+            'TTg.f....3....f.gTTT',
+            'TT..g....p....g..TTT',
+            'T.1...TT.p.TT...2..T',
+            'T.p.f.TT.p.TT.f.p..T',
+            'T.ppppppppppppppp..T',
+            'T..g..h..p..h..g...T',
+            'T.f......p......f..T',
+            'T...g....0....g....T',
+            'TTTTTTTTTTTTTTTTTTTT'
+        ],
+        portalDefs: {
+            '1': { target: 'loc-1-1', label: region1.locations[0].name, colors: region1.locations[0].colors },
+            '2': { target: null, label: region1.locations[1].name, colors: region1.locations[1].colors },
+            '3': { target: null, label: region1.locations[2].name, colors: region1.locations[2].colors },
+            '0': { target: 'main', label: 'Ana Harita', colors: EXIT_COLORS }
+        }
+    },
+
+    // 1. Bölge / 1. Mekan: Fısıltılı Orman Girişi
+    // (Pokemonlar henüz haritada değil; liste regions.js'te hazır)
+    'loc-1-1': {
+        id: 'loc-1-1',
+        name: region1.locations[0].name,
+        start: { col: 10, row: 7 },
+        grid: [
+            'TTTTTTTTTTTTTTTTTTTT',
+            'Tg.f..TT....TT..fggT',
+            'Tgg....g.ff.g....ggT',
+            'T.WWW....gpg....h..T',
+            'T.WWW..ppppppp..g..T',
+            'T.gg...p..p..gg.f..T',
+            'T..hf..p..p..h..g..T',
+            'T.g....pppp....f...T',
+            'T....g....0..g.....T',
+            'TTTTTTTTTTTTTTTTTTTT'
+        ],
+        portalDefs: {
+            '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }
+        }
+    }
 };
 
-// Izgaradaki portal karolarını { region, col, row } listesine çevirir
+// Izgaradaki portal karolarını { ...tanım, col, row } listesine çevirir
 export function extractPortals(map) {
     const portals = [];
     map.grid.forEach((rowStr, row) => {
         for (let col = 0; col < rowStr.length; col++) {
-            const ch = rowStr[col];
-            if (ch >= '1' && ch <= '5') {
-                portals.push({ region: Number(ch), col, row });
-            }
+            const def = map.portalDefs[rowStr[col]];
+            if (def) portals.push({ ...def, col, row });
         }
     });
     return portals;

@@ -1,10 +1,9 @@
-import { MAIN_MAP, TILE_SIZE, SOLID_TILES, PLAYER_START, extractPortals } from '../config/worldMap.js';
-import { REGIONS } from '../config/regions.js';
+import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 
-// Kuşbakışı ana harita motoru: karo tabanlı pixel art harita, gezinen oyuncu
-// ve bölge portalları. Portallar şimdilik görseldir; temas bir şey tetiklemez.
-// (Plan: portaldan mekan haritalarına geçiş, savaşların harita üzerinde başlaması.)
+// Kuşbakışı harita motoru: karo tabanlı pixel art haritalar, gezinen oyuncu ve
+// portallar. Hedefi (target) olan portala temas haritalar arasında geçiş yapar;
+// hedefi olmayan portallar görünür ama pasiftir (henüz açılmamış içerik).
 export class Overworld {
     constructor({ canvas, input, onExit }) {
         this.canvas = canvas;
@@ -12,8 +11,9 @@ export class Overworld {
         this.input = input;
         this.onExit = onExit;
 
-        this.map = MAIN_MAP;
-        this.portals = extractPortals(this.map);
+        this.currentMap = null;
+        this.portals = [];
+        this.portalCooldown = 0; // haritaya girişte anında geri ışınlanmayı önler
         this.interval = null;
         this.running = false;
 
@@ -22,7 +22,7 @@ export class Overworld {
             x: 0,
             y: 0,
             speed: 3.5,
-            size: 56,        // çizim boyutu
+            size: 72,        // çizim boyutu
             hitbox: { w: 30, h: 20 }, // ayak hizasındaki çarpışma kutusu
             facing: 1,       // 1 = sağa, -1 = sola
             moving: false,
@@ -38,15 +38,49 @@ export class Overworld {
 
     start(character) {
         this.player.img.src = character.battleSprite || character.sprite;
-        this.player.x = PLAYER_START.col * TILE_SIZE + TILE_SIZE / 2;
-        this.player.y = PLAYER_START.row * TILE_SIZE + TILE_SIZE / 2;
         this.player.facing = 1;
+        this.loadMap('main');
 
         this.ctx.imageSmoothingEnabled = false;
         this.running = true;
 
         if (this.interval) clearInterval(this.interval);
         this.interval = setInterval(() => this.update(), 1000 / FRAME_RATE);
+    }
+
+    loadMap(id) {
+        const map = MAPS[id];
+        if (!map) {
+            console.error(`Harita bulunamadı: ${id}`);
+            return;
+        }
+
+        this.currentMap = map;
+        this.portals = extractPortals(map);
+        this.portalCooldown = 45;
+        this.player.x = map.start.col * TILE_SIZE + TILE_SIZE / 2;
+        this.player.y = map.start.row * TILE_SIZE + TILE_SIZE / 2;
+
+        const title = document.getElementById('overworld-title');
+        if (title) title.textContent = map.name;
+    }
+
+    // Hedefli bir portala yeterince yaklaşınca haritalar arası geçiş
+    checkPortals() {
+        if (this.portalCooldown > 0) {
+            this.portalCooldown--;
+            return;
+        }
+
+        for (const portal of this.portals) {
+            if (!portal.target) continue;
+            const cx = portal.col * TILE_SIZE + TILE_SIZE / 2;
+            const cy = portal.row * TILE_SIZE + TILE_SIZE / 2;
+            if (Math.hypot(this.player.x - cx, this.player.y - cy) < 24) {
+                this.loadMap(portal.target);
+                return;
+            }
+        }
     }
 
     stop() {
@@ -59,7 +93,7 @@ export class Overworld {
     isWalkable(x, y) {
         const col = Math.floor(x / TILE_SIZE);
         const row = Math.floor(y / TILE_SIZE);
-        const rowStr = this.map.grid[row];
+        const rowStr = this.currentMap.grid[row];
         if (!rowStr) return false;
         const tile = rowStr[col];
         if (tile === undefined) return false;
@@ -106,6 +140,7 @@ export class Overworld {
 
     update() {
         this.movePlayer();
+        this.checkPortals();
 
         const { ctx, canvas } = this;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -121,7 +156,7 @@ export class Overworld {
 
     drawTiles() {
         const { ctx } = this;
-        const grid = this.map.grid;
+        const grid = this.currentMap.grid;
 
         for (let row = 0; row < grid.length; row++) {
             for (let col = 0; col < grid[row].length; col++) {
@@ -237,12 +272,12 @@ export class Overworld {
         const t = Date.now() / 100;
 
         for (const portal of this.portals) {
-            const region = REGIONS[portal.region];
             const cx = portal.col * TILE_SIZE + TILE_SIZE / 2;
             const cy = portal.row * TILE_SIZE + TILE_SIZE / 2;
-            const [main, light, bright] = region.colors;
+            const [main, light, bright] = portal.colors;
 
             ctx.save();
+            if (!portal.target) ctx.globalAlpha = 0.6; // pasif portal soluk görünür
             ctx.shadowBlur = 14;
             ctx.shadowColor = main;
 
@@ -276,15 +311,14 @@ export class Overworld {
         ctx.textAlign = 'center';
 
         for (const portal of this.portals) {
-            const region = REGIONS[portal.region];
             const cx = portal.col * TILE_SIZE + TILE_SIZE / 2;
             const cy = portal.row * TILE_SIZE - 8;
 
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 3;
-            ctx.strokeText(region.name, cx, cy);
-            ctx.fillStyle = region.colors[1];
-            ctx.fillText(region.name, cx, cy);
+            ctx.strokeText(portal.label, cx, cy);
+            ctx.fillStyle = portal.colors[1];
+            ctx.fillText(portal.label, cx, cy);
         }
 
         ctx.restore();
@@ -295,13 +329,6 @@ export class Overworld {
 
         // Yürürken hafif zıplama
         const bob = player.moving ? Math.sin(Date.now() / 90) * 3 : 0;
-
-        // Gölge
-        ctx.save();
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(player.x - 14, player.y + player.size / 2 - 8, 28, 6);
-        ctx.restore();
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;

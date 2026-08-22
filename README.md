@@ -59,8 +59,12 @@ src/
 
 Undertale tarzı, kuşbakışı tek kişilik mod. Plan: 5 bölge x 3 mekan x 5 Pokemon
 (3 yaygın + 1 boss + 1 gizli) = 75 karakter. Yetenekler o Pokemonun resmi
-hamlelerinden seçilir. Şu an: ana harita ve 5 bölge portalı (portallar henüz pasif).
-Sırada: portaldan mekan geçişleri, harita üzerinde savaş, evrim mekaniği.
+hamlelerinden seçilir. Maceraya Bulbasaur (#1) ile başlanır.
+
+Şu an: ana harita, 1. bölge (Vahşi Orman) ve ilk mekan (Fısıltılı Orman Girişi)
+gezilebilir; portallar haritalar arasında geçiş yapar, açılmamış içeriğin
+portalları soluk/pasif görünür. 1. bölgenin tüm Pokemon listeleri regions.js'te.
+Sırada: haritada Pokemon karşılaşmaları, harita üzerinde savaş, evrim mekaniği.
 
 ## Yeni İçerik Ekleme
 

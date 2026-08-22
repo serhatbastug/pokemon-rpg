@@ -103,7 +103,22 @@ export const MAPS = {
         ],
         portalDefs: {
             '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }
-        }
+        },
+        // Haritaya dağılmış düşmanlar (regions.js'teki mekan listesinden).
+        // kind: common (yaygın, 3'er adet), hidden (gizli, uzak köşede), boss (meydanda)
+        spawns: [
+            { id: 127, kind: 'common', col: 6, row: 1 },
+            { id: 127, kind: 'common', col: 20, row: 8 },
+            { id: 127, kind: 'common', col: 13, row: 16 },
+            { id: 217, kind: 'common', col: 26, row: 4 },
+            { id: 217, kind: 'common', col: 5, row: 10 },
+            { id: 217, kind: 'common', col: 33, row: 13 },
+            { id: 709, kind: 'common', col: 16, row: 7 },
+            { id: 709, kind: 'common', col: 30, row: 10 },
+            { id: 709, kind: 'common', col: 8, row: 17 },
+            { id: 545, kind: 'hidden', col: 38, row: 4 },
+            { id: 768, kind: 'boss', col: 36, row: 15 }
+        ]
     }
 };
 

@@ -1,7 +1,9 @@
 import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
-import { MERCHANT } from '../config/characters.js';
+import { MERCHANT, STARTER_ABILITIES } from '../config/characters.js';
 import { fetchCharacter } from '../services/pokeapi.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
+import { PROJECTILE_SPRITES, drawPixelSprite } from '../game/projectileSprites.js';
+import { Enemy } from './Enemy.js';
 
 // Kuşbakışı harita motoru: karo tabanlı pixel art haritalar, gezinen oyuncu ve
 // portallar. Hedefi (target) olan portala temas haritalar arasında geçiş yapar;
@@ -36,19 +38,48 @@ export class Overworld {
             hitbox: { w: 30, h: 20 }, // ayak hizasındaki çarpışma kutusu
             facing: 1,       // 1 = sağa, -1 = sola
             moving: false,
-            img: new Image()
+            img: new Image(),
+            name: '',
+            // Savaş durumu
+            maxHp: 100,
+            hp: 100,
+            cooldowns: STARTER_ABILITIES.map(() => 0),
+            invuln: 0,               // hasar sonrası dokunulmazlık kareleri
+            aim: { x: 1, y: 0 }      // son hareket yönü; yetenekler bu yöne atılır
         };
+
+        // Harita savaşı durumu
+        this.enemies = [];
+        this.projectiles = [];
+        this.mapTexts = [];
+        this.spores = [];
+        this.ballAnim = null;   // aktif Pokeball atışı animasyonu
+        this.captures = [];     // yakalanan Pokemonlar
+        this.enemyDataCache = new Map(); // PokeAPI verisi (id -> Promise)
 
         input.onKeyDown(e => {
             if (!this.running) return;
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
+
+            // Yetenekler: K, O, Ş (Ş Türkçe klavyede Semicolon konumundadır)
+            if (e.code === 'KeyK') this.castAbility(0);
+            if (e.code === 'KeyO') this.castAbility(1);
+            if (e.code === 'Semicolon' || e.key === 'ş' || e.key === 'Ş') this.castAbility(2);
+
+            // N: bayılmış Pokemona Pokeball at
+            if (e.code === 'KeyN') this.tryCatch();
         });
     }
 
     start(character) {
         this.player.img.src = character.battleSprite || character.sprite;
+        this.player.name = character.name || '';
         this.player.facing = 1;
+        this.player.hp = this.player.maxHp;
+        this.player.cooldowns = STARTER_ABILITIES.map(() => 0);
+        this.player.invuln = 0;
+        this.captures = [];
         this.loadMap('main');
 
         if (!this.merchantRequested) {
@@ -87,6 +118,20 @@ export class Overworld {
         this.portalCooldown = 45;
         this.player.x = map.start.col * TILE_SIZE + TILE_SIZE / 2;
         this.player.y = map.start.row * TILE_SIZE + TILE_SIZE / 2;
+
+        // Harita savaşı durumu sıfırlanır; düşmanlar spawn listesinden kurulur
+        this.projectiles = [];
+        this.mapTexts = [];
+        this.spores = [];
+        this.ballAnim = null;
+        this.enemies = (map.spawns || []).map(spawn => new Enemy({ ...spawn, world: this }));
+        for (const enemy of this.enemies) {
+            this.fetchEnemyData(enemy.id).then(data => {
+                enemy.name = data.name;
+                enemy.img.src = data.battleSprite || data.sprite;
+            }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));
+        }
+
         this.updateCamera(true);
 
         const title = document.getElementById('overworld-title');
@@ -147,12 +192,24 @@ export class Overworld {
     }
 
     // Çarpışma kutusunun dört köşesi de yürünebilirse hareket geçerli
+    // (hem oyuncu hem düşmanlar kullanır)
+    canBoxMoveTo(x, y, hw, hh) {
+        return this.isWalkable(x - hw, y - hh)
+            && this.isWalkable(x + hw, y - hh)
+            && this.isWalkable(x - hw, y + hh)
+            && this.isWalkable(x + hw, y + hh);
+    }
+
     canMoveTo(x, y) {
         const { w, h } = this.player.hitbox;
-        return this.isWalkable(x - w / 2, y - h / 2)
-            && this.isWalkable(x + w / 2, y - h / 2)
-            && this.isWalkable(x - w / 2, y + h / 2)
-            && this.isWalkable(x + w / 2, y + h / 2);
+        return this.canBoxMoveTo(x, y, w / 2, h / 2);
+    }
+
+    fetchEnemyData(id) {
+        if (!this.enemyDataCache.has(id)) {
+            this.enemyDataCache.set(id, fetchCharacter({ id }));
+        }
+        return this.enemyDataCache.get(id);
     }
 
     movePlayer() {
@@ -176,6 +233,9 @@ export class Overworld {
         if (dx > 0) player.facing = 1;
         if (dx < 0) player.facing = -1;
 
+        // Yetenekler son hareket yönüne atılır
+        player.aim = { x: dx, y: dy };
+
         // Eksenleri ayrı dene: duvara sürtünerek kaymaya izin verir
         const nx = player.x + dx * player.speed;
         if (this.canMoveTo(nx, player.y)) player.x = nx;
@@ -187,6 +247,7 @@ export class Overworld {
     update() {
         this.movePlayer();
         this.checkPortals();
+        this.updateCombat();
         this.updateCamera();
 
         const { ctx, canvas } = this;
@@ -200,11 +261,192 @@ export class Overworld {
         this.drawTiles();
         this.drawPortals();
         this.drawShops();
+        for (const enemy of this.enemies) {
+            // Pokeball'a girmiş (sallanan toptaki) Pokemon görünmez
+            if (this.ballAnim && this.ballAnim.enemy === enemy && this.ballAnim.frame >= 15) continue;
+            enemy.draw(ctx);
+        }
+        this.drawProjectiles();
         this.drawPlayer();
+        this.drawSpores();
+        this.drawBallAnim();
         this.drawPortalLabels();
         this.drawShopLabels();
+        this.drawCatchHints();
+        this.drawMapTexts();
 
         ctx.restore();
+
+        // Ekran sabiti arayüz (HP, yetenekler, yakalananlar)
+        this.drawHud();
+    }
+
+    // ---- Harita savaşı ----
+
+    updateCombat() {
+        const { player } = this;
+
+        for (let i = 0; i < player.cooldowns.length; i++) {
+            if (player.cooldowns[i] > 0) player.cooldowns[i]--;
+        }
+        if (player.invuln > 0) player.invuln--;
+
+        for (const enemy of this.enemies) enemy.update();
+
+        // Mermiler: hareket, duvar ve düşman çarpışması
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+
+            if (p.life <= 0 || !this.isWalkable(p.x, p.y)) {
+                this.projectiles.splice(i, 1);
+                continue;
+            }
+
+            for (const enemy of this.enemies) {
+                if (enemy.fainted) continue;
+                if (Math.hypot(p.x - enemy.x, p.y - enemy.y) < enemy.size / 2 + 10) {
+                    enemy.takeDamage(p.damage);
+                    this.projectiles.splice(i, 1);
+                    break;
+                }
+            }
+        }
+
+        // Sleep Powder sporları
+        for (let i = this.spores.length - 1; i >= 0; i--) {
+            const s = this.spores[i];
+            s.r += 5;
+            s.life--;
+            if (s.life <= 0) this.spores.splice(i, 1);
+        }
+
+        // Pokeball animasyonu
+        if (this.ballAnim) {
+            const ball = this.ballAnim;
+            ball.frame++;
+            if (ball.frame === 15) {
+                // Topa girdi: sallanma başlar
+                ball.x = ball.enemy.x;
+                ball.y = ball.enemy.y;
+            }
+            if (ball.frame >= 55) {
+                // Yakalandı
+                this.captures.push({ id: ball.enemy.id, name: ball.enemy.name });
+                this.spawnMapText(ball.enemy.x, ball.enemy.y - 30, `${ball.enemy.name} yakalandı!`, '#4ade80');
+                this.enemies = this.enemies.filter(e => e !== ball.enemy);
+                this.ballAnim = null;
+            }
+        }
+
+        // Uçan yazılar
+        for (let i = this.mapTexts.length - 1; i >= 0; i--) {
+            const t = this.mapTexts[i];
+            t.y -= 0.8;
+            t.life--;
+            if (t.life <= 0) this.mapTexts.splice(i, 1);
+        }
+    }
+
+    castAbility(index) {
+        const { player } = this;
+        const ability = STARTER_ABILITIES[index];
+        if (!ability || player.cooldowns[index] > 0) return;
+
+        if (ability.type === 'sleep') {
+            // Sleep Powder: çevredeki düşmanları uyutur
+            let hit = 0;
+            for (const enemy of this.enemies) {
+                if (enemy.fainted) continue;
+                if (Math.hypot(enemy.x - player.x, enemy.y - player.y) < ability.radius) {
+                    enemy.stunTimer = ability.stun;
+                    hit++;
+                }
+            }
+            this.spores.push({ x: player.x, y: player.y, r: 20, life: 30 });
+            if (hit > 0) this.spawnMapText(player.x, player.y - 50, `${hit} Pokemon uyudu!`, '#a78bfa');
+        } else {
+            // Mermi: son hareket yönüne (dururken bakılan yöne) atılır
+            let { x: ax, y: ay } = player.aim;
+            if (ax === 0 && ay === 0) ax = player.facing;
+            const len = Math.hypot(ax, ay) || 1;
+            this.projectiles.push({
+                x: player.x,
+                y: player.y,
+                vx: (ax / len) * ability.speed,
+                vy: (ay / len) * ability.speed,
+                type: ability.type,
+                damage: ability.damage,
+                life: ability.life
+            });
+        }
+
+        player.cooldowns[index] = ability.cooldown;
+    }
+
+    tryCatch() {
+        if (this.ballAnim) return;
+
+        // En yakın bayılmış Pokemonu bul
+        let target = null;
+        let best = 110; // maksimum atış mesafesi
+        for (const enemy of this.enemies) {
+            if (!enemy.fainted) continue;
+            const dist = Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y);
+            if (dist < best) {
+                best = dist;
+                target = enemy;
+            }
+        }
+
+        if (!target) {
+            this.spawnMapText(this.player.x, this.player.y - 50, 'Yakında bayılmış Pokemon yok', '#94a3b8');
+            return;
+        }
+
+        this.ballAnim = {
+            enemy: target,
+            frame: 0,
+            fromX: this.player.x,
+            fromY: this.player.y - 20,
+            x: this.player.x,
+            y: this.player.y - 20
+        };
+    }
+
+    damagePlayer(amount, from) {
+        const { player } = this;
+        if (player.invuln > 0) return;
+
+        player.hp -= amount;
+        player.invuln = 60;
+        this.spawnMapText(player.x, player.y - 50, `-${amount}`, '#ff4444');
+
+        // Saldırandan hafif geri itme
+        if (from) {
+            const dist = Math.hypot(player.x - from.x, player.y - from.y) || 1;
+            const kx = player.x + ((player.x - from.x) / dist) * 30;
+            const ky = player.y + ((player.y - from.y) / dist) * 30;
+            if (this.canMoveTo(kx, player.y)) player.x = kx;
+            if (this.canMoveTo(player.x, ky)) player.y = ky;
+        }
+
+        if (player.hp <= 0) {
+            // Bayıldın: mekan girişinde tam canla yeniden doğ
+            player.hp = player.maxHp;
+            player.invuln = 90;
+            const start = this.currentMap.start;
+            player.x = start.col * TILE_SIZE + TILE_SIZE / 2;
+            player.y = start.row * TILE_SIZE + TILE_SIZE / 2;
+            this.updateCamera(true);
+            this.spawnMapText(player.x, player.y - 60, 'BAYILDIN!', '#ef4444');
+        }
+    }
+
+    spawnMapText(x, y, text, color) {
+        this.mapTexts.push({ x, y, text, color, life: 70 });
     }
 
     // ---- Çizim ----
@@ -455,6 +697,9 @@ export class Overworld {
     drawPlayer() {
         const { ctx, player } = this;
 
+        // Hasar sonrası dokunulmazlıkta yanıp sönme
+        if (player.invuln > 0 && player.invuln % 8 < 4) return;
+
         // Yürürken hafif zıplama
         const bob = player.moving ? Math.sin(Date.now() / 90) * 3 : 0;
 
@@ -463,6 +708,166 @@ export class Overworld {
         ctx.translate(player.x, player.y - player.size / 4 + bob);
         if (player.facing === 1) ctx.scale(-1, 1);
         ctx.drawImage(player.img, -player.size / 2, -player.size / 2, player.size, player.size);
+        ctx.restore();
+    }
+
+    drawProjectiles() {
+        const { ctx } = this;
+        for (const p of this.projectiles) {
+            const def = PROJECTILE_SPRITES[p.type];
+            if (def) {
+                const opts = {};
+                if (def.spin) opts.angle = (Date.now() / 1000) * def.spin;
+                else if (def.directional && p.vx < 0) opts.flip = true;
+                drawPixelSprite(ctx, def, p.x, p.y, opts);
+            }
+        }
+    }
+
+    // Sleep Powder: genişleyen mor spor halkası
+    drawSpores() {
+        const { ctx } = this;
+        for (const s of this.spores) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, s.life / 30) * 0.8;
+            const n = 16;
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2 + s.r * 0.02;
+                ctx.fillStyle = i % 2 === 0 ? '#a78bfa' : '#c4b5fd';
+                ctx.fillRect(s.x + Math.cos(a) * s.r - 3, s.y + Math.sin(a) * s.r - 3, 6, 6);
+            }
+            ctx.restore();
+        }
+    }
+
+    drawBallAnim() {
+        if (!this.ballAnim) return;
+        const { ctx } = this;
+        const ball = this.ballAnim;
+
+        // Uçuş: oyuncudan hedefe (ilk 15 kare), sonra hedefte sallanma
+        let bx, by, tilt = 0;
+        if (ball.frame < 15) {
+            const t = ball.frame / 15;
+            bx = ball.fromX + (ball.enemy.x - ball.fromX) * t;
+            by = ball.fromY + (ball.enemy.y - ball.fromY) * t - Math.sin(t * Math.PI) * 40;
+        } else {
+            bx = ball.enemy.x;
+            by = ball.enemy.y;
+            tilt = Math.sin((ball.frame - 15) / 4) * 0.35; // sallanma
+        }
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(bx, by);
+        ctx.rotate(tilt);
+        // Pokeball pikselleri: üst kırmızı, alt beyaz, bant ve merkez düğme
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(-8, -8, 16, 8);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-8, 0, 16, 8);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-8, -2, 16, 4);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-3, -3, 6, 6);
+        ctx.restore();
+    }
+
+    // Bayılmış ve menzildeki Pokemonların üstünde yakalama ipucu
+    drawCatchHints() {
+        const { ctx, player } = this;
+        ctx.save();
+        ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'center';
+
+        for (const enemy of this.enemies) {
+            if (!enemy.fainted) continue;
+            if (this.ballAnim && this.ballAnim.enemy === enemy) continue;
+            const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+            if (dist > 110) continue;
+
+            const bob = Math.sin(Date.now() / 250) * 3;
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText('N: Yakala!', enemy.x, enemy.y - enemy.size / 2 - 8 + bob);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillText('N: Yakala!', enemy.x, enemy.y - enemy.size / 2 - 8 + bob);
+        }
+
+        ctx.restore();
+    }
+
+    drawMapTexts() {
+        const { ctx } = this;
+        ctx.save();
+        ctx.font = "bold 15px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'center';
+
+        for (const t of this.mapTexts) {
+            ctx.globalAlpha = Math.min(1, t.life / 30);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(t.text, t.x, t.y);
+            ctx.fillStyle = t.color;
+            ctx.fillText(t.text, t.x, t.y);
+        }
+
+        ctx.restore();
+    }
+
+    // Ekran sabiti arayüz: can barı, yetenek kutuları, yakalanan sayısı
+    drawHud() {
+        const { ctx, canvas, player } = this;
+        ctx.save();
+
+        // Can barı (sol üst)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(12, 12, 216, 30);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(18, 24, 160, 12);
+        ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
+        ctx.fillRect(18, 24, 160 * (player.hp / player.maxHp), 12);
+        ctx.font = "bold 12px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(player.name || 'Oyuncu', 18, 21);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}`, 222, 34);
+
+        // Yakalananlar (sağ üst)
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(canvas.width - 150, 12, 138, 26);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(`Yakalanan: ${this.captures.length}`, canvas.width - 20, 30);
+
+        // Yetenek kutuları (sol alt)
+        const boxY = canvas.height - 58;
+        STARTER_ABILITIES.forEach((ability, i) => {
+            const boxX = 12 + i * 52;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(boxX, boxY, 44, 44);
+
+            // Cooldown dolgusu (yukarıdan aşağı iner)
+            const cd = player.cooldowns[i];
+            if (cd > 0) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(boxX, boxY, 44, 44 * (cd / ability.cooldown));
+            }
+
+            ctx.strokeStyle = cd > 0 ? '#475569' : '#4ade80';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(boxX, boxY, 44, 44);
+
+            ctx.textAlign = 'center';
+            ctx.font = "bold 18px 'Space Grotesk', sans-serif";
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(ability.key, boxX + 22, boxY + 26);
+            ctx.font = "9px 'Space Grotesk', sans-serif";
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(ability.name, boxX + 22, boxY + 39);
+        });
+
         ctx.restore();
     }
 }

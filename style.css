@@ -1239,3 +1239,17 @@ canvas {
 .lib-img-slot, .lib-name, .dex-cell {
     cursor: pointer;
 }
+
+/* Pokedex: boss girdileri yakalanabilirlerden ayrılır */
+.dex-cell.boss {
+    border-color: #f97316;
+}
+
+.dex-cell.defeated {
+    border-color: #fbbf24;
+}
+
+.dex-cell.boss .dex-tag,
+.dex-cell.defeated .dex-tag {
+    color: #fbbf24;
+}

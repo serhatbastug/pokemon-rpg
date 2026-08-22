@@ -74,7 +74,7 @@ export const Scenes = {
 
         ctx.font = "bold 20px 'Space Grotesk', sans-serif";
         ctx.lineWidth = 4;
-        const sub = `${v.isRegionBoss ? 'Bölge bossu' : 'Boss'} ${v.name} yakalandı!`;
+        const sub = `${v.isRegionBoss ? 'Bölge bossu' : 'Boss'} ${v.name} yenildi!`;
         ctx.strokeText(sub, cx, cy - 96);
         ctx.fillStyle = '#f8fafc';
         ctx.fillText(sub, cx, cy - 96);
@@ -133,9 +133,13 @@ export const Scenes = {
         }
         if (chain.length < 2) return;
 
+        // Zincir bu Pokemonun kendi düğümünden başlar: chain[0] mevcut formdur.
+        // Yalnızca seviye şartını karşılayan sonraki formlara geçilir; taş/takas
+        // gibi tetikleyicilerde minLevel null olur ve orada durulur.
         let target = chain[0];
-        for (const stage of chain) {
-            if (stage.minLevel === null || member.level >= stage.minLevel) target = stage;
+        for (let i = 1; i < chain.length; i++) {
+            const stage = chain[i];
+            if (stage.minLevel !== null && member.level >= stage.minLevel) target = stage;
             else break;
         }
         if (target.id === member.formId) return;
@@ -335,6 +339,7 @@ export const Scenes = {
 
     onBossDefeated(boss) {
         const isNew = this.progress.markBossDefeated(this.currentMap.id);
+        this.progress.markDefeated(boss.id, boss.name, boss.kind);
 
         // Rozet ve onunla açılan saha hamlesi
         const move = FIELD_MOVES.find(m => m.badge === this.currentMap.id);

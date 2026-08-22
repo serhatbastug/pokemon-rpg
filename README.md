@@ -20,7 +20,7 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (313 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
+| `npm run check` | Veri ve saf mantık testleri (324 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
 | `npm run test:ui` | Puppeteer ile uçtan uca oynanış (71 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
@@ -193,7 +193,7 @@ başlanır, bitince Kecleon'a uğramak gerekir.
   Gizli Pokemonlar belirgin şekilde zor yakalanır.
 - **NPC antrenör savaşları:** Her mekanda görüş alanına girince meydan okuyan
   bir antrenör var; ekibindeki Pokemonları sırayla gönderir, yenince jeton verir.
-- **Pokedex:** Kütüphanede görülen/yakalanan takibi. Bir Pokemona tıklayınca
+- **Pokedex:** Kütüphanede görülen/yakalanan takibi (bosslar ayrı: yakalanmaz, yenilir). Bir Pokemona tıklayınca
   **karakter bilgisi** açılır: istatistikler, hamleleri ve tipleriyle birlikte
   **hangi tiplere zayıf, hangilerine dayanıklı, hamlelerinin neye üstün olduğu**.
 - **Bölge ölçeklendirmesi:** Düşmanların canı ve hasarı bölgeye göre artar

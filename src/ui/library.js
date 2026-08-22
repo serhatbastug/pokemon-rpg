@@ -151,8 +151,12 @@ export class Library {
             .map(([id, entry]) => ({ id: Number(id), ...entry }))
             .sort((a, b) => a.id - b.id);
 
+        const bossCount = entries.filter(e => e.kind === 'boss' || e.kind === 'regionBoss').length;
+        const defeated = entries.filter(e => e.defeated).length;
         this.dexSummary.textContent =
-            `${stats.caught} yakalandı · ${stats.seen} görüldü · hedef 75 Pokemon`;
+            `${stats.caught} yakalandı · ${stats.seen} görüldü` +
+            (bossCount ? ` · ${defeated}/${bossCount} boss yenildi` : '') +
+            ` · hedef 75 Pokemon`;
 
         this.dexList.innerHTML = '';
         if (!entries.length) {
@@ -161,19 +165,26 @@ export class Library {
         }
 
         for (const entry of entries) {
+            // Bosslar yakalanamaz; "görüldü" demek yanıltıcı olur
+            const isBoss = entry.kind === 'boss' || entry.kind === 'regionBoss';
+            const state = isBoss
+                ? (entry.defeated ? { cls: 'defeated', label: 'Yenildi' } : { cls: 'boss', label: 'Boss' })
+                : (entry.caught ? { cls: 'caught', label: 'Yakalandı' } : { cls: 'seen', label: 'Görüldü' });
+
             const cell = document.createElement('div');
-            cell.className = `dex-cell ${entry.caught ? 'caught' : 'seen'}`;
+            cell.className = `dex-cell ${state.cls}`;
             cell.title = `#${entry.id} ${entry.name}`;
             cell.innerHTML = `
                 <div class="dex-img-slot"></div>
                 <div class="dex-name">${entry.name}</div>
-                <div class="dex-tag">${entry.caught ? 'Yakalandı' : 'Görüldü'}</div>
+                <div class="dex-tag">${state.label}</div>
             `;
             cell.addEventListener('click', () => this.showDetail(entry.id));
             this.dexList.appendChild(cell);
             this.sprite(entry.id).then(data => {
                 const slot = cell.querySelector('.dex-img-slot');
-                if (slot) slot.innerHTML = `<img class="dex-img" src="${data.sprite}" alt="${data.name}">`;
+                const src = data.battleSprite || data.sprite;
+                if (slot) slot.innerHTML = `<img class="dex-img" src="${src}" alt="${data.name}">`;
             }).catch(() => {});
         }
     }
@@ -227,7 +238,7 @@ export class Library {
         this.detail.innerHTML = `
             <button class="detail-close">&times;</button>
             <div class="detail-top">
-                <img class="detail-sprite" src="${data.sprite}" alt="${data.name}">
+                <img class="detail-sprite" src="${data.battleSprite || data.sprite}" alt="${data.name}">
                 <div>
                     <h4 class="detail-name">${data.name} <span class="detail-id">#${id}</span></h4>
                     ${member ? `<div class="detail-level">Seviye ${member.level}</div>` : ''}
@@ -281,7 +292,10 @@ export class Library {
     fillSprite(card, id) {
         this.sprite(id).then(data => {
             const slot = card.querySelector('.lib-img-slot');
-            if (slot) slot.innerHTML = `<img class="lib-img" src="${data.sprite}" alt="${data.name}">`;
+            // Sahada piksel sprite kullanılıyor; menüde de aynısı görünsün ki
+            // Pokemonu sahaya sürdüğünde görseli değişmesin
+            const src = data.battleSprite || data.sprite;
+            if (slot) slot.innerHTML = `<img class="lib-img" src="${src}" alt="${data.name}">`;
         }).catch(() => {});
     }
 }

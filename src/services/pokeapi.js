@@ -74,16 +74,32 @@ export async function fetchEvolutionChain(id) {
     // URL'den tür numarasını çıkarır: .../pokemon-species/2/ -> 2
     const idFromUrl = (url) => Number(url.split('/').filter(Boolean).pop());
 
+    // Zincir bir AĞAÇTIR (Eevee gibi türlerde dallanır). Kökten değil,
+    // istenen Pokemonun kendi düğümünden başlamak gerekir: Umbreon'un
+    // "sonraki formu" yoktur, Eevee'nin ilk dalı (Vaporeon) değildir.
+    const findNode = (node) => {
+        if (idFromUrl(node.species.url) === Number(id)) return node;
+        for (const child of node.evolves_to || []) {
+            const found = findNode(child);
+            if (found) return found;
+        }
+        return null;
+    };
+
+    const start = findNode(chain) || chain;
+
+    // Bu düğümden ileriye doğru tek bir yol çıkar (dallanmada ilk dal)
     const stages = [];
-    let node = chain;
+    let node = start;
     while (node) {
         const detail = node.evolution_details?.[0];
         stages.push({
             id: idFromUrl(node.species.url),
             name: node.species.name,
-            minLevel: detail?.min_level ?? null
+            // Yalnızca seviyeyle olan evrimler oyunda desteklenir; taş/takas
+            // gibi tetikleyicilerde minLevel null gelir ve evrim gerçekleşmez.
+            minLevel: typeof detail?.min_level === 'number' ? detail.min_level : null
         });
-        // Dallanan zincirlerde (ör. Eevee) ilk dal izlenir
         node = node.evolves_to?.[0];
     }
     return stages;

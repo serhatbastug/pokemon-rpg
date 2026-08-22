@@ -151,11 +151,17 @@ export const CombatSystem = {
                 this.ballAnim = null;
 
                 if (ball.success) {
-                    const joinedParty = this.progress.addCapture(caught.id, caught.name);
-                    this.progress.markSeen(caught.id, caught.name, true);
+                    const result = this.progress.addCapture(caught.id, caught.name);
                     this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
                     Sfx.catchSuccess();
-                    if (!joinedParty) {
+
+                    if (result.duplicate) {
+                        // Aynı türden zaten var: koleksiyon şişmesin, jeton kazan
+                        const bonus = this.progress.tokensForEnemy(caught.kind);
+                        this.progress.addTokens(bonus);
+                        this.spawnMapText(caught.x, caught.y - 54,
+                            `Zaten koleksiyonda - +${bonus} jeton`, '#fbbf24');
+                    } else if (!result.joinedParty) {
                         this.spawnMapText(caught.x, caught.y - 54, 'Ekip dolu - kütüphaneye gönderildi', '#94a3b8');
                     } else {
                         // Yeni üye ekibe katıldı: sahaya hazırlansın

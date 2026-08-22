@@ -59,6 +59,15 @@ export class Progress {
             this.items = data.items && typeof data.items === 'object' ? data.items : { ...STARTING_ITEMS };
             this.dex = data.dex && typeof data.dex === 'object' ? data.dex : {};
             this.beatenTrainers = Array.isArray(data.beatenTrainers) ? data.beatenTrainers : [];
+
+            // Eski kayıtlarda aynı türden birden fazla olabilir; tür bazına indir
+            const seenIds = new Set();
+            this.collection = this.collection.filter(entry => {
+                if (seenIds.has(entry.id)) return false;
+                seenIds.add(entry.id);
+                return true;
+            });
+            this.reconcileDex();
             return true;
         } catch (error) {
             console.warn('Kayıt okunamadı:', error);
@@ -92,13 +101,26 @@ export class Progress {
         return this.party.length >= PARTY_SIZE;
     }
 
-    // Yakalanan Pokemon koleksiyona, yer varsa ekibe eklenir
+    // Yakalanan Pokemon koleksiyona, yer varsa ekibe eklenir.
+    // Aynı türden ikincisi koleksiyonu şişirmez: koleksiyon tür bazlıdır.
     addCapture(id, name) {
-        const entry = { id, formId: id, level: STARTING_LEVEL, name };
+        const alreadyOwned = this.collection.some(entry => entry.id === id);
+        if (alreadyOwned) {
+            this.markSeen(id, name, true);
+            return { added: false, joinedParty: false, duplicate: true };
+        }
+
         this.collection.push({ id, name });
-        if (!this.partyFull) this.party.push(entry);
+
+        let joinedParty = false;
+        if (!this.partyFull && !this.party.some(member => member.id === id)) {
+            this.party.push({ id, formId: id, level: STARTING_LEVEL, name });
+            joinedParty = true;
+        }
+
+        this.markSeen(id, name, true);
         this.save();
-        return !this.partyFull || this.party.includes(entry);
+        return { added: true, joinedParty, duplicate: false };
     }
 
     // Koleksiyondaki bir Pokemonu ekibe alır / ekipten çıkarır
@@ -197,13 +219,44 @@ export class Progress {
 
     // --- Pokedex ---
 
-    markSeen(id, name, caught = false) {
+    markSeen(id, name, caught = false, kind = null) {
         const entry = this.dex[id] || { name, seen: false, caught: false };
         entry.name = name || entry.name;
         entry.seen = true;
         if (caught) entry.caught = true;
+        // Bosslar yakalanamaz; Pokedex bunu ayrı gösterir
+        if (kind) entry.kind = kind;
         this.dex[id] = entry;
         this.save();
+    }
+
+    markDefeated(id, name, kind) {
+        const entry = this.dex[id] || { name, seen: true, caught: false };
+        entry.name = name || entry.name;
+        entry.seen = true;
+        entry.kind = kind;
+        entry.defeated = true;
+        this.dex[id] = entry;
+        this.save();
+    }
+
+    // Ekipte ya da koleksiyonda olan her Pokemon Pokedex'te "yakalandı" olmalı.
+    // Pokedex sonradan eklendiği için eski kayıtlar bu şekilde tamamlanır.
+    reconcileDex() {
+        let changed = false;
+        for (const entry of [...this.collection, ...this.party]) {
+            const dexEntry = this.dex[entry.id];
+            if (!dexEntry || !dexEntry.caught) {
+                this.dex[entry.id] = {
+                    ...(dexEntry || {}),
+                    name: dexEntry?.name || entry.name,
+                    seen: true,
+                    caught: true
+                };
+                changed = true;
+            }
+        }
+        if (changed) this.save();
     }
 
     get dexStats() {

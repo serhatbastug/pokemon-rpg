@@ -261,7 +261,7 @@ export class Overworld {
             this.fetchEnemyData(enemy.id).then(data => {
                 enemy.name = data.name;
                 enemy.types = data.types || [];
-                this.progress.markSeen(enemy.id, data.name); // Pokedex: görüldü
+                this.progress.markSeen(enemy.id, data.name, false, enemy.kind); // Pokedex: görüldü
                 enemy.img.src = data.battleSprite || data.sprite;
                 preloadTypes(enemy.types);
             }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));

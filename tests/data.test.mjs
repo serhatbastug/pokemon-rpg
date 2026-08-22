@@ -192,6 +192,68 @@ check('tüm eşya fiyatları pozitif', SHOP_ITEMS.every(i => i.price > 0));
 check('itemById bilinmeyen kimlik için null', itemById('yok-boyle-bir-sey') === null);
 check('karo boyutu 50', TILE_SIZE === 50);
 
+// ---- İlerleme mantığı (Progress) ----
+// Progress localStorage kullanır; node için basit bir taklit yeterli.
+globalThis.localStorage = {
+    store: new Map(),
+    getItem(key) { return this.store.has(key) ? this.store.get(key) : null; },
+    setItem(key, value) { this.store.set(key, String(value)); },
+    removeItem(key) { this.store.delete(key); },
+    key(i) { return [...this.store.keys()][i] ?? null; },
+    get length() { return this.store.size; }
+};
+
+const { Progress } = await import('../src/world/Progress.js');
+const progress = new Progress();
+progress.clear();
+
+// Aynı türden ikinci yakalama koleksiyonu şişirmemeli
+const first = progress.addCapture(127, 'Pinsir');
+const second = progress.addCapture(127, 'Pinsir');
+check('ilk yakalama koleksiyona ekleniyor', first.added === true && first.joinedParty === true);
+check('aynı türden ikinci yakalama tekrar eklenmiyor',
+    second.duplicate === true && progress.collection.filter(e => e.id === 127).length === 1,
+    `${progress.collection.length} koleksiyon girdisi`);
+check('aynı tür ekibe ikinci kez katılmıyor',
+    progress.party.filter(m => m.id === 127).length === 1);
+
+// Yakalanan Pokemon Pokedex'te "yakalandı" olmalı
+check('yakalanan Pokemon Pokedex\'te yakalandı olarak işaretli',
+    progress.dex[127]?.caught === true);
+
+// Bosslar Pokedex'te ayrı: yakalanmaz, yenilir
+progress.markSeen(768, 'Golisopod', false, 'boss');
+check('boss görüldüğünde yakalanmadı olarak işaretli',
+    progress.dex[768]?.caught === false && progress.dex[768]?.kind === 'boss');
+progress.markDefeated(768, 'Golisopod', 'boss');
+check('boss yenildiğinde yenildi olarak işaretleniyor',
+    progress.dex[768]?.defeated === true && progress.dex[768]?.caught === false);
+
+// Eski kayıtlarda Pokedex boş olabilir: ekip ve koleksiyonla uyumlanmalı
+progress.dex = {};
+progress.reconcileDex();
+check('Pokedex ekip ve koleksiyonla uyumlanıyor',
+    progress.dex[1]?.caught === true && progress.dex[127]?.caught === true,
+    Object.keys(progress.dex).join(', '));
+
+// Yükleme sırasında eski kayıttaki tekrarlar temizlenmeli
+progress.collection.push({ id: 127, name: 'Pinsir' }); // eski kayıttan gelen tekrar
+progress.save();
+const reloaded = new Progress();
+check('kayıt yüklenirken koleksiyondaki tekrarlar temizleniyor',
+    reloaded.collection.filter(e => e.id === 127).length === 1,
+    `${reloaded.collection.length} girdi`);
+
+// En iyi top seçimi
+progress.items = { 'poke-ball': 2, 'ultra-ball': 1 };
+check('elde varken en güçlü top kullanılıyor', progress.bestBall()?.id === 'ultra-ball');
+progress.items = { 'poke-ball': 2 };
+check('ultra yoksa poke ball kullanılıyor', progress.bestBall()?.id === 'poke-ball');
+progress.items = {};
+check('hiç top yoksa null dönüyor', progress.bestBall() === null);
+
+progress.clear();
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

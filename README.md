@@ -76,10 +76,18 @@ Undertale tarzı, kuşbakışı tek kişilik mod. Plan: 5 bölge x 3 mekan x 5 P
 (3 yaygın + 1 boss + 1 gizli) = 75 karakter. Yetenekler o Pokemonun resmi
 hamlelerinden seçilir. Maceraya Bulbasaur (#1) ile başlanır.
 
-Şu an: ana harita, 1. bölge (Vahşi Orman) ve ilk mekan (Fısıltılı Orman Girişi)
-gezilebilir; portallar haritalar arasında geçiş yapar, açılmamış içeriğin
-portalları soluk/pasif görünür. 1. bölgenin tüm Pokemon listeleri regions.js'te.
-Sırada: haritada Pokemon karşılaşmaları, harita üzerinde savaş, evrim mekaniği.
+**1. Bölge (Vahşi Orman) tamamlandı** — üç mekanın da haritası, Pokemonları ve
+boss savaşı hazır; her mekan farklı bir harita tarzında:
+
+| Mekan | Tarz | Yaygınlar | Gizli | Boss |
+|---|---|---|---|---|
+| Fısıltılı Orman Girişi | labirent (40x20) | Pinsir, Ursaring, Trevenant | Scolipede | Golisopod |
+| Gölgeli Derinlikler | organik mağara (46x22) | Scyther, Carnivine, Krookodile | Umbreon | Hawlucha |
+| Kadim Ağaç Meydanı | tapınak meydanı (48x24) | Gyarados, Hydreigon, Slaking | Snorlax | **Zarude** (bölge bossu) |
+
+Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
+uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sahnesi.
+Sırada: 2. bölge, evrim mekaniği, Kecleon dükkanında alışveriş.
 
 ## Yeni İçerik Ekleme
 

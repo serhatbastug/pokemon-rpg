@@ -584,21 +584,23 @@ export class Overworld {
         ctx.font = "bold 46px 'Space Grotesk', sans-serif";
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 6;
-        ctx.strokeText('ZAFER!', cx, cy - 130);
+        const title = v.isRegionBoss ? 'BÖLGE FETHEDİLDİ!' : 'ZAFER!';
+        ctx.strokeText(title, cx, cy - 130);
         ctx.fillStyle = '#fbbf24';
-        ctx.fillText('ZAFER!', cx, cy - 130);
+        ctx.fillText(title, cx, cy - 130);
 
         ctx.font = "bold 20px 'Space Grotesk', sans-serif";
         ctx.lineWidth = 4;
-        const sub = `Boss ${v.name} yakalandı!`;
+        const sub = `${v.isRegionBoss ? 'Bölge bossu' : 'Boss'} ${v.name} yakalandı!`;
         ctx.strokeText(sub, cx, cy - 96);
         ctx.fillStyle = '#f8fafc';
         ctx.fillText(sub, cx, cy - 96);
 
         ctx.font = "15px 'Space Grotesk', sans-serif";
-        ctx.strokeText('Fısıltılı Orman Girişi tamamlandı — ESC ile menüye dön', cx, cy + 110);
+        const foot = `${v.locationName} tamamlandı — ESC ile menüye dön`;
+        ctx.strokeText(foot, cx, cy + 110);
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('Fısıltılı Orman Girişi tamamlandı — ESC ile menüye dön', cx, cy + 110);
+        ctx.fillText(foot, cx, cy + 110);
 
         ctx.restore();
     }
@@ -712,7 +714,7 @@ export class Overworld {
                 this.ballAnim = null;
 
                 // Bossu yakalamak mekanı tamamlar: zafer sahnesi
-                if (caught.kind === 'boss') this.onBossCaptured(caught);
+                if (caught.isBoss) this.onBossCaptured(caught);
             }
         }
 
@@ -863,6 +865,7 @@ export class Overworld {
             const start = this.currentMap.start;
             player.x = start.col * TILE_SIZE + TILE_SIZE / 2;
             player.y = start.row * TILE_SIZE + TILE_SIZE / 2;
+            this.portalCooldown = 45; // doğar doğmaz portala düşmeyi engelle
             this.updateCamera(true);
             this.spawnMapText(player.x, player.y - 60, 'BAYILDIN!', '#ef4444');
         }
@@ -889,6 +892,8 @@ export class Overworld {
                 if (!grid[row] || grid[row][col] === undefined) continue;
                 const tile = grid[row][col];
                 if (map.portalDefs[tile]) continue; // portallar korunur
+
+                if (tile === 'A') continue; // kadim ağaç yıkılmaz
 
                 // Yıkılan engellerden enkaz fışkırır
                 if (tile === 'T' || tile === 'h' || tile === 'H' || tile === 'R') {
@@ -917,7 +922,13 @@ export class Overworld {
     }
 
     onBossCaptured(boss) {
-        this.victory = { frame: 0, name: boss.name, confetti: [] };
+        this.victory = {
+            frame: 0,
+            name: boss.name,
+            isRegionBoss: boss.kind === 'regionBoss',
+            locationName: this.currentMap.name,
+            confetti: []
+        };
         for (let i = 0; i < 90; i++) {
             this.victory.confetti.push({
                 x: Math.random() * this.canvas.width,
@@ -940,6 +951,29 @@ export class Overworld {
         const w = grid[0].length * TILE_SIZE;
         const h = grid.length * TILE_SIZE;
 
+        // Karo desenleri konuma göre değişir ama VARIANTS karoda bir tekrar eder;
+        // her benzersiz desen bir kez çizilip önbelleğe alınır, sonra kopyalanır.
+        // (Doğrudan çizim harita başına ~230.000 fillRect demek olurdu.)
+        const VARIANTS = 6;
+        const patches = new Map();
+        const patchFor = (tile, col, row, phase) => {
+            const vc = col % VARIANTS;
+            const vr = row % VARIANTS;
+            const key = `${tile}|${vc}|${vr}|${phase}`;
+            let patch = patches.get(key);
+            if (!patch) {
+                patch = document.createElement('canvas');
+                patch.width = TILE_SIZE;
+                patch.height = TILE_SIZE;
+                const pctx = patch.getContext('2d');
+                pctx.imageSmoothingEnabled = false;
+                pctx.translate(-vc * TILE_SIZE, -vr * TILE_SIZE);
+                this.drawTile(pctx, tile, vc, vr, phase);
+                patches.set(key, patch);
+            }
+            return patch;
+        };
+
         this.terrain = [0, 1].map(phase => {
             const layer = document.createElement('canvas');
             layer.width = w;
@@ -951,7 +985,7 @@ export class Overworld {
                 for (let col = 0; col < grid[row].length; col++) {
                     // Keşfedilmemiş gizli oda dışarıdan ağaçlık görünür
                     const tile = this.isHiddenTile(col, row) ? 'T' : grid[row][col];
-                    this.drawTile(lctx, tile, col, row, phase);
+                    lctx.drawImage(patchFor(tile, col, row, phase), col * TILE_SIZE, row * TILE_SIZE);
                 }
             }
             return layer;
@@ -1069,6 +1103,44 @@ export class Overworld {
             ctx.fillStyle = dark ? '#12602e' : '#22c55e';
             ctx.fillRect(x0 + PX * 3, y0 + PX, PX, PX);
             ctx.fillRect(x0 + PX * 4, y0, PX, PX);
+        }
+
+        if (tile === 'A') {
+            // Kadim ağaç: kalın dikey kabuk damarları, yosun ve parlayan runeler
+            const bark = ['#3b1f08', '#4a2a0c', '#2c1606', '#553012'];
+            for (let by = 0; by < N; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const idx = (bx * 2 + ((by + bx) % 3) + col * 3 + row * 5) % bark.length;
+                    ctx.fillStyle = bark[idx];
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Dikey kabuk çatlakları
+            ctx.fillStyle = '#1a0d03';
+            for (let bx = 1; bx < N; bx += 3) {
+                for (let by = 0; by < N; by++) {
+                    if ((by + bx + col + row) % 4 === 0) continue;
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Yosun tutamları
+            ctx.fillStyle = '#166534';
+            for (let i = 0; i < 5; i++) {
+                const mx = ((col * 7 + row * 11 + i * 5) % N) * PX;
+                const my = ((col * 5 + row * 3 + i * 13) % N) * PX;
+                ctx.fillRect(x0 + mx, y0 + my, PX, PX);
+            }
+            // Nefes alan kadim runeler (iki pişmiş kare arasında yanıp söner)
+            ctx.globalAlpha = phase === 0 ? 0.55 : 1;
+            ctx.fillStyle = '#4ade80';
+            for (let i = 0; i < 3; i++) {
+                const rx = ((col * 13 + row * 7 + i * 11) % (N - 2) + 1) * PX;
+                const ry = ((col * 3 + row * 17 + i * 5) % (N - 3) + 1) * PX;
+                ctx.fillRect(x0 + rx, y0 + ry, PX, PX);
+                ctx.fillRect(x0 + rx, y0 + ry + PX, PX, PX);
+                ctx.fillRect(x0 + rx + PX, y0 + ry + PX, PX, PX);
+            }
+            ctx.globalAlpha = 1;
         }
 
         if (tile === 'f') {

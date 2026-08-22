@@ -218,9 +218,8 @@ async function main() {
 
     await page.keyboard.press('Semicolon');
     await wait(100);
-    const afterS = await worldState();
-    check('S (Sleep Powder) spor olusturuyor',
-        await page.evaluate(() => window.__overworld.spores.length > 0), `spor: ${afterS.projectiles}`);
+    const sporeCount = await page.evaluate(() => window.__overworld.spores.length);
+    check('S (Sleep Powder) spor olusturuyor', sporeCount > 0, `${sporeCount} spor bulutu`);
 
     // --- Savaş: bir düşmanı bayılt ve yakala ---
     await page.evaluate(() => {
@@ -309,6 +308,57 @@ async function main() {
     const loc2Fps = await measureFps(4000);
     check('Golgeli Derinlikler 50+ FPS', loc2Fps.fps >= 50, JSON.stringify(loc2Fps));
 
+    // --- Üçüncü mekan: Kadim Ağaç Meydanı (bölge bossu) ---
+    await page.evaluate(() => window.__overworld.loadMap('loc-1-3'));
+    await wait(1500);
+    const loc3 = await worldState();
+    check('Kadim Agac Meydani yuklendi', loc3.map === 'loc-1-3', `${loc3.enemies} dusman`);
+    await shot('12-kadim-agac-meydani');
+
+    const regionBossAsleep = await page.evaluate(() =>
+        window.__overworld.enemies.find(e => e.kind === 'regionBoss')?.asleep);
+    check('Bolge bossu Zarude uyuyor', regionBossAsleep === true);
+
+    // Kadim ağaç boss yıkımından korunmalı
+    const ancientBefore = await page.evaluate(() =>
+        window.__overworld.currentMap.grid.join('').split('A').length - 1);
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        const boss = w.enemies.find(e => e.kind === 'regionBoss');
+        w.player.x = boss.x - 100;
+        w.player.y = boss.y;
+    });
+    await page.waitForFunction(() => {
+        const b = window.__overworld.enemies.find(e => e.kind === 'regionBoss');
+        return b && !b.asleep;
+    }, { timeout: 15000 });
+    await wait(300);
+    const ancientAfter = await page.evaluate(() =>
+        window.__overworld.currentMap.grid.join('').split('A').length - 1);
+    check('Kadim agac boss yikimindan korunuyor', ancientAfter === ancientBefore && ancientBefore === 16,
+        `${ancientBefore} -> ${ancientAfter} karo`);
+    check('Bolge bossu arenasi acildi', await page.evaluate(() => window.__overworld.arenaOpened));
+    await shot('13-zarude-arena');
+
+    const loc3Fps = await measureFps(4000);
+    check('Kadim Agac Meydani 50+ FPS', loc3Fps.fps >= 50, JSON.stringify(loc3Fps));
+
+    // Bölge bossunu yakala -> bölge fethedildi
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        const boss = w.enemies.find(e => e.kind === 'regionBoss');
+        boss.x = w.player.x + 50;
+        boss.y = w.player.y;
+        boss.hp = 1;
+        boss.takeDamage(5);
+    });
+    await wait(200);
+    await page.keyboard.press('KeyN');
+    await page.waitForFunction(() => window.__overworld.victory?.isRegionBoss, { timeout: 15000 });
+    check('Bolge bossu yakalaninca bolge fethedildi', true);
+    await wait(900);
+    await shot('14-bolge-zaferi');
+
     // --- Konsol ve ağ hataları ---
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));
@@ -322,6 +372,7 @@ async function main() {
     console.log(`  labirent (loc-1-1): ${JSON.stringify(locFps)}`);
     console.log(`  boss arenasi      : ${JSON.stringify(bossFps)}`);
     console.log(`  magara  (loc-1-2) : ${JSON.stringify(loc2Fps)}`);
+    console.log(`  meydan  (loc-1-3) : ${JSON.stringify(loc3Fps)}`);
 
     await browser.close();
     process.exit(passed === results.length ? 0 : 1);

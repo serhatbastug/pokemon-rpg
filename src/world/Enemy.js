@@ -7,7 +7,9 @@ const KIND_STATS = {
     // Gizli: mağarasını korur, peşinden gelmez (guardRadius dışına çıkmaz)
     hidden: { hp: 70, speed: 2.6, size: 66, aggroTiles: 5, guardRadius: 190 },
     // Boss: uyanana kadar hareketsiz uyur
-    boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8, sleeps: true }
+    boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8, sleeps: true },
+    // Bölge bossu: mekan bosslarından belirgin şekilde güçlü
+    regionBoss: { hp: 240, speed: 2.4, size: 116, aggroTiles: 10, sleeps: true }
 };
 
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
@@ -23,7 +25,13 @@ const SPECIES_ATTACKS = {
     455: { type: 'leaf', name: 'Razor Leaf', damage: 11, speed: 6.5, cooldown: 90, range: 300, spread: 2 }, // Carnivine
     553: { type: 'seedbomb', name: 'Stone Edge', damage: 17, speed: 6, cooldown: 140, range: 300 },        // Krookodile
     197: { type: 'shadowball', name: 'Shadow Ball', damage: 15, speed: 6, cooldown: 95, range: 320 },      // Umbreon
-    701: { type: 'focusblast', name: 'Flying Press', damage: 15, speed: 6.5, cooldown: 120, range: 360, spread: 2 } // Hawlucha
+    701: { type: 'focusblast', name: 'Flying Press', damage: 15, speed: 6.5, cooldown: 120, range: 360, spread: 2 }, // Hawlucha
+    // Kadim Ağaç Meydanı
+    130: { type: 'ice', name: 'Ice Fang', damage: 14, speed: 7.5, cooldown: 105, range: 300 },              // Gyarados
+    635: { type: 'fireblast', name: 'Dragon Pulse', damage: 18, speed: 6, cooldown: 135, range: 340 },      // Hydreigon
+    289: { type: 'punch', name: 'Hammer Arm', damage: 20, speed: 5.5, cooldown: 150, range: 260 },          // Slaking
+    143: { type: 'focusblast', name: 'Body Slam', damage: 22, speed: 5, cooldown: 130, range: 280 },        // Snorlax
+    893: { type: 'leaf', name: 'Power Whip', damage: 16, speed: 8, cooldown: 85, range: 380, spread: 3 }    // Zarude (bölge bossu)
 };
 
 const CONTACT_DAMAGE = 8;
@@ -65,6 +73,10 @@ export class Enemy {
         this.wanderTimer = 0;
         this.wanderDir = { x: 0, y: 0 };
         this.strafePhase = Math.random() * Math.PI * 2;
+    }
+
+    get isBoss() {
+        return this.kind === 'boss' || this.kind === 'regionBoss';
     }
 
     // Boss uyanışı: çok yaklaşınca ya da yakınında ateş edilince
@@ -320,15 +332,16 @@ export class Enemy {
         }
 
         // Boss etiketi
-        if (this.kind === 'boss' && !this.fainted) {
+        if (this.isBoss && !this.fainted) {
             ctx.save();
             ctx.font = "bold 13px 'Space Grotesk', sans-serif";
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 3;
-            const label = this.asleep ? `${this.name} uyuyor...` : `BOSS ${this.name}`;
+            const rank = this.kind === 'regionBoss' ? 'BÖLGE BOSSU' : 'BOSS';
+            const label = this.asleep ? `${this.name} uyuyor...` : `${rank} ${this.name}`;
             ctx.strokeText(label, this.x, this.y - this.size / 2 - 18);
-            ctx.fillStyle = this.asleep ? '#93c5fd' : '#f97316';
+            ctx.fillStyle = this.asleep ? '#93c5fd' : (this.kind === 'regionBoss' ? '#facc15' : '#f97316');
             ctx.fillText(label, this.x, this.y - this.size / 2 - 18);
             ctx.restore();
         }

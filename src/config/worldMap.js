@@ -5,6 +5,7 @@ import { REGIONS } from './regions.js';
 //   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
 //   'H' gizli çalı: çalıyla birebir aynı görünür ama içinden GEÇİLEBİLİR
 //   'M' tüccar tezgahı (engel; Kecleon'un satış yeri, bölge merkezlerinde durur)
+//   'A' kadim ağaç (engel; anıtsal landmark - boss yıkımında bile ayakta kalır)
 //   'b' boss arenası zemini (boss uyanınca ortalığı dağıtır, zemin onun temasına döner)
 //   Rakamlar o haritanın portalDefs tanımındaki portallardır ('0' çıkış geleneğidir).
 // Bir haritanın tüm satırları eşit uzunlukta olmalıdır. 20x10 (50px karo) tam bir
@@ -15,7 +16,7 @@ import { REGIONS } from './regions.js';
 
 export const TILE_SIZE = 50;
 
-export const SOLID_TILES = new Set(['T', 'W', 'R', 'h', 'M']);
+export const SOLID_TILES = new Set(['T', 'W', 'R', 'h', 'M', 'A']);
 
 const EXIT_COLORS = ['#64748b', '#94a3b8', '#e2e8f0'];
 
@@ -68,7 +69,7 @@ export const MAPS = {
         portalDefs: {
             '1': { target: 'loc-1-1', label: region1.locations[0].name, colors: region1.locations[0].colors },
             '2': { target: 'loc-1-2', label: region1.locations[1].name, colors: region1.locations[1].colors },
-            '3': { target: null, label: region1.locations[2].name, colors: region1.locations[2].colors },
+            '3': { target: 'loc-1-3', label: region1.locations[2].name, colors: region1.locations[2].colors },
             '0': { target: 'main', label: 'Ana Harita', colors: EXIT_COLORS }
         }
     },
@@ -184,6 +185,64 @@ export const MAPS = {
             { id: 701, kind: 'boss', col: 37, row: 16 }
         ],
         secretArea: { col0: 3, row0: 17, col1: 7, row1: 19 }
+    },
+
+    // 1. Bölge / 3. Mekan: Kadim Ağaç Meydanı (bölge bossunun mekanı)
+    // Tapınak düzeni (48x24); scratchpad/gen-plaza.mjs ile üretildi.
+    // Merkezde dev kadim ağaç (A), çevresinde eşmerkezli taş halkalar ve dört
+    // kapı, dışta ışınsal yollarla bağlı kutsal korular. Gizli oda kuzeybatıda.
+    'loc-1-3': {
+        id: 'loc-1-3',
+        name: region1.locations[2].name,
+        ambience: 'forest',
+        start: { col: 5, row: 12 }, // portalın üstünde olmamalı (ölünce oraya doğulur)
+        grid: [
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTg....g.....TTTTTTTTTTTTTTTTTTTT',
+            'TTT...g.TTTTTTTTT...g....g..TTTTTTTTTTTTTTTTTTTT',
+            'TTTsssssTTTTTTTTT.g.....sf..TTTTTTTTTTTT..g...TT',
+            'TTTsssssTTTTTTTTTTTT..s...f.TTTTTTTTT...g....gTT',
+            'TTTsssssTTTTTTTTT..gf..pp.f..gsTTTTTT.g....g..TT',
+            'TTTTTHTTTTTTTTTT.g.RRRR..RRRR...TTTTg....gs...TT',
+            'TTTTT.TTTTTTTTT.ffRRf....f..RRg..TTT...g......TT',
+            'TTTTTfTTTTTTTT.sRR.....s......RR.....gsf..g...TT',
+            'TTTTT.TTTTTTTT..R..............R.....f.TTTTTTTTT',
+            'TT...gfTTTTTT..RR.....AAAA.....RR.....gTTTTTTTTT',
+            'TT.g....g......ppf....AAAA.....pp...gTTTTTTTTTTT',
+            'TT.0..gs...g...pp.....AAAA.....pp.g..TTTTTTTTTTT',
+            'TT..g.f..g...g.RR.f...AAAA.....RR....g..TTTTTTTT',
+            'TTgf...TTTTTTT..R.........s.s..R........gsTTTTTT',
+            'TTTTTTTTTTTTTT.gRR..s...f....fRR..gs......TTTTTT',
+            'TTTTTTTTTTTTTTTf..RR..f.s...RR...TTTTf...g....TT',
+            'TTTTTTTTTTTTTTTT...RRRR..RRRR.gsTTTTTTTg....g.TT',
+            'TTTTTTTTTTTTTTTTT.g.s..pp......TTTTTTTT...gsf.TT',
+            'TTTTTTTTTTTTTTTTTTTT.g....g.TTTTTTTTTTT...f..gTT',
+            'TTTTTTTTTTTTTTTTTTT.gs.......g.TTTTTTTT....gf.TT',
+            'TTTTTTTTTTTTTTTTTTT...g.f..g...TTTTTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTTT...........gTTTTTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
+        ],
+        portalDefs: {
+            '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }
+        },
+        // Meydanın tamamı bölge bossunun arenası; kadim ağaç yıkımdan korunur
+        bossArena: { col0: 15, row0: 5, col1: 32, row1: 18 },
+        spawns: [
+            { id: 130, kind: 'common', col: 23, row: 8 },
+            { id: 130, kind: 'common', col: 23, row: 15 },
+            { id: 130, kind: 'common', col: 19, row: 12 },
+            { id: 635, kind: 'common', col: 42, row: 5 },
+            { id: 635, kind: 'common', col: 24, row: 21 },
+            { id: 635, kind: 'common', col: 5, row: 12 },
+            { id: 289, kind: 'common', col: 42, row: 18 },
+            { id: 289, kind: 'common', col: 22, row: 2 },
+            { id: 289, kind: 'common', col: 37, row: 8 },
+            // Gizli Snorlax: kuzeybatıdaki gizli odada uyur
+            { id: 143, kind: 'hidden', col: 5, row: 4 },
+            // Bölge bossu Zarude: kadim ağacın dibinde uyur
+            { id: 893, kind: 'regionBoss', col: 28, row: 12 }
+        ],
+        secretArea: { col0: 3, row0: 3, col1: 7, row1: 5 }
     }
 };
 

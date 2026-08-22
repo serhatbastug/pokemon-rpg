@@ -457,8 +457,10 @@ export class Overworld {
 
         // Atmosfer: loş tonlama + kenar karartması (ekran sabiti)
         const shadowy = this.currentMap.ambience === 'shadow';
+        // Tonlama ölçülü: üstüne bir de vinyet biniyor, fazlası haritayı
+        // okunmaz hale getiriyor.
         if (this.currentMap.theme === 'dark') {
-            ctx.fillStyle = shadowy ? 'rgba(8, 6, 20, 0.34)' : 'rgba(6, 18, 10, 0.18)';
+            ctx.fillStyle = shadowy ? 'rgba(8, 6, 20, 0.26)' : 'rgba(6, 18, 10, 0.09)';
             ctx.fillRect(0, 0, this.viewW, this.viewH);
         }
         if (this.currentMap.ambience) {

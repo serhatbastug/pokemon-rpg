@@ -89,3 +89,120 @@ export function groundShadow(ctx, x, y, rx, ry, alpha = 0.22) {
     ctx.fill();
     ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// BOYAMA (painted) katmanı
+//
+// Anime'de arka planlar (背景) guaj boyayla elle boyanır ve KONTURU YOKTUR.
+// Kontur yalnızca karakter çiziminde bulunur. Bu yüzden zemin/ağaç/kaya için
+// aşağıdaki yol kullanılır: düz taban rengi + yumuşak kenarlı ton bantları,
+// çizgi yok. Yumuşaklık ctx.filter ile verilir; zemin bir kez pişirildiği
+// için maliyeti kare hızını etkilemez.
+// ---------------------------------------------------------------------------
+
+// Boyanmış şekil: kontur yok, iki-üç ton bandı yumuşak kenarlarla
+export function paint(ctx, pathFn, {
+    base,
+    shadow,
+    light,
+    bounds,
+    softness = 0.18,          // bulanıklık, şeklin boyutuna oranla
+    shadowAlpha = 1,
+    lightAlpha = 1,
+    shadowDir = { x: 0.55, y: 0.6 },
+    lightDir = { x: -0.4, y: -0.45 }
+}) {
+    ctx.save();
+
+    pathFn();
+    ctx.fillStyle = base;
+    ctx.fill();
+
+    if (bounds && (shadow || light)) {
+        pathFn();
+        ctx.clip();
+
+        const span = Math.max(bounds.w, bounds.h);
+        const blur = Math.max(1.5, span * softness);
+        const cx = bounds.x + bounds.w / 2;
+        const cy = bounds.y + bounds.h / 2;
+
+        // Gölge bandı: şeklin ALT-SAĞ yanına oturan kütle. Yarıçapı küçük
+        // tutulur, aksi halde tüm şekli kaplayıp görüntüyü karartır.
+        if (shadow) {
+            ctx.globalAlpha = shadowAlpha;
+            ctx.filter = `blur(${blur.toFixed(2)}px)`;
+            ctx.fillStyle = shadow;
+            ctx.beginPath();
+            ctx.arc(cx + shadowDir.x * span, cy + shadowDir.y * span, span * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Işık: üst-solda geniş, yumuşak leke
+        if (light) {
+            ctx.globalAlpha = lightAlpha;
+            ctx.filter = `blur(${(blur * 1.2).toFixed(2)}px)`;
+            ctx.fillStyle = light;
+            ctx.beginPath();
+            ctx.ellipse(
+                cx + lightDir.x * bounds.w * 0.4,
+                cy + lightDir.y * bounds.h * 0.4,
+                bounds.w * 0.38, bounds.h * 0.3, -0.5, 0, Math.PI * 2
+            );
+            ctx.fill();
+        }
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+}
+
+// Yaprak silueti: daire değil, kenarı yaprak kümeleriyle tırtıklı bir kütle.
+// Anime arka planlarında ağaç tacı böyle çizilir; düz daire "mantar" gibi
+// durur, bulanık leke ise çizim değil kir gibi görünür.
+// bumpFn(i) 0-1 arası bir değer döndürerek her kümenin boyunu değiştirir.
+export function foliagePath(ctx, cx, cy, r, bumps, bumpFn) {
+    ctx.beginPath();
+    const inner = r * 0.82;
+    for (let i = 0; i < bumps; i++) {
+        const a0 = (i / bumps) * Math.PI * 2;
+        const a1 = ((i + 1) / bumps) * Math.PI * 2;
+        const am = (a0 + a1) / 2;
+        // Çıkıntı ölçülü tutulur: fazlası tacı yıldıza çevirir
+        const out = r * (0.98 + bumpFn(i) * 0.14);
+        const x0 = cx + Math.cos(a0) * inner;
+        const y0 = cy + Math.sin(a0) * inner * 0.88;
+        if (i === 0) ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo(
+            cx + Math.cos(am) * out * 1.16, cy + Math.sin(am) * out * 1.04,
+            cx + Math.cos(a1) * inner, cy + Math.sin(a1) * inner * 0.88
+        );
+    }
+    ctx.closePath();
+}
+
+// Boyama tarzı fırça darbesi (yaprak kümesi, yosun, doku lekesi)
+export function brush(ctx, pathFn, color, blur = 3, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.filter = `blur(${blur}px)`;
+    ctx.fillStyle = color;
+    pathFn();
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+}
+
+// Yere düşen boyalı gölge: kenarı yumuşak
+export function paintedShadow(ctx, x, y, rx, ry, alpha = 0.26) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.filter = `blur(${Math.max(2, ry * 0.9).toFixed(1)}px)`;
+    ctx.fillStyle = '#16301a';
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+}

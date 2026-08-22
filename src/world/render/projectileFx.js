@@ -1,8 +1,15 @@
-// Macera modu mermi görselleri: ANIME tarzı enerji efektleri.
-// Degrade yok - düz renk dolgu, koyu kontur ve keskin beyaz çekirdek.
+// Macera modu mermi görselleri.
+//
+// İki dil desteklenir (bkz. config/renderStyle.js):
+//   glow (painted/lineless) -> anime enerji efekti: koyu kontur YOK, doygun
+//        renk + beyaz çekirdek + dışa sönen hale. Anime'de enerji saldırıları
+//        ışıldar, siyah çizgiyle çevrelenmez.
+//   outline (bold)          -> koyu konturlu cel-shading
 // (Arena modu kendi piksel sprite'larını kullanmaya devam eder.)
 
-// Her efekt: [çekirdek(beyaza yakın), ana renk, kontur] + şekil
+import { style } from '../../config/renderStyle.js';
+
+// Her efekt: [çekirdek(beyaza yakın), ana renk, kontur/koyu ton] + şekil
 const FX = {
     leaf: { colors: ['#eaffd0', '#5ec94f', '#1e5427'], shape: 'blade' },
     petal: { colors: ['#ffe4f2', '#ff7fb0', '#a8285c'], shape: 'blade' },
@@ -39,10 +46,11 @@ export function fxFor(type) {
     return FX[type] || DEFAULT_FX;
 }
 
-// Bir mermiyi anime enerji efekti olarak çizer
+// Bir mermiyi enerji efekti olarak çizer
 export function drawProjectileFx(ctx, projectile, radius = 15) {
     const fx = fxFor(projectile.type);
     const [core, main, outline] = fx.colors;
+    const useOutline = style().fx.outline;
     const angle = Math.atan2(projectile.vy, projectile.vx);
     const t = Date.now() / 1000;
 
@@ -50,24 +58,47 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
     ctx.imageSmoothingEnabled = true;
     ctx.translate(projectile.x, projectile.y);
 
-    // Anime aura: yumuşak parıltı değil, düz yarı saydam halka
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = main;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 1.45, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    if (useOutline) {
+        // Düz yarı saydam halka
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = main;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    } else {
+        // Anime halesi: dışa doğru sönen katmanlar (degrade maliyeti yok)
+        ctx.fillStyle = main;
+        for (const [scale, alpha] of [[1.9, 0.1], [1.55, 0.16], [1.25, 0.24]]) {
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
 
     ctx.rotate(angle);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Şeklin çevresine koyu kontur: anime hissinin belkemiği
-    const outlineStroke = (width = 2.6) => {
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = width;
+    // Şeklin kenarı: bold'da koyu kontur, anime'de parlak ışık kenarı
+    const rim = (width = 2.6) => {
+        if (useOutline) {
+            ctx.strokeStyle = outline;
+            ctx.lineWidth = width;
+        } else {
+            ctx.globalAlpha = 0.9;
+            ctx.strokeStyle = core;
+            ctx.lineWidth = width * 0.55;
+        }
         ctx.stroke();
+        ctx.globalAlpha = 1;
     };
+
+    // Çok katmanlı çizgi efektlerinde (şimşek, çapraz kesik) en alttaki katman
+    const backLayer = useOutline ? outline : main;
+    const backAlpha = useOutline ? 1 : 0.4;
 
     switch (fx.shape) {
         case 'blade': {
@@ -80,8 +111,7 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
             bladePath(1);
             ctx.fillStyle = main;
             ctx.fill();
-            outlineStroke();
-            // Keskin beyaz çekirdek
+            rim();
             bladePath(0.5);
             ctx.fillStyle = core;
             ctx.fill();
@@ -99,7 +129,7 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
             shardPath(1);
             ctx.fillStyle = main;
             ctx.fill();
-            outlineStroke();
+            rim();
             shardPath(0.5);
             ctx.fillStyle = core;
             ctx.fill();
@@ -116,7 +146,7 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
             flamePath(1);
             ctx.fillStyle = main;
             ctx.fill();
-            outlineStroke();
+            rim();
             flamePath(0.55);
             ctx.fillStyle = core;
             ctx.fill();
@@ -130,11 +160,12 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
                 ctx.lineTo(radius * 0.15, radius * 0.35);
                 ctx.lineTo(radius * 1.1, -radius * 0.15);
             };
-            // Kalın koyu kontur -> düz renk -> ince beyaz çekirdek
-            ctx.strokeStyle = outline;
+            ctx.globalAlpha = backAlpha;
+            ctx.strokeStyle = backLayer;
             ctx.lineWidth = 7;
             boltPath();
             ctx.stroke();
+            ctx.globalAlpha = 1;
             ctx.strokeStyle = main;
             ctx.lineWidth = 4.2;
             boltPath();
@@ -153,10 +184,12 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
                 ctx.moveTo(radius * 0.85, -radius * 0.85);
                 ctx.lineTo(-radius * 0.85, radius * 0.85);
             };
-            ctx.strokeStyle = outline;
+            ctx.globalAlpha = backAlpha;
+            ctx.strokeStyle = backLayer;
             ctx.lineWidth = radius * 0.5;
             arms();
             ctx.stroke();
+            ctx.globalAlpha = 1;
             ctx.strokeStyle = main;
             ctx.lineWidth = radius * 0.34;
             arms();
@@ -172,7 +205,7 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
             ctx.beginPath();
             ctx.roundRect(-radius * 1.7, -radius * 0.34, radius * 3.4, radius * 0.68, radius * 0.34);
             ctx.fill();
-            outlineStroke(2.4);
+            rim(2.4);
             ctx.fillStyle = core;
             ctx.beginPath();
             ctx.roundRect(-radius * 1.4, -radius * 0.13, radius * 2.8, radius * 0.26, radius * 0.13);
@@ -182,24 +215,22 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
         case 'ring': {
             ctx.rotate(-angle); // halka yön değiştirmesin
             const spin = t * 3;
-            // Koyu kontur halkası
-            ctx.strokeStyle = outline;
+            const ringArc = (r, from, to) => {
+                ctx.beginPath();
+                ctx.arc(0, 0, r, from, to);
+                ctx.stroke();
+            };
+            ctx.globalAlpha = backAlpha;
+            ctx.strokeStyle = backLayer;
             ctx.lineWidth = radius * 0.4;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.85, spin, spin + Math.PI * 1.5);
-            ctx.stroke();
-            // Düz renk
+            ringArc(radius * 0.85, spin, spin + Math.PI * 1.5);
+            ctx.globalAlpha = 1;
             ctx.strokeStyle = main;
             ctx.lineWidth = radius * 0.26;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.85, spin, spin + Math.PI * 1.5);
-            ctx.stroke();
-            // İç halka
+            ringArc(radius * 0.85, spin, spin + Math.PI * 1.5);
             ctx.strokeStyle = core;
             ctx.lineWidth = radius * 0.1;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.5, -spin, -spin + Math.PI * 1.2);
-            ctx.stroke();
+            ringArc(radius * 0.5, -spin, -spin + Math.PI * 1.2);
             break;
         }
         default: { // orb
@@ -207,13 +238,12 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fill();
-            outlineStroke();
-            // Sert kenarlı iç çekirdek
+            rim();
             ctx.fillStyle = core;
             ctx.beginPath();
             ctx.arc(-radius * 0.14, -radius * 0.14, radius * 0.48, 0, Math.PI * 2);
             ctx.fill();
-            // Anime parlaması: keskin beyaz leke
+            // Parlama lekesi
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.ellipse(-radius * 0.4, -radius * 0.4, radius * 0.2, radius * 0.12, -0.6, 0, Math.PI * 2);
@@ -226,29 +256,41 @@ export function drawProjectileFx(ctx, projectile, radius = 15) {
 
 // Alan etkisi halkası (uyku sporu, taç yaprağı fırtınası, şifa)
 export function drawAreaFx(ctx, x, y, radius, color, alpha = 1) {
+    const useOutline = style().fx.outline;
     ctx.save();
-    ctx.globalAlpha = alpha * 0.9;
 
-    // Düz yarı saydam dolgu (degrade yok)
+    // Düz yarı saydam dolgu
     ctx.globalAlpha = alpha * 0.18;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Kalın anime halkası: koyu kontur + düz renk
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = 'rgba(20, 24, 30, 0.55)';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.stroke();
+    if (useOutline) {
+        // Koyu kontur + düz renk halka
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = 'rgba(20, 24, 30, 0.55)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
 
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+    } else {
+        // Anime: dışa sönen ışıklı halka
+        ctx.strokeStyle = color;
+        for (const [width, a] of [[7, 0.2], [4, 0.45], [2, 0.95]]) {
+            ctx.globalAlpha = alpha * a;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
 
     ctx.restore();
 }

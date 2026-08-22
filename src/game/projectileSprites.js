@@ -1,4 +1,4 @@
-// Mermiler için kare kare pixel art sprite tanımları.
+﻿// Mermiler için kare kare pixel art sprite tanımları.
 // Her sprite: frames (desen dizileri), colors (karakter -> renk haritası),
 // scale (piksel boyutu), frameMs (kare süresi), glow (neon parlaması),
 // spin (kendi etrafında dönme hızı, rad/sn), directional (sola giderken aynalanır).
@@ -7,7 +7,7 @@
 export const PROJECTILE_SPRITES = {
     // Şövalye: Razor Leaf - dönen yaprak
     leaf: {
-        scale: 3,
+        scale: 2,
         spin: 6,
         glow: { color: '#22c55e', blur: 8 },
         colors: { g: '#16a34a', G: '#4ade80', w: '#dcfce7' },
@@ -35,7 +35,7 @@ export const PROJECTILE_SPRITES = {
 
     // Büyücü: Ember - kor topu
     ember: {
-        scale: 3,
+        scale: 2,
         glow: { color: '#ff6a00', blur: 14 },
         colors: { r: '#ef4444', o: '#fb923c', y: '#fde047' },
         frames: [
@@ -64,7 +64,7 @@ export const PROJECTILE_SPRITES = {
 
     // Büyücü: Fire Blast - dev ateş küresi
     fireblast: {
-        scale: 4,
+        scale: 2.5,
         frameMs: 100,
         glow: { color: '#ff2200', blur: 24 },
         colors: { r: '#dc2626', o: '#f97316', y: '#fde047', w: '#fff7ed' },
@@ -102,7 +102,7 @@ export const PROJECTILE_SPRITES = {
 
     // Okçu: rüzgar dilimi
     wind: {
-        scale: 3,
+        scale: 2,
         frameMs: 80,
         directional: true,
         glow: { color: '#86efac', blur: 12 },
@@ -127,7 +127,7 @@ export const PROJECTILE_SPRITES = {
 
     // Suikastçı: Shadow Punch - gölge yumruğu
     punch: {
-        scale: 3,
+        scale: 2,
         glow: { color: '#a855f7', blur: 16 },
         colors: { p: '#7e22ce', P: '#c084fc', w: '#f3e8ff' },
         frames: [
@@ -158,7 +158,7 @@ export const PROJECTILE_SPRITES = {
 
     // Vampir: Bite - kapanan çene
     bite: {
-        scale: 3,
+        scale: 2,
         frameMs: 140,
         directional: true,
         glow: { color: '#e11d48', blur: 10 },
@@ -189,7 +189,7 @@ export const PROJECTILE_SPRITES = {
 
     // Vampir: Toxic Fang - zehir balonu
     poison: {
-        scale: 3,
+        scale: 2,
         glow: { color: '#10b981', blur: 12 },
         colors: { d: '#064e3b', g: '#10b981', G: '#34d399', w: '#d1fae5' },
         frames: [
@@ -216,7 +216,7 @@ export const PROJECTILE_SPRITES = {
 
     // Ninja: Slash - hız çizgisi
     slash: {
-        scale: 3,
+        scale: 2,
         frameMs: 70,
         directional: true,
         glow: { color: '#94a3b8', blur: 8 },
@@ -249,7 +249,7 @@ export const PROJECTILE_SPRITES = {
 
     // Buz Şövalyesi: Ice Shard - buz kristali
     ice: {
-        scale: 3,
+        scale: 2,
         glow: { color: '#38bdf8', blur: 12 },
         colors: { b: '#0ea5e9', B: '#7dd3fc', w: '#e0f2fe' },
         frames: [
@@ -276,7 +276,7 @@ export const PROJECTILE_SPRITES = {
 
     // Buz Şövalyesi: Sheer Cold - büyük dondurucu kristal
     freeze: {
-        scale: 4,
+        scale: 2.5,
         glow: { color: '#38bdf8', blur: 18 },
         colors: { b: '#0ea5e9', B: '#7dd3fc', w: '#e0f2fe' },
         frames: [
@@ -307,7 +307,7 @@ export const PROJECTILE_SPRITES = {
 
     // Şövalye: Seed Bomb - filizli tohum bombası
     seedbomb: {
-        scale: 3,
+        scale: 2,
         glow: { color: '#65a30d', blur: 10 },
         colors: { b: '#78350f', B: '#a16207', g: '#22c55e', w: '#fef9c3' },
         frames: [
@@ -334,7 +334,7 @@ export const PROJECTILE_SPRITES = {
 
     // Mecha: Magnet Bomb - kutuplu çelik küre
     magnetbomb: {
-        scale: 3,
+        scale: 2,
         frameMs: 100,
         glow: { color: '#94a3b8', blur: 12 },
         colors: { s: '#64748b', S: '#e2e8f0', r: '#ef4444', u: '#3b82f6', w: '#ffffff' },
@@ -364,7 +364,7 @@ export const PROJECTILE_SPRITES = {
 
     // Ninja: X-Scissor - X biçimli enerji kesiği
     xscissor: {
-        scale: 3,
+        scale: 2,
         frameMs: 90,
         glow: { color: '#22c55e', blur: 14 },
         colors: { g: '#22c55e', G: '#86efac', w: '#ffffff' },
@@ -396,7 +396,7 @@ export const PROJECTILE_SPRITES = {
 
     // Ursaring: Focus Blast - odaklanmış enerji küresi
     focusblast: {
-        scale: 3,
+        scale: 2,
         frameMs: 100,
         glow: { color: '#f97316', blur: 16 },
         colors: { o: '#f97316', y: '#fde047', w: '#fff7ed' },
@@ -428,7 +428,7 @@ export const PROJECTILE_SPRITES = {
 
     // Trevenant: Shadow Ball - karanlık gölge küresi
     shadowball: {
-        scale: 3,
+        scale: 2,
         frameMs: 110,
         glow: { color: '#7e22ce', blur: 16 },
         colors: { k: '#2e1065', p: '#7e22ce', P: '#a855f7', w: '#e9d5ff' },
@@ -460,7 +460,7 @@ export const PROJECTILE_SPRITES = {
 
     // Golisopod: Pin Missile - iğne füzesi
     pinmissile: {
-        scale: 3,
+        scale: 2,
         frameMs: 70,
         directional: true,
         glow: { color: '#a3e635', blur: 10 },
@@ -485,7 +485,7 @@ export const PROJECTILE_SPRITES = {
 
     // Mecha: Signal Beam - böcek tipi sinyal ışını
     signalbeam: {
-        scale: 3,
+        scale: 2,
         frameMs: 70,
         directional: true,
         glow: { color: '#ec4899', blur: 14 },

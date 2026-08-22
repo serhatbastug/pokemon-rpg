@@ -1,4 +1,4 @@
-import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
+﻿import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
 import { MERCHANT, STARTER_ABILITIES } from '../config/characters.js';
 import { fetchCharacter } from '../services/pokeapi.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
@@ -14,6 +14,10 @@ export class Overworld {
         this.ctx = canvas.getContext('2d');
         this.input = input;
         this.onExit = onExit;
+
+        // Görüntü ölçeği: 1 = birebir. Düşürmek haritanın daha geniş bir
+        // kısmını ekrana sığdırır (her şey orantılı küçülür).
+        this.zoom = 1;
 
         this.currentMap = null;
         this.portals = [];
@@ -185,13 +189,24 @@ export class Overworld {
         if (title) title.textContent = map.name;
     }
 
+    // Ölçek uygulandıktan sonra ekranda görünen dünya alanı
+    get viewSize() {
+        return { w: this.canvas.width / this.zoom, h: this.canvas.height / this.zoom };
+    }
+
     // Kamera oyuncuyu ortalayarak takip eder, harita kenarlarında durur.
-    // Ekrandan küçük/eşit haritalarda kamera sabit kalır.
+    // Görünür alandan küçük haritalar ekranda ortalanır.
     updateCamera(snap = false) {
         const mapW = this.currentMap.grid[0].length * TILE_SIZE;
         const mapH = this.currentMap.grid.length * TILE_SIZE;
-        const targetX = Math.max(0, Math.min(mapW - this.canvas.width, this.player.x - this.canvas.width / 2));
-        const targetY = Math.max(0, Math.min(mapH - this.canvas.height, this.player.y - this.canvas.height / 2));
+        const view = this.viewSize;
+
+        const targetX = mapW <= view.w
+            ? (mapW - view.w) / 2
+            : Math.max(0, Math.min(mapW - view.w, this.player.x - view.w / 2));
+        const targetY = mapH <= view.h
+            ? (mapH - view.h) / 2
+            : Math.max(0, Math.min(mapH - view.h, this.player.y - view.h / 2));
 
         if (snap) {
             this.camera.x = targetX;
@@ -520,7 +535,7 @@ export class Overworld {
             const a = (v.frame / 20) + (i / 8) * Math.PI * 2;
             const r = 80 + Math.sin(v.frame / 12 + i) * 12;
             ctx.fillStyle = i % 2 === 0 ? '#fde047' : '#4ade80';
-            ctx.fillRect(cx + Math.cos(a) * r - 3, cy - jump + Math.sin(a) * r * 0.6 - 3, 6, 6);
+            ctx.fillRect(cx + Math.cos(a) * r - 1.5, cy - jump + Math.sin(a) * r * 0.6 - 1.5, 3, 3);
         }
 
         // Yazılar
@@ -571,7 +586,7 @@ export class Overworld {
             ctx.shadowBlur = 8;
             ctx.shadowColor = shadowy ? '#818cf8' : '#bef264';
             ctx.fillStyle = shadowy ? '#c7d2fe' : '#d9f99d';
-            ctx.fillRect(fly.x - 2, fly.y - 2, 4, 4);
+            ctx.fillRect(fly.x - 1, fly.y - 1, 2, 2);
         }
         ctx.restore();
     }
@@ -841,7 +856,7 @@ export class Overworld {
                             x: px, y: py,
                             vx: (Math.random() - 0.5) * 9,
                             vy: -Math.random() * 8 - 2,
-                            size: 6 + Math.random() * 6,
+                            size: 3 + Math.random() * 3,
                             color: tile === 'R' ? '#64748b' : (Math.random() < 0.5 ? '#14532d' : '#4a2800'),
                             life: 45 + Math.random() * 30,
                             gravity: 0.4
@@ -865,7 +880,7 @@ export class Overworld {
                 y: -Math.random() * this.canvas.height,
                 vy: 1.5 + Math.random() * 3,
                 vx: (Math.random() - 0.5) * 1.5,
-                size: 5 + Math.random() * 6,
+                size: 3 + Math.random() * 3,
                 color: ['#fbbf24', '#4ade80', '#60a5fa', '#f472b6', '#f8fafc'][Math.floor(Math.random() * 5)]
             });
         }
@@ -892,9 +907,11 @@ export class Overworld {
         }
     }
 
-    // Karo içi 10px bloklarla, karoya özgü deterministik desen çizer
+    // Karo içi PX'lik bloklarla, karoya özgü deterministik desen çizer.
+    // PX küçüldükçe piksel sanatı incelir (5 = karo başına 10x10 blok).
     drawTile(ctx, tile, col, row) {
-        const PX = 10;
+        const PX = 5;
+        const N = TILE_SIZE / PX; // kenardaki blok sayısı
         const x0 = col * TILE_SIZE;
         const y0 = row * TILE_SIZE;
 
@@ -919,107 +936,141 @@ export class Overworld {
         // Çiçek, uzun çim, çalı ve portal karoları çim zemin üzerine çizilir
         const base = palettes[tile] || palettes['.'];
 
-        for (let by = 0; by < TILE_SIZE / PX; by++) {
-            for (let bx = 0; bx < TILE_SIZE / PX; bx++) {
-                const idx = (col * 7 + row * 13 + bx * 3 + by * 5) % base.length;
+        // İnce dokulu zemin: her blok karoya özgü sahte-rastgele bir tonda
+        for (let by = 0; by < N; by++) {
+            for (let bx = 0; bx < N; bx++) {
+                const idx = (col * 7 + row * 13 + bx * 3 + by * 5 + ((bx * by) % 3)) % base.length;
                 ctx.fillStyle = base[idx];
                 ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
             }
         }
 
         if (tile === 'W') {
-            // Su parıltısı (hareketli)
+            // Su: ince dalga çizgileri ve kayan parıltılar
             const t = Math.floor(Date.now() / 400);
-            ctx.fillStyle = '#38bdf8';
-            const sx = ((col * 3 + row * 5 + t) % 4) * PX;
-            const sy = ((col * 5 + row * 3 + t) % 4) * PX;
-            ctx.fillRect(x0 + sx, y0 + sy, PX, PX / 2);
+            ctx.fillStyle = dark ? '#0e5a86' : '#0ea5e9';
+            for (let i = 0; i < 3; i++) {
+                const wy = ((col * 3 + row * 7 + i * 3 + t) % N) * PX;
+                ctx.fillRect(x0 + ((i * 3) % N) * PX, y0 + wy, PX * 3, PX);
+            }
+            ctx.fillStyle = '#7dd3fc';
+            const sx = ((col * 3 + row * 5 + t) % N) * PX;
+            const sy = ((col * 5 + row * 3 + t) % N) * PX;
+            ctx.fillRect(x0 + sx, y0 + sy, PX * 2, PX);
         }
 
         if (tile === 'R') {
-            // Kaya vurgusu
-            ctx.fillStyle = '#94a3b8';
-            ctx.fillRect(x0 + PX, y0 + PX, PX, PX);
+            // Kaya: ışık alan üst yüz, gölgeli alt yüz ve çatlaklar
+            ctx.fillStyle = dark ? '#5b6a80' : '#94a3b8';
+            for (let bx = 1; bx < N - 2; bx++) ctx.fillRect(x0 + bx * PX, y0 + PX, PX, PX);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(x0 + PX * 2, y0 + PX * 2, PX, PX);
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(x0 + TILE_SIZE - PX * 2, y0 + TILE_SIZE - PX * 2, PX, PX);
+            for (let i = 0; i < 4; i++) {
+                const cx = ((col * 5 + row * 3 + i * 7) % (N - 2) + 1) * PX;
+                const cy = ((col * 7 + row * 5 + i * 11) % (N - 3) + 3) * PX;
+                ctx.fillRect(x0 + cx, y0 + cy, PX, PX);
+            }
         }
 
         if (tile === 'T') {
-            // Ağaç: gövde + yaprak yığını
-            ctx.fillStyle = dark ? '#2e1503' : '#451a03';
-            ctx.fillRect(x0 + PX * 2, y0 + PX * 3, PX, PX * 2);
+            // Ağaç: dokulu gövde + katmanlı yaprak kütlesi
+            const trunk = dark ? '#2e1503' : '#451a03';
+            const trunkLight = dark ? '#3f2109' : '#5c2708';
+            for (let by = 6; by < N; by++) {
+                ctx.fillStyle = by % 2 === 0 ? trunk : trunkLight;
+                ctx.fillRect(x0 + PX * 4, y0 + by * PX, PX * 2, PX);
+            }
             const leafColors = dark
                 ? ['#02180b', '#052e16', '#0a3a1c', '#0d4a24']
                 : ['#052e16', '#14532d', '#166534', '#16a34a'];
-            for (let by = 0; by < 3; by++) {
-                for (let bx = 0; bx < 5; bx++) {
-                    const d = Math.abs(bx - 2) + by;
-                    if (d > 3) continue;
-                    const idx = (col * 11 + row * 17 + bx + by * 7) % leafColors.length;
+            // Elips biçimli taç (10x10 ızgarada)
+            for (let by = 0; by < 7; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const ddx = (bx - 4.5) / 4.6;
+                    const ddy = (by - 3) / 3.4;
+                    if (ddx * ddx + ddy * ddy > 1) continue;
+                    const idx = (col * 11 + row * 17 + bx * 2 + by * 5) % leafColors.length;
                     ctx.fillStyle = leafColors[idx];
                     ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
                 }
             }
+            // Üstten gelen ışık vurgusu
+            ctx.fillStyle = dark ? '#12602e' : '#22c55e';
+            ctx.fillRect(x0 + PX * 3, y0 + PX, PX, PX);
+            ctx.fillRect(x0 + PX * 4, y0, PX, PX);
         }
 
         if (tile === 'f') {
-            // Çiçekler: karoya özgü sabit konumlarda renkli taç + sarı merkez
+            // Çiçekler: 5 taçlı ince desen (artı biçimi + sarı göbek)
             const flowerColors = ['#f472b6', '#fbbf24', '#f87171', '#e0f2fe'];
-            for (let i = 0; i < 3; i++) {
-                const fx = ((col * 13 + row * 7 + i * 11) % 4) * PX + PX / 2;
-                const fy = ((col * 5 + row * 11 + i * 17) % 4) * PX + PX / 2;
+            for (let i = 0; i < 4; i++) {
+                const fx = ((col * 13 + row * 7 + i * 11) % (N - 3) + 1) * PX;
+                const fy = ((col * 5 + row * 11 + i * 17) % (N - 3) + 1) * PX;
                 ctx.fillStyle = flowerColors[(col + row + i) % flowerColors.length];
-                ctx.fillRect(x0 + fx - 3, y0 + fy - 3, 6, 6);
+                ctx.fillRect(x0 + fx, y0 + fy - PX, PX, PX);
+                ctx.fillRect(x0 + fx, y0 + fy + PX, PX, PX);
+                ctx.fillRect(x0 + fx - PX, y0 + fy, PX, PX);
+                ctx.fillRect(x0 + fx + PX, y0 + fy, PX, PX);
                 ctx.fillStyle = '#fef08a';
-                ctx.fillRect(x0 + fx - 1, y0 + fy - 1, 3, 3);
+                ctx.fillRect(x0 + fx, y0 + fy, PX, PX);
             }
         }
 
         if (tile === 'g') {
-            // Uzun çim: hafifçe salınan koyu yeşil demetler
-            const sway = Math.floor(Date.now() / 500) % 2 === 0 ? 0 : 2;
-            const bladeColors = ['#166534', '#16a34a', '#22c55e'];
-            for (let i = 0; i < 5; i++) {
-                const gx = ((col * 7 + row * 3 + i * 9) % 4) * PX + PX / 2;
-                const gy = ((col * 3 + row * 5 + i * 13) % 3) * PX + PX * 1.5;
+            // Uzun çim: tek piksel kalınlığında, salınan ince yapraklar
+            const sway = Math.floor(Date.now() / 500) % 2 === 0 ? 0 : PX;
+            const bladeColors = dark ? ['#0d4a24', '#12602e', '#16a34a'] : ['#166534', '#16a34a', '#22c55e'];
+            for (let i = 0; i < 7; i++) {
+                const gx = ((col * 7 + row * 3 + i * 9) % (N - 1)) * PX;
+                const gh = 3 + ((col + row + i) % 4); // blok cinsinden boy
                 ctx.fillStyle = bladeColors[i % bladeColors.length];
-                ctx.fillRect(x0 + gx + sway, y0 + gy - PX, 4, PX * 1.6);
-                ctx.fillRect(x0 + gx - 4, y0 + gy - PX / 2, 4, PX * 1.1);
+                for (let b = 0; b < gh; b++) {
+                    // Uca doğru bükülme
+                    const bend = b >= gh - 2 ? sway : 0;
+                    ctx.fillRect(x0 + gx + bend, y0 + (N - 1 - b) * PX, PX, PX);
+                }
             }
         }
 
         if (tile === 'b') {
-            // Boss arenası: parçalanmış zemin, kırık dallar ve kavlamış toprak
+            // Boss arenası: çatlaklar, kavlamış toprak ve kırık dal parçaları
             const scarColors = ['#3f2a12', '#4a3218', '#2e1d0c'];
-            for (let i = 0; i < 4; i++) {
-                const sx = ((col * 5 + row * 11 + i * 13) % 4) * PX;
-                const sy = ((col * 7 + row * 3 + i * 17) % 4) * PX;
+            for (let i = 0; i < 8; i++) {
+                const sx = ((col * 5 + row * 11 + i * 13) % N) * PX;
+                const sy = ((col * 7 + row * 3 + i * 17) % N) * PX;
                 ctx.fillStyle = scarColors[(col + row + i) % scarColors.length];
                 ctx.fillRect(x0 + sx, y0 + sy, PX, PX);
             }
-            // Yerdeki kırık dal parçaları
-            if ((col * 3 + row * 5) % 4 === 0) {
+            // Çapraz çatlak
+            if ((col * 3 + row * 5) % 3 === 0) {
                 ctx.fillStyle = '#1f1408';
-                ctx.fillRect(x0 + PX, y0 + PX * 3, PX * 3, 4);
+                for (let b = 0; b < N; b++) {
+                    const cy = ((b + col + row) % 3 === 0) ? b + 1 : b;
+                    if (cy < N) ctx.fillRect(x0 + b * PX, y0 + cy * PX, PX, PX);
+                }
             }
         }
 
         // Gizli çalı normal çalıyla birebir aynı çizilir (içinden geçilebilir)
         if (tile === 'h' || tile === 'H') {
-            // Çalı: yuvarlak hatlı yoğun yaprak kümesi
-            const bushColors = ['#14532d', '#166534', '#16a34a'];
-            for (let by = 0; by < 5; by++) {
-                for (let bx = 0; bx < 5; bx++) {
-                    const d = Math.abs(bx - 2) + Math.abs(by - 2);
-                    if (d > 3) continue;
-                    const idx = (col * 9 + row * 5 + bx * 3 + by) % bushColors.length;
+            // Çalı: yuvarlak, yoğun yaprak kümesi + üstte ışık vurgusu
+            const bushColors = dark ? ['#052e16', '#0d4a24', '#12602e'] : ['#14532d', '#166534', '#16a34a'];
+            for (let by = 0; by < N; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const ddx = (bx - 4.5) / 4.6;
+                    const ddy = (by - 4.5) / 4.6;
+                    if (ddx * ddx + ddy * ddy > 1) continue;
+                    const idx = (col * 9 + row * 5 + bx * 3 + by * 2) % bushColors.length;
                     ctx.fillStyle = bushColors[idx];
                     ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
                 }
             }
-            ctx.fillStyle = '#4ade80';
-            ctx.fillRect(x0 + PX, y0 + PX, PX / 2, PX / 2);
-            ctx.fillRect(x0 + PX * 3, y0 + PX * 2, PX / 2, PX / 2);
+            // Üst yaprakların ışık alan noktaları
+            ctx.fillStyle = dark ? '#16a34a' : '#4ade80';
+            ctx.fillRect(x0 + PX * 3, y0 + PX * 2, PX, PX);
+            ctx.fillRect(x0 + PX * 5, y0 + PX, PX, PX);
+            ctx.fillRect(x0 + PX * 6, y0 + PX * 3, PX, PX);
         }
     }
 
@@ -1037,24 +1088,24 @@ export class Overworld {
             ctx.shadowBlur = 14;
             ctx.shadowColor = main;
 
-            // Dönen piksel halka
-            const n = 12;
+            // Dönen ince piksel halka (iç içe iki tur)
+            const n = 22;
             for (let i = 0; i < n; i++) {
                 const a = t * 0.2 + (i / n) * Math.PI * 2;
                 const r = 20 + Math.sin(t * 0.5 + i) * 2;
                 ctx.fillStyle = i % 3 === 0 ? bright : (i % 3 === 1 ? light : main);
-                ctx.fillRect(cx + Math.cos(a) * r - 3, cy + Math.sin(a) * r * 0.7 - 3, 6, 6);
+                ctx.fillRect(cx + Math.cos(a) * r - 1.5, cy + Math.sin(a) * r * 0.7 - 1.5, 3, 3);
             }
 
             // Merkez girdap
-            for (let i = 0; i < 4; i++) {
-                const a = -t * 0.4 + (i / 4) * Math.PI * 2;
-                const r = 7;
-                ctx.fillStyle = light;
-                ctx.fillRect(cx + Math.cos(a) * r - 2, cy + Math.sin(a) * r * 0.7 - 2, 5, 5);
+            for (let i = 0; i < 8; i++) {
+                const a = -t * 0.4 + (i / 8) * Math.PI * 2;
+                const r = 5 + (i % 3) * 2;
+                ctx.fillStyle = i % 2 === 0 ? light : bright;
+                ctx.fillRect(cx + Math.cos(a) * r - 1.5, cy + Math.sin(a) * r * 0.7 - 1.5, 3, 3);
             }
             ctx.fillStyle = bright;
-            ctx.fillRect(cx - 2, cy - 2, 4, 4);
+            ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
 
             ctx.restore();
         }
@@ -1098,29 +1149,33 @@ export class Overworld {
                 ctx.drawImage(this.merchantImg, cx - 26, y0 - 28 + bob, 52, 52);
             }
 
-            // Ahşap tezgah
+            // Ahşap tezgah (ince tahta damarlarıyla)
             ctx.fillStyle = '#78350f';
             ctx.fillRect(x0 + 2, y0 + 18, TILE_SIZE - 4, 28);
             ctx.fillStyle = '#92400e';
-            ctx.fillRect(x0 + 2, y0 + 18, TILE_SIZE - 4, 6);
+            ctx.fillRect(x0 + 2, y0 + 18, TILE_SIZE - 4, 3);
+            ctx.fillStyle = '#a16207';
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(x0 + 4 + i * 9, y0 + 24 + (i % 2) * 6, 6, 2);
+            }
             ctx.fillStyle = '#451a03';
-            for (let i = 0; i < 4; i++) {
-                ctx.fillRect(x0 + 6 + i * 11, y0 + 28, 3, 16);
+            for (let i = 0; i < 6; i++) {
+                ctx.fillRect(x0 + 5 + i * 7, y0 + 30, 2, 14);
             }
 
             // Tente direkleri
             ctx.fillStyle = '#451a03';
-            ctx.fillRect(x0 + 1, y0 - 34, 4, 52);
-            ctx.fillRect(x0 + TILE_SIZE - 5, y0 - 34, 4, 52);
+            ctx.fillRect(x0 + 1, y0 - 34, 3, 52);
+            ctx.fillRect(x0 + TILE_SIZE - 4, y0 - 34, 3, 52);
 
-            // Kırmızı-beyaz şeritli tente
-            for (let i = 0; i < 5; i++) {
+            // Kırmızı-beyaz şeritli tente (ince şeritler + fırfırlı etek)
+            for (let i = 0; i < 9; i++) {
                 ctx.fillStyle = i % 2 === 0 ? '#dc2626' : '#f8fafc';
-                ctx.fillRect(x0 - 2 + i * 11, y0 - 44, 11, 10);
-            }
-            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(x0 - 2 + i * 6, y0 - 44, 6, 9);
                 ctx.fillStyle = i % 2 === 0 ? '#b91c1c' : '#e2e8f0';
-                ctx.fillRect(x0 - 2 + i * 11, y0 - 34, 11, 4);
+                ctx.fillRect(x0 - 2 + i * 6, y0 - 35, 6, 3);
+                // Fırfır uçları
+                ctx.fillRect(x0 - 2 + i * 6 + 1, y0 - 32, 4, 2);
             }
 
             ctx.restore();
@@ -1183,11 +1238,11 @@ export class Overworld {
         for (const s of this.spores) {
             ctx.save();
             ctx.globalAlpha = Math.max(0, s.life / 30) * 0.8;
-            const n = 16;
+            const n = 34;
             for (let i = 0; i < n; i++) {
                 const a = (i / n) * Math.PI * 2 + s.r * 0.02;
-                ctx.fillStyle = i % 2 === 0 ? '#a78bfa' : '#c4b5fd';
-                ctx.fillRect(s.x + Math.cos(a) * s.r - 3, s.y + Math.sin(a) * s.r - 3, 6, 6);
+                ctx.fillStyle = i % 3 === 0 ? '#ddd6fe' : (i % 3 === 1 ? '#a78bfa' : '#c4b5fd');
+                ctx.fillRect(s.x + Math.cos(a) * s.r - 1.5, s.y + Math.sin(a) * s.r - 1.5, 3, 3);
             }
             ctx.restore();
         }
@@ -1214,15 +1269,33 @@ export class Overworld {
         ctx.imageSmoothingEnabled = false;
         ctx.translate(bx, by);
         ctx.rotate(tilt);
-        // Pokeball pikselleri: üst kırmızı, alt beyaz, bant ve merkez düğme
-        ctx.fillStyle = '#dc2626';
-        ctx.fillRect(-8, -8, 16, 8);
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(-8, 0, 16, 8);
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(-8, -2, 16, 4);
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(-3, -3, 6, 6);
+        // Pokeball: 16x16'lık ince piksel deseni (P kırmızı, w beyaz, k siyah)
+        const BALL = [
+            '....kkkkkk....',
+            '..kkPPPPPPkk..',
+            '.kPPPPPPPPPPk.',
+            '.kPPwPPPPPPPk.',
+            'kPPwPPPPPPPPPk',
+            'kPPPPPPPPPPPPk',
+            'kkkkkkkkkkkkkk',
+            'kkkwwwwwwwwkkk',
+            'kwwwkkkkkkwwwk',
+            'kwwwkwwwwkwwwk',
+            '.kwwkwwwwkwwk.',
+            '.kwwwkkkkwwwk.',
+            '..kkwwwwwwkk..',
+            '....kkkkkk....'
+        ];
+        const BP = 1.5; // piksel boyutu
+        const ballColors = { k: '#111827', P: '#dc2626', w: '#f8fafc' };
+        for (let r = 0; r < BALL.length; r++) {
+            for (let c = 0; c < BALL[r].length; c++) {
+                const color = ballColors[BALL[r][c]];
+                if (!color) continue;
+                ctx.fillStyle = color;
+                ctx.fillRect(-BALL[r].length * BP / 2 + c * BP, -BALL.length * BP / 2 + r * BP, BP, BP);
+            }
+        }
         ctx.restore();
     }
 

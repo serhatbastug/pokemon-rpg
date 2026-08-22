@@ -106,7 +106,10 @@ export class CharacterSelect {
             this.status.querySelector('.p2-status-badge').textContent = `P2: ${character.className} (${character.name})`;
             this.status.querySelector('.p2-status-badge').classList.add('selected');
 
-            this.startBtn.classList.remove('hidden');
+            // İki oyuncu da seçildi: 2 kişilik mod düğmesi aktifleşir
+            this.startBtn.classList.remove('not-ready');
+            const hint = document.getElementById('mode-hint');
+            if (hint) hint.textContent = 'Her iki oyuncu da hazır — 2 kişilik oyna!';
         }
 
         this.closeModal();

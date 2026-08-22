@@ -294,6 +294,35 @@ body.battle-active {
     color: var(--text-secondary);
 }
 
+/* Mod seçim düğmeleri (ekranın en üstünde) */
+.mode-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.mode-hint {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 2rem;
+}
+
+/* Mod düğmeleri satır içinde durur; eski alt boşlukları sıfırlanır */
+.mode-buttons .start-adventure-btn,
+.mode-buttons .start-battle-btn {
+    margin: 0;
+}
+
+/* Henüz iki karakter seçilmedi */
+.start-battle-btn.not-ready {
+    filter: grayscale(0.7);
+    opacity: 0.6;
+    animation: none;
+}
+
 /* Start Battle Button */
 .start-battle-btn {
     display: block;
@@ -501,6 +530,10 @@ canvas {
     max-width: 550px;
     padding: 2rem;
     position: relative;
+    /* Uzun içerikli ekranlar (kütüphane, dükkan) kaydırılabilir olmalı */
+    max-height: 88vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     transform: scale(0.9);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
@@ -508,6 +541,16 @@ canvas {
 
 .detail-overlay.active .modal-card {
     transform: scale(1);
+}
+
+/* Kaydırılabilir kartlarda kapatma düğmesi üstte sabit kalsın */
+.library-card .close-btn,
+.shop-modal .close-btn {
+    position: sticky;
+    float: right;
+    top: 0;
+    right: 0;
+    z-index: 2;
 }
 
 .close-btn {

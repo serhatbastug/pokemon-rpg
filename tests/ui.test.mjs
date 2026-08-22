@@ -116,8 +116,8 @@ async function main() {
     await cards[1].click();
     await page.waitForSelector('.select-hero-btn', { visible: true });
     await page.click('.select-hero-btn');
-    const battleBtnVisible = await page.$eval('#start-battle-btn', el => !el.classList.contains('hidden'));
-    check('P2 secilince savas dugmesi cikti', battleBtnVisible);
+    const battleBtnReady = await page.$eval('#start-battle-btn', el => !el.classList.contains('not-ready'));
+    check('P2 secilince 2 kisilik dugmesi aktiflesiyor', battleBtnReady);
 
     // --- Savaş ekranı ---
     await page.click('#start-battle-btn');
@@ -357,7 +357,7 @@ async function main() {
     });
     await wait(200);
     await page.keyboard.press('KeyN');
-    await page.waitForFunction(() => !!window.__overworld.victory, { timeout: 6000 });
+    await page.waitForFunction(() => !!window.__overworld.victory, { timeout: 20000 });
     check('Bossu yakalayinca zafer sahnesi aciliyor', true);
     await wait(900);
     await shot('10-zafer');
@@ -382,12 +382,14 @@ async function main() {
         boss.hp = 1;
         boss.takeDamage(999);
     });
-    await page.waitForFunction(() => !!window.__overworld.victory, { timeout: 15000 });
+    await page.waitForFunction(() => !!window.__overworld.victory, { timeout: 20000 });
     const secondBadge = await page.evaluate(() => window.__overworld.victory.badge?.name);
     check('Ikinci mekan bossu Rock Smash rozetini veriyor', secondBadge === 'Rock Smash', `rozet: ${secondBadge}`);
     await wait(600);
     await shot('14-rozet');
-    await page.evaluate(() => { window.__overworld.victory = null; });
+    await page.evaluate(() => { window.__overworld.victory.frame = 200; });
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => window.__overworld.victory === null, { timeout: 10000 });
 
     // --- Üçüncü mekan: Kadim Ağaç Meydanı (bölge bossu) ---
     await page.evaluate(() => window.__overworld.loadMap('loc-1-3'));
@@ -431,7 +433,7 @@ async function main() {
         boss.hp = 1;
         boss.takeDamage(999);
     });
-    await page.waitForFunction(() => window.__overworld.victory?.isRegionBoss, { timeout: 15000 });
+    await page.waitForFunction(() => window.__overworld.victory?.isRegionBoss, { timeout: 20000 });
     check('Bolge bossu yenilince bolge fethedildi', true);
     await wait(900);
     await shot('14-bolge-zaferi');

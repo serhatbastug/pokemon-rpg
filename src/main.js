@@ -76,7 +76,11 @@ document.getElementById('overworld-back-btn').addEventListener('click', () => {
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();
-    if (!p1 || !p2) return;
+    if (!p1 || !p2) {
+        const hint = document.getElementById('mode-hint');
+        if (hint) hint.textContent = 'Önce aşağıdan iki karakter seçin (P1 ve P2).';
+        return;
+    }
 
     showBattleScreen();
     game.start(p1, p2);

@@ -78,8 +78,9 @@ export class Overworld {
         this.debris = [];       // boss uyanışında savrulan enkaz
         this.shake = 0;         // ekran sarsıntısı
         this.arenaOpened = false;
-        this.victory = null;    // boss yakalandığında zafer sahnesi
-        this.shotsFired = 0;    // atılan yetenek sayacı (testler ve hata ayıklama)
+        this.victory = null;        // boss yenildiğinde zafer sahnesi
+        this.pendingVictory = null; // jetonlar toplanana kadar bekleyen zafer
+        this.shotsFired = 0;        // atılan yetenek sayacı (testler ve hata ayıklama)
 
         // Atmosfer: kenarları karartan vinyet (bir kez oluşturulur)
         const vg = this.ctx.createRadialGradient(
@@ -94,7 +95,13 @@ export class Overworld {
             if (!this.running) return;
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
-            if (this.victory || this.evolutionScene) return; // sahnelerde oynanış durur
+
+            // Zafer sahnesi: bir tuşla ana haritaya dön
+            if (this.victory) {
+                if (this.victory.frame > 90) this.finishVictory();
+                return;
+            }
+            if (this.evolutionScene) return; // sahnelerde oynanış durur
 
             // Yetenek tuşları sahadaki Pokemona göre değişir (K, O, Ş, L, P)
             const abilities = this.abilities;
@@ -204,6 +211,13 @@ export class Overworld {
 
         // Kayıttan gelen seviyeye uygun evrim formunu sessizce uygula
         for (let i = 0; i < this.partyPokemon.length; i++) this.checkEvolution(i, true);
+    }
+
+    // Zafer sahnesi bitti: macera ana haritasına dön
+    finishVictory() {
+        this.victory = null;
+        this.recallActive(null);
+        this.loadMap('main');
     }
 
     // Kütüphaneden seviye yükseltilen üye: statları tazelenir, evrim kontrol edilir
@@ -828,6 +842,7 @@ export class Overworld {
         this.checkPortals();
         this.checkSecretDiscovery();
         this.updateCombat();
+        this.updatePendingVictory();
         this.updateCamera();
     }
 
@@ -988,7 +1003,9 @@ export class Overworld {
         }
 
         ctx.font = "15px 'Space Grotesk', sans-serif";
-        const foot = `${v.locationName} tamamlandı — ESC ile menüye dön`;
+        const foot = v.frame > 90
+            ? `${v.locationName} tamamlandı — bir tuşa bas: ana haritaya dön`
+            : `${v.locationName} tamamlandı`;
         ctx.strokeText(foot, cx, cy + 110);
         ctx.fillStyle = '#94a3b8';
         ctx.fillText(foot, cx, cy + 110);
@@ -1619,6 +1636,27 @@ export class Overworld {
         const move = FIELD_MOVES.find(m => m.badge === this.currentMap.id);
         const badge = isNew && move ? move : null;
 
+        // Bossun düşürdüğü jetonları toplamak için süre tanı; zafer ekranı
+        // ancak jetonlar alındıktan (ya da süre dolduktan) sonra açılır
+        this.pendingVictory = { boss, badge, wait: 420 };
+        this.spawnMapText(boss.x, boss.y - 90, 'Jetonları topla!', '#fbbf24');
+    }
+
+    // Jetonlar toplanınca (ya da süre dolunca) zafer sahnesini başlat
+    updatePendingVictory() {
+        const pending = this.pendingVictory;
+        if (!pending) return;
+
+        pending.wait--;
+        // Haritada jeton kalmadıysa beklemeye gerek yok (kısa bir tampon bırak)
+        if (this.tokenDrops.length === 0 && pending.wait > 60) pending.wait = 60;
+        if (pending.wait > 0) return;
+
+        this.pendingVictory = null;
+        this.startVictory(pending.boss, pending.badge);
+    }
+
+    startVictory(boss, badge) {
         this.victory = {
             frame: 0,
             name: boss.name,

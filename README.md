@@ -96,8 +96,12 @@ uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sa
 - **Antrenör:** Haritada gezdirdiğiniz karakter bir antrenördür (elle çizilmiş
   piksel sprite) ve **vurulmaz**. Sahadaki Pokemonunuz peşinizden gelir,
   saldırıları o yapar ve hasarı o alır.
-- **6 kişilik ekip:** 1-6 tuşlarıyla anında Pokemon değiştirilir. Sahadaki
-  Pokemon bayılırsa sıradaki gelir; hepsi bayılırsa mekan girişine dönülür.
+- **Poke top fırlatma:** Pokemonlar peşinizden gelmez. **1-6** tuşlarıyla o
+  ekip üyesinin topunu baktığınız yöne fırlatırsınız; Pokemon orada açılır ve
+  o noktayı tutarak savaşır. Aynı tuşa tekrar basmak onu topuna geri çağırır.
+  Antrenör çok uzaklaşırsa Pokemon kendiliğinden döner.
+- **6 kişilik ekip:** Sahadaki Pokemon bayılırsa sıradaki gelir; hepsi
+  bayılırsa mekan girişine dönülür.
 - **Yakalama:** Yalnızca yabani (yaygın/gizli) Pokemonlar yakalanır. **Bosslar
   yakalanmaz, yenilir** — mekanı tamamlamanın yolu onları alt etmektir.
 - **Yetenek jetonu:** Yenilen her düşman haritaya altın jeton düşürür; antrenör
@@ -115,8 +119,22 @@ uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sa
   resmi hamle açılır: **L Leech Seed** (16), **P Petal Blizzard** (32).
 - **Kayıt:** Ekip, koleksiyon, jetonlar ve rozetler localStorage'a yazılır.
 
-Sırada: 2. bölge (Ateş Dağı), rozetlerle açılan saha hamleleri (Cut/Surf) ve
-bunlarla ulaşılan gizli alanlar, Kecleon dükkanında alışveriş.
+### Rozetler ve saha hamleleri
+
+Her mekanın bossunu yenmek bir rozet ve onunla bir **saha hamlesi** açar:
+
+| Rozet | Mekan / Boss | Saha hamlesi | Etkisi |
+|---|---|---|---|
+| Yaprak Rozeti | Fısıltılı Orman Girişi / Golisopod | **Cut** (F) | Çalıları keser |
+| Gölge Rozeti | Gölgeli Derinlikler / Hawlucha | **Rock Smash** (F) | Kayaları kırar |
+| Kadim Rozet | Kadim Ağaç Meydanı / Zarude | **Surf** | Suyun üstünden geçilir |
+
+Ana harita bu hamleler düşünülerek genişletildi (28x14): doğudaki su kanalı
+Surf ile geçilen bir adaya, güneydeki kaya ve çalı duvarları Rock Smash ve Cut
+ile açılan gizli köşelere çıkar. Yani eski haritalar sonradan tekrar ziyaret
+edilmeye değer hâle gelir.
+
+Sırada: 2. bölge (Ateş Dağı), Kecleon dükkanında alışveriş.
 
 ## Yeni İçerik Ekleme
 

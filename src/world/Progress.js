@@ -147,6 +147,12 @@ export class Progress {
         if (!this.badges.includes(mapId)) {
             this.badges.push(mapId);
             this.save();
+            return true; // yeni rozet
         }
+        return false;
+    }
+
+    hasBadge(mapId) {
+        return this.badges.includes(mapId);
     }
 }

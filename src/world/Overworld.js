@@ -7,6 +7,7 @@ import { buildAbilities } from '../services/moveAbilities.js';
 import { effectiveness, effectivenessLabel, preloadTypes } from '../services/typeChart.js';
 import { ActivePokemon } from './ActivePokemon.js';
 import { drawTrainer } from './trainerSprite.js';
+import { FIELD_MOVES, fieldMoveForTile, hasSurf, unlockedMoves } from '../config/fieldMoves.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { PROJECTILE_SPRITES, drawPixelSprite } from '../game/projectileSprites.js';
 import { Enemy } from './Enemy.js';
@@ -25,6 +26,7 @@ export class Overworld {
         this.partyPokemon = [];   // ActivePokemon örnekleri (ekip sırasıyla)
         this.active = null;       // sahadaki Pokemon
         this.tokenDrops = [];     // haritada toplanmayı bekleyen jetonlar
+        this.deployBall = null;   // havada olan poke top
         this.evolutionScene = null;
         this.swapCooldown = 0;
 
@@ -107,6 +109,9 @@ export class Overworld {
 
             // N: bayılmış Pokemona Pokeball at
             if (e.code === 'KeyN') this.tryCatch();
+
+            // F: saha hamlesi (rozetle açılan Cut / Rock Smash)
+            if (e.code === 'KeyF') this.useFieldMove();
         });
     }
 
@@ -187,9 +192,8 @@ export class Overworld {
 
         if (!this.partyPokemon.length) return;
 
-        this.active = this.partyPokemon[Math.min(progress.activeIndex, this.partyPokemon.length - 1)];
-        this.active.x = this.player.x - 34;
-        this.active.y = this.player.y + 6;
+        // Pokemon kendiliğinden sahaya çıkmaz; oyuncu poke topunu fırlatır (1-6)
+        this.active = null;
 
         // Tip etkililik tablosu: ekip ve düşman tipleri
         const types = this.partyPokemon.flatMap(p => p.types);
@@ -218,25 +222,105 @@ export class Overworld {
         await this.checkEvolution(index);
     }
 
-    // Ekipteki başka bir Pokemona geç
+    // Poke topu fırlatarak Pokemonu sahaya sürer. Aynı tuşa tekrar basmak
+    // (ya da başka bir slot seçmek) onu geri çağırır.
     swapTo(index) {
-        if (this.swapCooldown > 0) return;
+        if (this.swapCooldown > 0 || this.deployBall) return;
         const next = this.partyPokemon[index];
-        if (!next || next === this.active || next.fainted) {
-            if (next && next.fainted) {
-                this.spawnMapText(this.player.x, this.player.y - 50, `${next.name} bayılmış!`, '#94a3b8');
-            }
+        if (!next) return;
+
+        if (next.fainted) {
+            this.spawnMapText(this.player.x, this.player.y - 50, `${next.name} bayılmış!`, '#94a3b8');
             return;
         }
 
-        next.x = this.active ? this.active.x : this.player.x;
-        next.y = this.active ? this.active.y : this.player.y;
-        next.invuln = 30;
-        this.active = next;
-        this.progress.setActive(index);
-        this.swapCooldown = 30;
-        this.effectsTrail(next.x, next.y);
-        this.spawnMapText(next.x, next.y - 50, `Hadi ${next.name}!`, '#38bdf8');
+        // Sahadaki Pokemonun topuna tekrar basıldı: geri çağır
+        if (next === this.active) {
+            this.recallActive('geri döndü');
+            return;
+        }
+
+        // Topun düşeceği nokta: antrenörün baktığı yönde, duvara girmeyecek şekilde
+        const aim = this.aimVector();
+        let tx = this.player.x + aim.x * 120;
+        let ty = this.player.y + aim.y * 120;
+        for (let i = 0; i < 8 && !this.canBoxMoveTo(tx, ty, 16, 12); i++) {
+            tx -= aim.x * 14;
+            ty -= aim.y * 14;
+        }
+        if (!this.canBoxMoveTo(tx, ty, 16, 12)) {
+            tx = this.player.x;
+            ty = this.player.y;
+        }
+
+        if (this.active) this.recallActive(null);
+
+        this.deployBall = {
+            index,
+            frame: 0,
+            fromX: this.player.x,
+            fromY: this.player.y - 14,
+            toX: tx,
+            toY: ty
+        };
+        this.swapCooldown = 20;
+    }
+
+    // Topun havada geçirdiği süre ve açılma anı
+    updateDeployBall() {
+        const ball = this.deployBall;
+        if (!ball) return;
+
+        ball.frame++;
+        if (ball.frame < 18) return;
+
+        const pokemon = this.partyPokemon[ball.index];
+        this.deployBall = null;
+        if (!pokemon || pokemon.fainted) return;
+
+        pokemon.x = ball.toX;
+        pokemon.y = ball.toY;
+        pokemon.invuln = 30;
+        this.active = pokemon;
+        this.progress.setActive(ball.index);
+
+        // Açılma parlaması
+        for (let i = 0; i < 26; i++) {
+            const a = (i / 26) * Math.PI * 2;
+            this.debris.push({
+                x: ball.toX, y: ball.toY,
+                vx: Math.cos(a) * 3,
+                vy: Math.sin(a) * 3 - 1,
+                size: 3,
+                color: i % 2 === 0 ? '#f8fafc' : '#38bdf8',
+                life: 22,
+                gravity: 0.05
+            });
+        }
+        this.spawnMapText(ball.toX, ball.toY - 50, `Hadi ${pokemon.name}!`, '#38bdf8');
+    }
+
+    recallActive(reason) {
+        if (!this.active) return;
+        const pokemon = this.active;
+        this.effectsTrail(pokemon.x, pokemon.y);
+        if (reason) this.spawnMapText(pokemon.x, pokemon.y - 40, `${pokemon.name} ${reason}`, '#94a3b8');
+        this.active = null;
+    }
+
+    // Sahadaki Pokemona en yakın ayakta düşman (menzil içinde)
+    nearestEnemy(x, y, range) {
+        let best = null;
+        let bestDist = range;
+        for (const enemy of this.enemies) {
+            if (enemy.fainted || enemy.asleep) continue;
+            const dist = Math.hypot(enemy.x - x, enemy.y - y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = enemy;
+            }
+        }
+        return best;
     }
 
     // Sahadaki Pokemon bayıldı: sıradaki sağlıklı Pokemon gelir
@@ -287,6 +371,14 @@ export class Overworld {
         this.portalCooldown = 45;
         this.player.x = map.start.col * TILE_SIZE + TILE_SIZE / 2;
         this.player.y = map.start.row * TILE_SIZE + TILE_SIZE / 2;
+
+        // Sahadaki Pokemon antrenörle birlikte yeni haritaya geçer
+        if (this.active) {
+            this.active.x = this.player.x;
+            this.active.y = this.player.y;
+            this.active.invuln = 45;
+        }
+        this.deployBall = null;
 
         // Harita savaşı durumu sıfırlanır; düşmanlar spawn listesinden kurulur
         this.projectiles = [];
@@ -394,6 +486,7 @@ export class Overworld {
     }
 
     // (x, y) noktasındaki karo yürünebilir mi?
+    // Surf rozeti varsa su karoları da geçilebilir olur.
     isWalkable(x, y) {
         const col = Math.floor(x / TILE_SIZE);
         const row = Math.floor(y / TILE_SIZE);
@@ -401,7 +494,70 @@ export class Overworld {
         if (!rowStr) return false;
         const tile = rowStr[col];
         if (tile === undefined) return false;
+        if (tile === 'W' && hasSurf(this.progress.badges)) return true;
         return !SOLID_TILES.has(tile);
+    }
+
+    // Antrenörün baktığı yöndeki komşu karoya saha hamlesi uygular
+    useFieldMove() {
+        const { player, progress } = this;
+        const aim = this.aimVector();
+        const col = Math.floor((player.x + aim.x * TILE_SIZE * 0.8) / TILE_SIZE);
+        const row = Math.floor((player.y + aim.y * TILE_SIZE * 0.8) / TILE_SIZE);
+
+        const grid = this.currentMap.grid;
+        const tile = grid[row]?.[col];
+        if (tile === undefined) return;
+
+        const move = fieldMoveForTile(tile, progress.badges);
+        if (!move) {
+            // Rozeti yoksa neye ihtiyacı olduğunu söyle
+            const locked = FIELD_MOVES.find(m => m.tile === tile && !m.passive);
+            if (locked) {
+                this.spawnMapText(player.x, player.y - 50, `${locked.name} gerekiyor`, '#94a3b8');
+            }
+            return;
+        }
+
+        // Karoyu kalıcı olarak aç ve zemini yeniden pişir
+        const rows = grid.map(r => r.split(''));
+        rows[row][col] = move.becomes;
+        this.currentMap = { ...this.currentMap, grid: rows.map(r => r.join('')) };
+        this.flow = null;
+        this.bakeTerrain();
+
+        // Parçalanma efekti
+        const px = col * TILE_SIZE + TILE_SIZE / 2;
+        const py = row * TILE_SIZE + TILE_SIZE / 2;
+        for (let i = 0; i < 16; i++) {
+            this.debris.push({
+                x: px, y: py,
+                vx: (Math.random() - 0.5) * 8,
+                vy: -Math.random() * 7 - 1,
+                size: 3 + Math.random() * 4,
+                color: move.color,
+                life: 30 + Math.random() * 20,
+                gravity: 0.35
+            });
+        }
+        this.shake = 8;
+        this.spawnMapText(px, py - 30, `${move.name}!`, move.color);
+    }
+
+    // Yakındaki saha hamlesi hedefi (ipucu göstermek için)
+    nearbyFieldTarget() {
+        const { player, progress } = this;
+        const aim = this.aimVector();
+        const col = Math.floor((player.x + aim.x * TILE_SIZE * 0.8) / TILE_SIZE);
+        const row = Math.floor((player.y + aim.y * TILE_SIZE * 0.8) / TILE_SIZE);
+        const tile = this.currentMap.grid[row]?.[col];
+        if (tile === undefined) return null;
+
+        const usable = fieldMoveForTile(tile, progress.badges);
+        if (usable) return { col, row, move: usable, locked: false };
+
+        const locked = FIELD_MOVES.find(m => m.tile === tile && !m.passive);
+        return locked ? { col, row, move: locked, locked: true } : null;
     }
 
     // Çarpışma kutusunun dört köşesi de yürünebilirse hareket geçerli
@@ -638,6 +794,8 @@ export class Overworld {
         this.drawProjectiles();
         if (this.active) this.active.draw(ctx);
         this.drawPlayer();
+        this.drawDeployBall();
+        this.drawFieldHint();
         this.drawSpores();
         this.drawBallAnim();
         this.drawDebris();
@@ -745,6 +903,28 @@ export class Overworld {
         ctx.fillStyle = '#f8fafc';
         ctx.fillText(sub, cx, cy - 96);
 
+        // Kazanılan rozet ve açılan saha hamlesi
+        if (v.badge) {
+            ctx.font = "bold 17px 'Space Grotesk', sans-serif";
+            ctx.lineWidth = 4;
+            const badgeText = `${v.badge.badgeName} kazanıldı — ${v.badge.name} açıldı!`;
+            ctx.strokeText(badgeText, cx, cy + 78);
+            ctx.fillStyle = v.badge.color;
+            ctx.fillText(badgeText, cx, cy + 78);
+
+            // Rozet: parlayan piksel madalya
+            const bx = cx, by = cy + 46;
+            ctx.fillStyle = v.badge.color;
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2 + v.frame / 30;
+                ctx.fillRect(bx + Math.cos(a) * 16 - 3, by + Math.sin(a) * 16 - 3, 6, 6);
+            }
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(bx - 6, by - 6, 12, 12);
+            ctx.fillStyle = v.badge.color;
+            ctx.fillRect(bx - 3, by - 3, 6, 6);
+        }
+
         ctx.font = "15px 'Space Grotesk', sans-serif";
         const foot = `${v.locationName} tamamlandı — ESC ile menüye dön`;
         ctx.strokeText(foot, cx, cy + 110);
@@ -788,10 +968,17 @@ export class Overworld {
     updateCombat() {
         if (this.swapCooldown > 0) this.swapCooldown--;
 
-        // Sahadaki Pokemon antrenörü takip eder ve bekleme sürelerini işler
+        this.updateDeployBall();
+
+        // Sahadaki Pokemon durduğu yeri tutar (antrenörü takip etmez)
         if (this.active) {
-            this.active.follow(this.player);
+            this.active.hold();
             this.active.update();
+
+            // Tasma: antrenör çok uzaklaşırsa Pokemon topuna döner
+            if (Math.hypot(this.player.x - this.active.x, this.player.y - this.active.y) > 430) {
+                this.recallActive('topuna döndü');
+            }
         }
 
         this.collectTokens();
@@ -1358,13 +1545,18 @@ export class Overworld {
     }
 
     onBossDefeated(boss) {
-        this.progress.markBossDefeated(this.currentMap.id);
+        const isNew = this.progress.markBossDefeated(this.currentMap.id);
+
+        // Rozet ve onunla açılan saha hamlesi
+        const move = FIELD_MOVES.find(m => m.badge === this.currentMap.id);
+        const badge = isNew && move ? move : null;
 
         this.victory = {
             frame: 0,
             name: boss.name,
             isRegionBoss: boss.kind === 'regionBoss',
             locationName: this.currentMap.name,
+            badge,
             confetti: []
         };
         for (let i = 0; i < 90; i++) {
@@ -1796,6 +1988,53 @@ export class Overworld {
         drawTrainer(ctx, player.x, player.y, player.dir, player.moving, 3);
     }
 
+    // Sahaya sürülen Pokemonun havada dönen topu
+    drawDeployBall() {
+        const ball = this.deployBall;
+        if (!ball) return;
+        const { ctx } = this;
+
+        const t = ball.frame / 18;
+        const x = ball.fromX + (ball.toX - ball.fromX) * t;
+        const y = ball.fromY + (ball.toY - ball.fromY) * t - Math.sin(t * Math.PI) * 46;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(x, y);
+        ctx.rotate(ball.frame * 0.45);
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(-6, -6, 12, 6);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-6, 0, 12, 6);
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(-6, -1.5, 12, 3);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-2, -2, 4, 4);
+        ctx.restore();
+    }
+
+    // Önündeki engel saha hamlesiyle aşılabiliyorsa ipucu göster
+    drawFieldHint() {
+        const target = this.nearbyFieldTarget();
+        if (!target) return;
+        const { ctx } = this;
+
+        const x = target.col * TILE_SIZE + TILE_SIZE / 2;
+        const y = target.row * TILE_SIZE + TILE_SIZE / 2;
+        const bob = Math.sin(Date.now() / 250) * 2;
+
+        ctx.save();
+        ctx.font = "bold 12px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        const text = target.locked ? `${target.move.name} gerekli` : target.move.hint;
+        ctx.strokeText(text, x, y - TILE_SIZE / 2 - 6 + bob);
+        ctx.fillStyle = target.locked ? '#94a3b8' : target.move.color;
+        ctx.fillText(text, x, y - TILE_SIZE / 2 - 6 + bob);
+        ctx.restore();
+    }
+
     // Yenilen düşmanlardan düşen yetenek jetonları
     spawnTokenDrop(x, y, amount) {
         for (let i = 0; i < amount; i++) {
@@ -2008,8 +2247,8 @@ export class Overworld {
 
         ctx.font = "bold 12px 'Space Grotesk', sans-serif";
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillText(active ? active.name : 'Pokemon yok', 18, 26);
+        ctx.fillStyle = active ? '#f8fafc' : '#facc15';
+        ctx.fillText(active ? active.name : '1-6: Poke top fırlat', 18, 26);
         if (active) {
             ctx.fillStyle = '#facc15';
             ctx.fillText(`Sv. ${active.level}`, 150, 26);
@@ -2057,6 +2296,22 @@ export class Overworld {
         ctx.fillText(`${progress.tokens} jeton`, canvas.width - 20, 30);
         ctx.fillStyle = '#94a3b8';
         ctx.fillText(`${progress.collection.length} yakalanan · E: kütüphane`, canvas.width - 20, 47);
+
+        // Kazanılan saha hamleleri (rozetler)
+        const moves = unlockedMoves(progress.badges);
+        if (moves.length) {
+            ctx.textAlign = 'right';
+            ctx.font = "bold 11px 'Space Grotesk', sans-serif";
+            moves.forEach((move, i) => {
+                const x = canvas.width - 20 - i * 92;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.fillRect(x - 82, 62, 84, 22);
+                ctx.fillStyle = move.color;
+                ctx.fillText(move.name, x - 8, 77);
+                // Rozet noktası
+                ctx.fillRect(x - 76, 69, 8, 8);
+            });
+        }
 
         // Yetenek kutuları (sol alt)
         const boxY = canvas.height - 58;

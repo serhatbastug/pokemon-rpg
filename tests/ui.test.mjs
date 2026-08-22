@@ -147,8 +147,12 @@ async function main() {
     // Yeni akış: macera düğmesi karakter seçimini açar
     await page.evaluate(() => localStorage.removeItem('pokerpg-save-v2'));
     await page.click('#start-adventure-btn');
-    await page.waitForFunction(() => window.__overworld && window.__overworld.running && window.__overworld.active, { timeout: 30000 });
-    await wait(800);
+    await page.waitForFunction(() => window.__overworld?.running && window.__overworld.partyPokemon.length > 0, { timeout: 30000 });
+    await wait(500);
+    // Pokemon artik pesimizden gelmiyor: poke topu firlatarak sahaya suruyoruz
+    await page.keyboard.press('Digit1');
+    await page.waitForFunction(() => !!window.__overworld.active, { timeout: 10000 });
+    await wait(500);
     const overworldVisible = await page.$eval('#overworld-screen', el => !el.classList.contains('hidden'));
     check('Ana harita acildi', overworldVisible);
     await shot('04-ana-harita');
@@ -163,6 +167,25 @@ async function main() {
         `${startState.party} uye: ${startState.activeName}`);
     check('Sahadaki Pokemonun yetenekleri var', startState.abilities === 3, `${startState.abilities} yetenek`);
     check('Jetonla baslanmiyor', startState.tokens === 0, `${startState.tokens} jeton`);
+
+    // Pokemon antrenörü takip etmemeli: antrenör uzaklaşınca yerinde kalır
+    const held = await page.evaluate(() => ({ x: window.__overworld.active.x, y: window.__overworld.active.y }));
+    await hold('KeyD', 700);
+    const afterWalk = await page.evaluate(() => ({
+        pokemon: { x: window.__overworld.active?.x, y: window.__overworld.active?.y },
+        trainerX: window.__overworld.player.x
+    }));
+    check('Pokemon antrenoru takip etmiyor',
+        !afterWalk.pokemon.x || Math.abs(afterWalk.pokemon.x - held.x) < 90,
+        `pokemon x: ${Math.round(held.x)} -> ${Math.round(afterWalk.pokemon.x ?? held.x)}`);
+
+    // Aynı slota tekrar basınca topuna döner
+    await page.keyboard.press('Digit1');
+    await wait(500);
+    const recalled = await page.evaluate(() => window.__overworld.active === null);
+    check('Ayni slot tusu Pokemonu geri cagiriyor', recalled === true);
+    await page.keyboard.press('Digit1');
+    await page.waitForFunction(() => !!window.__overworld.active, { timeout: 10000 });
 
     // Sprite, tip ve evrim istekleri otursun; ölçüm sabit duruma bakmalı
     await wait(3000);
@@ -274,7 +297,7 @@ async function main() {
 
     // Ekip değiştirme (2 tuşu)
     await page.keyboard.press('Digit2');
-    await wait(300);
+    await wait(900);
     const swapped = await page.evaluate(() => window.__overworld.progress.activeIndex);
     check('1-6 tuslariyla Pokemon degistiriliyor', swapped === 1, `aktif slot ${swapped + 1}`);
     await shot('07-yakalama');
@@ -284,7 +307,7 @@ async function main() {
     check('Yakalanan Pokemona otomatik hamle seti verildi', autoAbilities.length > 0, autoAbilities.join(', '));
 
     await page.keyboard.press('Digit1');
-    await wait(300);
+    await wait(900);
 
     // --- Gizli oda ---
     const secretBefore = await page.evaluate(() => window.__overworld.secretRevealed);
@@ -352,6 +375,19 @@ async function main() {
 
     const loc2Fps = await measureFps(4000);
     check('Golgeli Derinlikler 50+ FPS', loc2Fps.fps >= 50, JSON.stringify(loc2Fps));
+
+    // Bu mekanın bossunu da yen: Rock Smash rozeti açılsın
+    await page.evaluate(() => {
+        const boss = window.__overworld.enemies.find(e => e.isBoss);
+        boss.hp = 1;
+        boss.takeDamage(999);
+    });
+    await page.waitForFunction(() => !!window.__overworld.victory, { timeout: 15000 });
+    const secondBadge = await page.evaluate(() => window.__overworld.victory.badge?.name);
+    check('Ikinci mekan bossu Rock Smash rozetini veriyor', secondBadge === 'Rock Smash', `rozet: ${secondBadge}`);
+    await wait(600);
+    await shot('14-rozet');
+    await page.evaluate(() => { window.__overworld.victory = null; });
 
     // --- Üçüncü mekan: Kadim Ağaç Meydanı (bölge bossu) ---
     await page.evaluate(() => window.__overworld.loadMap('loc-1-3'));
@@ -471,7 +507,9 @@ async function main() {
     await page.reload({ waitUntil: 'networkidle2' });
     await page.waitForSelector('.char-card', { timeout: 20000 });
     await page.click('#start-adventure-btn');
-    await page.waitForFunction(() => window.__overworld?.active, { timeout: 30000 });
+    await page.waitForFunction(() => window.__overworld?.partyPokemon.length > 0, { timeout: 30000 });
+    await page.keyboard.press('Digit1');
+    await page.waitForFunction(() => !!window.__overworld.active, { timeout: 10000 });
     const restored = await page.evaluate(() => ({
         level: window.__overworld.progress.party[0].level,
         form: window.__overworld.progress.party[0].formId,
@@ -483,6 +521,79 @@ async function main() {
         restored.form === 2 && restored.level >= 16 && restored.party >= 2,
         `Sv.${restored.level} ${restored.name}, ekip ${restored.party}, ${restored.tokens} jeton`);
     await shot('17-kayittan-devam');
+    // --- Rozetler ve saha hamleleri ---
+    const badges = await page.evaluate(() => window.__overworld.progress.badges);
+    check('Uc mekanin da rozeti kazanildi', badges.length === 3, `rozetler: ${badges.join(', ')}`);
+
+    // Ana haritada su artık Surf ile geçilebilir olmalı
+    await page.evaluate(() => window.__overworld.loadMap('main'));
+    await wait(800);
+    const surfCheck = await page.evaluate(() => {
+        const w = window.__overworld;
+        // Doğu kanalındaki su karosu (21, 4)
+        return {
+            walkable: w.isWalkable(21 * 50 + 25, 4 * 50 + 25),
+            tile: w.currentMap.grid[4][21]
+        };
+    });
+    check('Surf rozetiyle su gecilebiliyor', surfCheck.walkable === true && surfCheck.tile === 'W',
+        `karo '${surfCheck.tile}', gecilebilir: ${surfCheck.walkable}`);
+
+    // Surf ile adaya ulaşılabiliyor mu
+    const island = await page.evaluate(() => {
+        const w = window.__overworld;
+        w.player.x = 19 * 50 + 25;
+        w.player.y = 4 * 50 + 25;
+        return w.isWalkable(25 * 50 + 25, 4 * 50 + 25);
+    });
+    check('Suyun ardindaki gizli ada acik', island === true);
+    await shot('18-surf-ada');
+
+    // Cut: çalıyı kes
+    const cutResult = await page.evaluate(() => {
+        const w = window.__overworld;
+        // Güneydeki çalı duvarının önüne geç (10, 9) ve aşağı bak
+        w.player.x = 10 * 50 + 25;
+        w.player.y = 9 * 50 + 25;
+        w.player.aim = { x: 0, y: 1 };
+        const before = w.currentMap.grid[10][10];
+        w.useFieldMove();
+        return { before, after: w.currentMap.grid[10][10] };
+    });
+    check('Cut ile cali kesiliyor', cutResult.before === 'h' && cutResult.after === '.',
+        `'${cutResult.before}' -> '${cutResult.after}'`);
+
+    // Rock Smash: kayayı kır
+    const smashResult = await page.evaluate(() => {
+        const w = window.__overworld;
+        w.player.x = 2 * 50 + 25;
+        w.player.y = 9 * 50 + 25;
+        w.player.aim = { x: 0, y: 1 };
+        const before = w.currentMap.grid[10][2];
+        w.useFieldMove();
+        return { before, after: w.currentMap.grid[10][2] };
+    });
+    check('Rock Smash ile kaya kiriliyor', smashResult.before === 'R' && smashResult.after === 's',
+        `'${smashResult.before}' -> '${smashResult.after}'`);
+    await shot('19-saha-hamleleri');
+
+    // Rozetsiz saha hamlesi çalışmamalı
+    const lockedResult = await page.evaluate(() => {
+        const w = window.__overworld;
+        const realBadges = w.progress.badges;
+        w.progress.badges = [];   // rozetleri geçici olarak kaldır
+        w.player.x = 10 * 50 + 25;
+        w.player.y = 11 * 50 + 25;
+        w.player.aim = { x: 0, y: -1 };
+        const before = w.currentMap.grid[10][9];
+        w.useFieldMove();
+        const after = w.currentMap.grid[10][9];
+        w.progress.badges = realBadges;
+        return { before, after };
+    });
+    check('Rozetsiz saha hamlesi calismiyor', lockedResult.before === lockedResult.after,
+        `'${lockedResult.before}' -> '${lockedResult.after}'`);
+
     // --- Konsol ve ağ hataları ---
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));

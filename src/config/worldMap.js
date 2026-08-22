@@ -26,18 +26,25 @@ export const MAPS = {
     'main': {
         id: 'main',
         name: 'Ana Harita',
+        ambience: 'forest',
         start: { col: 10, row: 8 },
+        // 28x14: doğu kanalı Surf ile geçilen adaya, güneydeki kaya ve çalı
+        // duvarları Rock Smash / Cut ile açılan gizli köşelere çıkar.
         grid: [
-            'TTTTTTTTTTTTTTTTTTTT',
-            'T.f......s5s....hf.T',
-            'T.1......gpg.....2.T',
-            'T.p.hRR..gpg.RRh.p.T',
-            'T.pppppppppppppppp.T',
-            'T.p.fWWs..p..sWWfp.T',
-            'T.p.sWWg..p..gWWsp.T',
-            'T.3..f...gpg..f..4.T',
-            'T.g.hR.f..p..f.Rh.gT',
-            'TTTTTTTTTTTTTTTTTTTT'
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'T.f......s5s....hf.TTTTTTTTT',
+            'T.1......gpg.....2.TTTTTTTTT',
+            'T.p.hRR..gpg.RRh.p.TWWWWW.fT',
+            'T.pppppppppppppppp.pWWWWW..T',
+            'T.p.fWWs..p..sWWfp.TWWWWW.gT',
+            'T.p.sWWg..p..gWWsp.TTTTTTTTT',
+            'T.3..f...gpg..f..4.TTTTTTTTT',
+            'T.g.hR.f..p..f.Rh.gTTTTTTTTT',
+            'TTpTTTTTTTpTTTTTTTTTTTTTTTTT',
+            'TRRRTTTTThhhTTTTTTTTTTTTTTTT',
+            'T...TTTT.f.g..TTTTTTTTTTTTTT',
+            'T.g.TTTT.g..f.TTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTT'
         ],
         portalDefs: {
             '1': { target: 'region-1', label: REGIONS[1].name, colors: REGIONS[1].colors },

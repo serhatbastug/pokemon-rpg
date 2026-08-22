@@ -35,32 +35,31 @@ export class ActivePokemon {
         this.boostTimer = 0;
     }
 
-    // Antrenörün biraz gerisinde, yumuşak takip
-    follow(trainer) {
-        const offsetX = -trainer.dirX * 34;
-        const offsetY = -trainer.dirY * 30 + 6;
-        const targetX = trainer.x + offsetX;
-        const targetY = trainer.y + offsetY;
+    // Sahaya sürülen Pokemon durduğu yeri tutar; düşmana dönüp hafifçe
+    // yana kayar ama antrenörü takip etmez.
+    hold() {
+        const enemy = this.world.nearestEnemy(this.x, this.y, 340);
+        if (enemy) {
+            this.facing = enemy.x > this.x ? 1 : -1;
 
-        const dx = targetX - this.x;
-        const dy = targetY - this.y;
-        const dist = Math.hypot(dx, dy);
+            // Çok yakınsa geri çekil, uzaksa hafifçe yaklaş
+            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+            let dx = 0, dy = 0;
+            if (dist < 90) {
+                dx = (this.x - enemy.x) / dist;
+                dy = (this.y - enemy.y) / dist;
+            } else if (dist > 240) {
+                dx = (enemy.x - this.x) / dist;
+                dy = (enemy.y - this.y) / dist;
+            }
 
-        if (dist > 4) {
-            const step = Math.min(dist, this.followSpeed * this.speedBoost * 1.5);
-            const nx = this.x + (dx / dist) * step;
-            const ny = this.y + (dy / dist) * step;
-            const hw = this.size * 0.24;
-            const hh = this.size * 0.16;
-            if (this.world.canBoxMoveTo(nx, this.y, hw, hh)) this.x = nx;
-            if (this.world.canBoxMoveTo(this.x, ny, hw, hh)) this.y = ny;
-            if (Math.abs(dx) > 6) this.facing = dx > 0 ? 1 : -1;
-        }
-
-        // Çok geride kalırsa (duvara takıldıysa) antrenörün yanına ışınlanır
-        if (Math.hypot(trainer.x - this.x, trainer.y - this.y) > 220) {
-            this.x = trainer.x;
-            this.y = trainer.y;
+            if (dx || dy) {
+                const step = this.followSpeed * this.speedBoost * 0.5;
+                const hw = this.size * 0.24;
+                const hh = this.size * 0.16;
+                if (this.world.canBoxMoveTo(this.x + dx * step, this.y, hw, hh)) this.x += dx * step;
+                if (this.world.canBoxMoveTo(this.x, this.y + dy * step, hw, hh)) this.y += dy * step;
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 // Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
-import { CHARACTER_CLASSES } from './config/characters.js';
-import { loadCharacters } from './services/pokeapi.js';
+import { CHARACTER_CLASSES, ADVENTURE_STARTER } from './config/characters.js';
+import { loadCharacters, fetchCharacter } from './services/pokeapi.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
@@ -30,12 +30,20 @@ const overworld = new Overworld({
     }
 });
 
-document.getElementById('start-adventure-btn').addEventListener('click', () => {
-    const { p1 } = characterSelect.getSelection();
-    if (!p1) return;
+// Macera her zaman başlangıç Pokemonu (Bulbasaur) ile başlar; ilk tıklamada yüklenir
+let adventureStarter = null;
+document.getElementById('start-adventure-btn').addEventListener('click', async () => {
+    if (!adventureStarter) {
+        try {
+            adventureStarter = await fetchCharacter(ADVENTURE_STARTER);
+        } catch (error) {
+            console.error('Başlangıç Pokemonu yüklenemedi:', error);
+            return;
+        }
+    }
 
     showOverworldScreen();
-    overworld.start(p1);
+    overworld.start(adventureStarter);
 });
 
 document.getElementById('overworld-back-btn').addEventListener('click', () => {

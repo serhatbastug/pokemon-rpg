@@ -1,3 +1,8 @@
+// Macera modu başlangıç Pokemonu: Bulbasaur (#1).
+// İki kişilik moddaki Şövalye (#2 Ivysaur) bunun evrimleşmiş halidir;
+// ileride eklenecek evrim mekaniği bu zinciri kullanacak.
+export const ADVENTURE_STARTER = { id: 1, className: 'Başlangıç' };
+
 // Karakter sınıfları ve karşılık gelen Pokemon ID'leri.
 // Yeni bir sınıf eklemek için buraya bir kayıt ekleyin ve
 // src/game/abilities.js içinde yeteneklerini tanımlayın.

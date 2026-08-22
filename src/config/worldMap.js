@@ -1,11 +1,12 @@
 // Ana harita verisi. Izgara karakterleri:
-//   '.' çim   'p' patika   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)
+//   '.' çim      'p' patika   'f' çiçekli çim   'g' uzun çim   's' kum
+//   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
 //   '1'-'5' bölge portalı (regions.js'teki bölge numarası; zemin çim sayılır)
 // Her satır tam 20 karakter olmalıdır (20 sütun x 10 satır, 50px karo = 1000x500).
 
 export const TILE_SIZE = 50;
 
-export const SOLID_TILES = new Set(['T', 'W', 'R']);
+export const SOLID_TILES = new Set(['T', 'W', 'R', 'h']);
 
 export const PLAYER_START = { col: 10, row: 8 };
 
@@ -13,14 +14,14 @@ export const MAIN_MAP = {
     name: 'Ana Harita',
     grid: [
         'TTTTTTTTTTTTTTTTTTTT',
-        'T.........5........T',
-        'T.1.......p......2.T',
-        'T.p..RR...p..RR..p.T',
+        'T.f......s5s....hf.T',
+        'T.1......gpg.....2.T',
+        'T.p.hRR..gpg.RRh.p.T',
         'T.pppppppppppppppp.T',
-        'T.p..W....p....W.p.T',
-        'T.p..WW...p...WW.p.T',
-        'T.3.......p......4.T',
-        'T....R....p...R....T',
+        'T.p.fWWs..p..sWWfp.T',
+        'T.p.sWWg..p..gWWsp.T',
+        'T.3..f...gpg..f..4.T',
+        'T.g.hR.f..p..f.Rh.gT',
         'TTTTTTTTTTTTTTTTTTTT'
     ]
 };

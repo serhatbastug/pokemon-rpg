@@ -139,11 +139,12 @@ export class Overworld {
         const palettes = {
             '.': ['#14532d', '#15803d', '#166534', '#15803d'],
             'p': ['#713f12', '#854d0e', '#92400e', '#854d0e'],
+            's': ['#a16207', '#ca8a04', '#a16207', '#92400e'],
             'R': ['#334155', '#475569', '#64748b', '#475569'],
             'W': ['#0c4a6e', '#075985', '#0369a1', '#075985']
         };
 
-        // Portal karoları ve ağaç altı çim zemin kullanır
+        // Çiçek, uzun çim, çalı ve portal karoları çim zemin üzerine çizilir
         const base = palettes[tile] || palettes['.'];
 
         for (let by = 0; by < TILE_SIZE / PX; by++) {
@@ -185,6 +186,49 @@ export class Overworld {
                     ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
                 }
             }
+        }
+
+        if (tile === 'f') {
+            // Çiçekler: karoya özgü sabit konumlarda renkli taç + sarı merkez
+            const flowerColors = ['#f472b6', '#fbbf24', '#f87171', '#e0f2fe'];
+            for (let i = 0; i < 3; i++) {
+                const fx = ((col * 13 + row * 7 + i * 11) % 4) * PX + PX / 2;
+                const fy = ((col * 5 + row * 11 + i * 17) % 4) * PX + PX / 2;
+                ctx.fillStyle = flowerColors[(col + row + i) % flowerColors.length];
+                ctx.fillRect(x0 + fx - 3, y0 + fy - 3, 6, 6);
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(x0 + fx - 1, y0 + fy - 1, 3, 3);
+            }
+        }
+
+        if (tile === 'g') {
+            // Uzun çim: hafifçe salınan koyu yeşil demetler
+            const sway = Math.floor(Date.now() / 500) % 2 === 0 ? 0 : 2;
+            const bladeColors = ['#166534', '#16a34a', '#22c55e'];
+            for (let i = 0; i < 5; i++) {
+                const gx = ((col * 7 + row * 3 + i * 9) % 4) * PX + PX / 2;
+                const gy = ((col * 3 + row * 5 + i * 13) % 3) * PX + PX * 1.5;
+                ctx.fillStyle = bladeColors[i % bladeColors.length];
+                ctx.fillRect(x0 + gx + sway, y0 + gy - PX, 4, PX * 1.6);
+                ctx.fillRect(x0 + gx - 4, y0 + gy - PX / 2, 4, PX * 1.1);
+            }
+        }
+
+        if (tile === 'h') {
+            // Çalı: yuvarlak hatlı yoğun yaprak kümesi
+            const bushColors = ['#14532d', '#166534', '#16a34a'];
+            for (let by = 0; by < 5; by++) {
+                for (let bx = 0; bx < 5; bx++) {
+                    const d = Math.abs(bx - 2) + Math.abs(by - 2);
+                    if (d > 3) continue;
+                    const idx = (col * 9 + row * 5 + bx * 3 + by) % bushColors.length;
+                    ctx.fillStyle = bushColors[idx];
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(x0 + PX, y0 + PX, PX / 2, PX / 2);
+            ctx.fillRect(x0 + PX * 3, y0 + PX * 2, PX / 2, PX / 2);
         }
     }
 

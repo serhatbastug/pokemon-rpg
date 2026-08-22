@@ -1,0 +1,10 @@
+{
+  "name": "pokemon-rpg",
+  "version": "0.1.0",
+  "description": "PokeRPG - 2 kişilik gerçek zamanlı arena savaşı",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes http-server -p 8765 -c-1 ."
+  }
+}

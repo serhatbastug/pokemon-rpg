@@ -1,0 +1,694 @@
+/* Design System & Variables */
+:root {
+    --bg-dark: #07070d;
+    --bg-card: rgba(255, 255, 255, 0.02);
+    --border-glass: rgba(255, 255, 255, 0.08);
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --accent-gold: #fbbf24;
+    --font-header: 'Space Grotesk', sans-serif;
+    --font-body: 'Outfit', sans-serif;
+    
+    /* Class Colors (Neon effects) */
+    --color-knight: #eab308;        /* Ivysaur -> Gold/Sun */
+    --color-mage: #ef4444;          /* Charizard -> Fire Red */
+    --color-assassin: #c084fc;      /* Gengar -> Shadow Purple */
+    --color-archer: #22c55e;        /* Scyther -> Emerald Green */
+    --color-elementalist: #facc15;  /* Zapdos -> Electric Yellow */
+    --color-vampire: #e11d48;       /* Golbat -> Crimson Blood Red */
+    --color-mecha: #06b6d4;         /* Genesect -> Techno Cyan */
+    --color-ninja: #64748b;         /* Ninjask -> Ninja Grey */
+    --color-ice-knight: #38bdf8;    /* Articuno -> Glacial Blue */
+}
+
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Savaş ekranı aktifken sayfanın kaymasını engelle */
+body.battle-active {
+    overflow: hidden !important;
+    height: 100vh;
+}
+
+/* Background animated stars effect */
+.stars, .twinkling {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: -1;
+}
+
+.stars {
+    background: #000 url('https://raw.githubusercontent.com/sarasoueidan/tools/master/images/stars.png') repeat top center;
+    opacity: 0.4;
+}
+
+/* Container */
+.app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    z-index: 1;
+}
+
+/* Header styling */
+.main-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.game-title {
+    font-family: var(--font-header);
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.2rem;
+}
+
+.game-title span {
+    background: linear-gradient(135deg, #fb7185 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.game-subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 300;
+    margin-bottom: 1rem;
+}
+
+/* Selection Badges status */
+.selection-status {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.p1-status-badge, .p2-status-badge {
+    padding: 0.5rem 1.2rem;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    transition: all 0.3s ease;
+}
+
+.p1-status-badge.selected {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+    color: #93c5fd;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.p2-status-badge.selected {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #fca5a5;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+/* Screen Transitions */
+.screen {
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.screen.hidden, .hidden {
+    display: none !important;
+}
+
+/* Grid Layout */
+.section-title {
+    font-family: var(--font-header);
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+}
+
+.character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    padding: 0.5rem 0;
+}
+
+/* Glassmorphism Card Design */
+.char-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 1.2rem;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.char-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--class-color, #ffffff);
+    transition: transform 0.4s ease;
+    transform: scaleX(0);
+}
+
+.char-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--class-color);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.char-card:hover::before {
+    transform: scaleX(1);
+}
+
+/* Selected Character State */
+.char-card.selected-p1 {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+}
+
+.char-card.selected-p1::after {
+    content: 'P1';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #3b82f6;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+}
+
+.char-card.selected-p2 {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.char-card.selected-p2::after {
+    content: 'P2';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+}
+
+/* Pokemon image container */
+.char-image-container {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.char-image-container::after {
+    content: '';
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background: var(--class-color);
+    filter: blur(30px);
+    opacity: 0.12;
+    border-radius: 50%;
+    z-index: -1;
+}
+
+.char-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.char-card:hover .char-img {
+    transform: scale(1.1) rotate(2deg);
+}
+
+.char-class {
+    font-family: var(--font-header);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--class-color);
+    margin-bottom: 0.2rem;
+}
+
+.char-name {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.poke-tag {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.1rem 0.5rem;
+    border-radius: 30px;
+    color: var(--text-secondary);
+}
+
+/* Start Battle Button */
+.start-battle-btn {
+    display: block;
+    margin: 2rem auto 0 auto;
+    padding: 1rem 3rem;
+    font-family: var(--font-header);
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite;
+}
+
+.start-battle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 25px rgba(16, 185, 129, 0.5);
+    filter: brightness(1.1);
+}
+
+/* Battle HUD styling */
+.battle-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 1rem 2rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(12px);
+}
+
+.player-hud {
+    flex: 1;
+    max-width: 400px;
+}
+
+.hud-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.hud-player-label {
+    padding: 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    border-radius: 5px;
+    color: #fff;
+}
+
+.p1-hud .hud-player-label { background: #3b82f6; }
+.p2-hud .hud-player-label { background: #ef4444; }
+.p2-hud .hud-header { justify-content: flex-end; }
+
+.p1-hud h3 { text-align: left; }
+.p2-hud h3 { text-align: right; }
+
+.bar-container {
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.hp-bar-bg {
+    height: 24px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.hp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ef4444, #10b981);
+    transition: width 0.15s ease-out;
+}
+
+.bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.vs-emblem {
+    font-family: var(--font-header);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    padding: 0 2rem;
+}
+
+/* Skills Cooldown HUD */
+.skills-cooldown-hud {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.p2-hud .skills-cooldown-hud {
+    justify-content: flex-end;
+}
+
+.skill-cd {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.key-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+    color: var(--text-secondary);
+}
+
+.cd-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    background: rgba(0, 0, 0, 0.7);
+    transition: height 0.1s linear;
+}
+
+/* Canvas Arena Container */
+.canvas-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    background: #050508;
+    border: 2px solid var(--border-glass);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+}
+
+canvas {
+    background: radial-gradient(circle, #111827 0%, #030712 100%);
+    display: block;
+}
+
+.controls-reminder {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 0.8rem 1.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-glass);
+}
+
+/* Detail Overlay Modal */
+.detail-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 18, 0.80);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.detail-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-card {
+    background: rgba(13, 13, 23, 0.95);
+    border: 1px solid var(--border-glass);
+    border-radius: 24px;
+    width: 90%;
+    max-width: 550px;
+    padding: 2rem;
+    position: relative;
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.detail-overlay.active .modal-card {
+    transform: scale(1);
+}
+
+.close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+/* Detail Modal Content */
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-pfp {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    padding: 0.5rem;
+}
+
+.detail-titles h3 {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.detail-titles .class-tag {
+    font-family: var(--font-header);
+    font-weight: 700;
+    color: var(--class-color);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Stats Styling */
+.stat-row {
+    margin-bottom: 0.8rem;
+}
+
+.stat-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+}
+
+.stat-bar-bg {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    background: var(--class-color);
+    border-radius: 10px;
+    width: 0;
+    transition: width 1s ease-out;
+}
+
+.select-hero-btn {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 0.8rem;
+    background: var(--class-color);
+    border: none;
+    border-radius: 12px;
+    color: #000;
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+}
+
+.select-hero-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 15px var(--class-color);
+}
+
+/* Game Over Overlay */
+.gameover-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(5, 5, 10, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+}
+
+.gameover-card {
+    background: rgba(20, 20, 35, 0.95);
+    border: 2px solid #ef4444;
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+    border-radius: 24px;
+    padding: 3rem;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    animation: scaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.gameover-title {
+    font-family: var(--font-header);
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #ef4444;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+}
+
+.winner-announcement {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
+    color: var(--text-primary);
+}
+
+.restart-btn {
+    width: 100%;
+    padding: 1rem;
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.restart-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.03);
+    }
+}
+
+@keyframes scaleUp {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

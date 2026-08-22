@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokeRPG - Real-time Arena PvP</title>
+    <!-- Google Fonts: Outfit & Space Grotesk -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="twinkling"></div>
+
+    <main class="app-container">
+        <!-- Header -->
+        <header class="main-header" id="main-header">
+            <h1 class="game-title">POKÉ<span>RPG</span></h1>
+            <p class="game-subtitle">2 Kişilik Gerçek Zamanlı Arena Savaşı</p>
+            <div id="selection-status" class="selection-status">
+                <span class="p1-status-badge">Oyuncu 1: Seçim Yapıyor...</span>
+                <span class="p2-status-badge">Oyuncu 2: Beklemede...</span>
+            </div>
+        </header>
+
+        <!-- Selection Screen -->
+        <section id="selection-screen" class="screen active">
+            <h2 class="section-title">Karakterinizi Seçin</h2>
+            <div id="character-grid" class="character-grid">
+                <div class="loading-spinner">Pokemonlar çağrılıyor...</div>
+            </div>
+            <button id="start-battle-btn" class="start-battle-btn hidden">SAVAŞI BAŞLAT</button>
+        </section>
+
+        <!-- Battle Screen -->
+        <section id="battle-screen" class="screen hidden">
+            <!-- HUD -->
+            <div class="battle-hud">
+                <!-- P1 Info -->
+                <div class="player-hud p1-hud">
+                    <div class="hud-header">
+                        <span class="hud-player-label">P1</span>
+                        <h3 id="p1-name">Oyuncu 1</h3>
+                    </div>
+                    <div class="bar-container">
+                        <div class="hp-bar-bg"><div id="p1-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+                        <span id="p1-hp-text" class="bar-text">100 / 100</span>
+                    </div>
+                    <div class="skills-cooldown-hud" id="p1-cooldowns">
+                        <div class="skill-cd" id="p1-cd-1"><span class="key-badge">F</span><span class="cd-overlay"></span></div>
+                        <div class="skill-cd" id="p1-cd-2"><span class="key-badge">Shift</span><span class="cd-overlay"></span></div>
+                        <div class="skill-cd" id="p1-cd-3"><span class="key-badge">Space</span><span class="cd-overlay"></span></div>
+                    </div>
+                </div>
+
+                <!-- Vs Emblem -->
+                <div class="vs-emblem">VS</div>
+
+                <!-- P2 Info -->
+                <div class="player-hud p2-hud">
+                    <div class="hud-header">
+                        <h3 id="p2-name">Oyuncu 2</h3>
+                        <span class="hud-player-label">P2</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="hp-bar-bg"><div id="p2-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+                        <span id="p2-hp-text" class="bar-text">100 / 100</span>
+                    </div>
+                    <div class="skills-cooldown-hud" id="p2-cooldowns">
+                        <div class="skill-cd" id="p2-cd-1"><span class="key-badge">Shift</span><span class="cd-overlay"></span></div>
+                        <div class="skill-cd" id="p2-cd-2"><span class="key-badge">,</span><span class="cd-overlay"></span></div>
+                        <div class="skill-cd" id="p2-cd-3"><span class="key-badge">Enter</span><span class="cd-overlay"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Arena -->
+            <div class="canvas-container">
+                <canvas id="battleCanvas" width="1000" height="500"></canvas>
+            </div>
+        </section>
+
+        <!-- Character Details Modal / Detail View -->
+        <section id="detail-overlay" class="detail-overlay hidden">
+            <div class="modal-card">
+                <button id="close-modal" class="close-btn">&times;</button>
+                <div class="modal-body">
+                    <!-- Dynamic details here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Game Over Screen -->
+        <section id="gameover-screen" class="gameover-overlay hidden">
+            <div class="gameover-card">
+                <h2 class="gameover-title">SAVAŞ BİTTİ</h2>
+                <div id="winner-announcement" class="winner-announcement">Oyuncu 1 Kazandı!</div>
+                <button id="restart-btn" class="restart-btn">YENİDEN OYNA</button>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

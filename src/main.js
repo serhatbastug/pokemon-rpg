@@ -1,0 +1,44 @@
+// Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
+import { CHARACTER_CLASSES } from './config/characters.js';
+import { loadCharacters } from './services/pokeapi.js';
+import { InputManager } from './core/input.js';
+import { CharacterSelect } from './ui/characterSelect.js';
+import { Hud } from './ui/hud.js';
+import { showBattleScreen, showGameOver, hideGameOver } from './ui/screens.js';
+import { Game } from './game/Game.js';
+
+const characterSelect = new CharacterSelect();
+const hud = new Hud();
+const input = new InputManager();
+
+const game = new Game({
+    canvas: document.getElementById('battleCanvas'),
+    input,
+    hud,
+    onGameOver: (winnerNum, winner) => {
+        showGameOver(`Oyuncu ${winnerNum} (${winner.char.className}) Kazandı!`);
+    }
+});
+
+document.getElementById('start-battle-btn').addEventListener('click', () => {
+    const { p1, p2 } = characterSelect.getSelection();
+    if (!p1 || !p2) return;
+
+    showBattleScreen();
+    game.start(p1, p2);
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    hideGameOver();
+    const { p1, p2 } = characterSelect.getSelection();
+    game.start(p1, p2);
+});
+
+// Karakterleri yükle; her biri hazır oldukça karta dönüşür
+loadCharacters(CHARACTER_CLASSES, character => characterSelect.addCharacter(character))
+    .then(characters => {
+        if (characters.length === 0) {
+            const spinner = document.querySelector('.loading-spinner');
+            if (spinner) spinner.textContent = 'Pokemonlar yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
+        }
+    });

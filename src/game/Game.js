@@ -18,7 +18,7 @@ export class Game {
         this.p1 = null;
         this.p2 = null;
         this.currentArena = null;
-        this.interval = null;
+        this.rafId = null;
         this.isGameOver = false;
 
         input.onKeyDown(e => this.handleKeyDown(e));
@@ -73,8 +73,24 @@ export class Game {
         // Piksel sanatı modu
         this.ctx.imageSmoothingEnabled = false;
 
-        if (this.interval) clearInterval(this.interval);
-        this.interval = setInterval(() => this.update(), 1000 / FRAME_RATE);
+        // Ekran yenilemesiyle senkron döngü; mantık sabit adımla ilerler
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        const stepMs = 1000 / FRAME_RATE;
+        let acc = 0;
+        let last = performance.now();
+
+        const loop = (now) => {
+            if (this.isGameOver) return;
+            this.rafId = requestAnimationFrame(loop);
+
+            acc += Math.min(now - last, stepMs * 3);
+            last = now;
+            while (acc >= stepMs) {
+                acc -= stepMs;
+                this.update();
+            }
+        };
+        this.rafId = requestAnimationFrame(loop);
     }
 
     getEnemyOf(player) {
@@ -83,7 +99,8 @@ export class Game {
 
     endGame(winnerNum) {
         this.isGameOver = true;
-        clearInterval(this.interval);
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
 
         const winner = winnerNum === 1 ? this.p1 : this.p2;
         this.onGameOver(winnerNum, winner);

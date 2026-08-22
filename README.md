@@ -14,6 +14,19 @@ npm start
 
 Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
+## Testler
+
+Puppeteer ile uçtan uca UI testleri (32 test): ekran geçişleri, karakter seçimi,
+savaş, harita gezinme, portallar, yetenekler, yakalama, gizli oda, boss uyanışı,
+zafer sahnesi ve her ekranda FPS ölçümü.
+
+```
+npm start           # ayrı bir terminalde sunucu çalışıyor olmalı
+npm test
+```
+
+Ekran görüntüleri `tests/screenshots/` altına yazılır (git'e dahil değil).
+
 ## Kontroller
 
 | | Oyuncu 1 | Oyuncu 2 |
@@ -49,6 +62,8 @@ src/
     projectileSprites.js Kare kare pixel art mermi sprite desenleri
   world/
     Overworld.js        Macera modu: kuşbakışı harita motoru
+  world/
+    Enemy.js            Düşman Pokemon: AI, saldırı, durum
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
     hud.js              Can barları ve cooldown göstergeleri

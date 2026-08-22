@@ -5,6 +5,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "npx --yes http-server -p 8765 -c-1 ."
+    "start": "npx --yes http-server -p 8765 -c-1 .",
+    "test": "node tests/ui.test.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.8.0"
   }
 }

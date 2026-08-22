@@ -46,6 +46,10 @@ document.getElementById('start-adventure-btn').addEventListener('click', async (
     overworld.start(adventureStarter);
 });
 
+// Otomatik UI testleri (tests/ui.test.mjs) oyun durumunu buradan okur
+window.__overworld = overworld;
+window.__game = game;
+
 document.getElementById('overworld-back-btn').addEventListener('click', () => {
     overworld.stop();
     showSelectionScreen();

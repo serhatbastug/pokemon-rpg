@@ -67,6 +67,7 @@ export class Overworld {
         this.shake = 0;         // ekran sarsıntısı
         this.arenaOpened = false;
         this.victory = null;    // boss yakalandığında zafer sahnesi
+        this.shotsFired = 0;    // atılan yetenek sayacı (testler ve hata ayıklama)
 
         // Atmosfer: kenarları karartan vinyet (bir kez oluşturulur)
         const vg = this.ctx.createRadialGradient(
@@ -117,8 +118,28 @@ export class Overworld {
         this.ctx.imageSmoothingEnabled = false;
         this.running = true;
 
-        if (this.interval) clearInterval(this.interval);
-        this.interval = setInterval(() => this.update(), 1000 / FRAME_RATE);
+        // Ekran yenilemesiyle senkron döngü (setInterval'dan daha akıcı);
+        // mantık sabit adımla ilerler, yavaş karelerde en fazla 3 adım telafi edilir
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        const stepMs = 1000 / FRAME_RATE;
+        let acc = 0;
+        let last = performance.now();
+
+        const loop = (now) => {
+            if (!this.running) return;
+            this.rafId = requestAnimationFrame(loop);
+
+            acc += Math.min(now - last, stepMs * 3);
+            last = now;
+            if (acc < stepMs) return;
+
+            while (acc >= stepMs) {
+                acc -= stepMs;
+                this.step();
+            }
+            this.draw();
+        };
+        this.rafId = requestAnimationFrame(loop);
     }
 
     loadMap(id) {
@@ -183,6 +204,7 @@ export class Overworld {
             }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));
         }
 
+        this.bakeTerrain();
         this.updateCamera(true);
 
         const title = document.getElementById('overworld-title');
@@ -238,8 +260,8 @@ export class Overworld {
 
     stop() {
         this.running = false;
-        if (this.interval) clearInterval(this.interval);
-        this.interval = null;
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
     }
 
     // (x, y) noktasındaki karo yürünebilir mi?
@@ -280,29 +302,44 @@ export class Overworld {
         const grid = this.currentMap.grid;
         const W = grid[0].length;
         const H = grid.length;
-        const dist = new Int16Array(W * H).fill(-1);
 
         const pc = Math.floor(this.player.x / TILE_SIZE);
         const pr = Math.floor(this.player.y / TILE_SIZE);
+
+        // Oyuncu aynı karodaysa alan değişmez; yeniden hesaplamaya gerek yok
+        if (this.flow && this.flow.pc === pc && this.flow.pr === pr) return;
+
+        // Tampon yeniden kullanılır (her karede yeni dizi ayırmamak için)
+        if (!this.flowBuf || this.flowBuf.length !== W * H) {
+            this.flowBuf = new Int16Array(W * H);
+            this.flowQueue = new Int32Array(W * H);
+        }
+        const dist = this.flowBuf.fill(-1);
+        const queue = this.flowQueue;
+
         if (pr < 0 || pr >= H || pc < 0 || pc >= W || SOLID_TILES.has(grid[pr][pc])) {
-            this.flow = { dist, W, H };
+            this.flow = { dist, W, H, pc, pr };
             return;
         }
 
+        // Dizi kaydırmadan (shift) çalışan halka kuyruk: O(n)
+        let head = 0, tail = 0;
         dist[pr * W + pc] = 0;
-        const queue = [[pc, pr]];
-        while (queue.length) {
-            const [c, r] = queue.shift();
-            const d = dist[r * W + c];
-            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                const nc = c + dc, nr = r + dr;
-                if (nc < 0 || nc >= W || nr < 0 || nr >= H) continue;
-                if (dist[nr * W + nc] !== -1 || SOLID_TILES.has(grid[nr][nc])) continue;
-                dist[nr * W + nc] = d + 1;
-                queue.push([nc, nr]);
-            }
+        queue[tail++] = pr * W + pc;
+
+        while (head < tail) {
+            const idx = queue[head++];
+            const c = idx % W;
+            const r = (idx - c) / W;
+            const d = dist[idx];
+
+            if (c + 1 < W) { const n = idx + 1; if (dist[n] === -1 && !SOLID_TILES.has(grid[r][c + 1])) { dist[n] = d + 1; queue[tail++] = n; } }
+            if (c - 1 >= 0) { const n = idx - 1; if (dist[n] === -1 && !SOLID_TILES.has(grid[r][c - 1])) { dist[n] = d + 1; queue[tail++] = n; } }
+            if (r + 1 < H) { const n = idx + W; if (dist[n] === -1 && !SOLID_TILES.has(grid[r + 1][c])) { dist[n] = d + 1; queue[tail++] = n; } }
+            if (r - 1 >= 0) { const n = idx - W; if (dist[n] === -1 && !SOLID_TILES.has(grid[r - 1][c])) { dist[n] = d + 1; queue[tail++] = n; } }
         }
-        this.flow = { dist, W, H };
+
+        this.flow = { dist, W, H, pc, pr };
     }
 
     // (col,row) karosunun oyuncuya labirent yolu mesafesi (karo cinsinden)
@@ -387,6 +424,7 @@ export class Overworld {
         if (!area || this.secretRevealed) return;
         if (this.isInsideArea(this.player.x, this.player.y, area)) {
             this.secretRevealed = true;
+            this.bakeTerrain(); // oda artık gerçek görünümüyle çizilir
             this.spawnMapText(this.player.x, this.player.y - 60, 'GİZLİ ODA BULUNDU!', '#fbbf24');
         }
     }
@@ -423,16 +461,19 @@ export class Overworld {
         if (this.canMoveTo(player.x, ny)) player.y = ny;
     }
 
-    update() {
+    // Oyun mantığı (sabit adım)
+    step() {
         // Zafer sahnesinde dünya donar, sadece kutlama oynar
-        if (!this.victory) {
-            this.movePlayer();
-            this.checkPortals();
-            this.checkSecretDiscovery();
-            this.updateCombat();
-            this.updateCamera();
-        }
+        if (this.victory) return;
 
+        this.movePlayer();
+        this.checkPortals();
+        this.checkSecretDiscovery();
+        this.updateCombat();
+        this.updateCamera();
+    }
+
+    draw() {
         const { ctx, canvas } = this;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -739,6 +780,8 @@ export class Overworld {
             });
         }
 
+        this.shotsFired++;
+
         // Uyuyan bossun yakınında ateş etmek onu uyandırır
         for (const enemy of this.enemies) {
             if (enemy.asleep && Math.hypot(enemy.x - player.x, enemy.y - player.y) < 320) {
@@ -870,6 +913,7 @@ export class Overworld {
         // Değiştirilmiş ızgarayı bu oturum için kullan
         this.currentMap = { ...map, grid: grid.map(row => row.join('')) };
         this.flow = null;
+        this.bakeTerrain(); // yıkılan arena yeniden pişirilir
     }
 
     onBossCaptured(boss) {
@@ -888,28 +932,54 @@ export class Overworld {
 
     // ---- Çizim ----
 
+    // Zemin, harita yüklenirken iki animasyon karesi halinde offscreen canvas'a
+    // bir kez çizilir. Her karede binlerce fillRect yerine tek drawImage yapılır;
+    // harita değişince (gizli oda açılması, boss yıkımı) yeniden pişirilir.
+    bakeTerrain() {
+        const grid = this.currentMap.grid;
+        const w = grid[0].length * TILE_SIZE;
+        const h = grid.length * TILE_SIZE;
+
+        this.terrain = [0, 1].map(phase => {
+            const layer = document.createElement('canvas');
+            layer.width = w;
+            layer.height = h;
+            const lctx = layer.getContext('2d');
+            lctx.imageSmoothingEnabled = false;
+
+            for (let row = 0; row < grid.length; row++) {
+                for (let col = 0; col < grid[row].length; col++) {
+                    // Keşfedilmemiş gizli oda dışarıdan ağaçlık görünür
+                    const tile = this.isHiddenTile(col, row) ? 'T' : grid[row][col];
+                    this.drawTile(lctx, tile, col, row, phase);
+                }
+            }
+            return layer;
+        });
+    }
+
     drawTiles() {
         const { ctx, canvas, camera } = this;
-        const grid = this.currentMap.grid;
+        if (!this.terrain) return;
 
-        // Yalnızca görünür karo aralığını çiz
-        const colStart = Math.max(0, Math.floor(camera.x / TILE_SIZE));
-        const colEnd = Math.min(grid[0].length - 1, Math.ceil((camera.x + canvas.width) / TILE_SIZE));
-        const rowStart = Math.max(0, Math.floor(camera.y / TILE_SIZE));
-        const rowEnd = Math.min(grid.length - 1, Math.ceil((camera.y + canvas.height) / TILE_SIZE));
+        // Su/çim animasyonu: iki pişmiş kare arasında geçiş
+        const layer = this.terrain[Math.floor(Date.now() / 450) % 2];
 
-        for (let row = rowStart; row <= rowEnd; row++) {
-            for (let col = colStart; col <= colEnd; col++) {
-                // Keşfedilmemiş gizli oda dışarıdan ağaçlık görünür
-                const tile = this.isHiddenTile(col, row) ? 'T' : grid[row][col];
-                this.drawTile(ctx, tile, col, row);
-            }
-        }
+        // Yalnızca görünür bölgeyi kopyala
+        const view = this.viewSize;
+        const sx = Math.max(0, Math.floor(camera.x));
+        const sy = Math.max(0, Math.floor(camera.y));
+        const sw = Math.min(layer.width - sx, Math.ceil(view.w) + TILE_SIZE);
+        const sh = Math.min(layer.height - sy, Math.ceil(view.h) + TILE_SIZE);
+        if (sw <= 0 || sh <= 0) return;
+
+        ctx.drawImage(layer, sx, sy, sw, sh, sx, sy, sw, sh);
     }
 
     // Karo içi PX'lik bloklarla, karoya özgü deterministik desen çizer.
     // PX küçüldükçe piksel sanatı incelir (5 = karo başına 10x10 blok).
-    drawTile(ctx, tile, col, row) {
+    // phase (0|1): su parıltısı ve çim salınımının animasyon karesi.
+    drawTile(ctx, tile, col, row, phase = 0) {
         const PX = 5;
         const N = TILE_SIZE / PX; // kenardaki blok sayısı
         const x0 = col * TILE_SIZE;
@@ -947,7 +1017,7 @@ export class Overworld {
 
         if (tile === 'W') {
             // Su: ince dalga çizgileri ve kayan parıltılar
-            const t = Math.floor(Date.now() / 400);
+            const t = phase * 3;
             ctx.fillStyle = dark ? '#0e5a86' : '#0ea5e9';
             for (let i = 0; i < 3; i++) {
                 const wy = ((col * 3 + row * 7 + i * 3 + t) % N) * PX;
@@ -1019,7 +1089,7 @@ export class Overworld {
 
         if (tile === 'g') {
             // Uzun çim: tek piksel kalınlığında, salınan ince yapraklar
-            const sway = Math.floor(Date.now() / 500) % 2 === 0 ? 0 : PX;
+            const sway = phase === 0 ? 0 : PX;
             const bladeColors = dark ? ['#0d4a24', '#12602e', '#16a34a'] : ['#166534', '#16a34a', '#22c55e'];
             for (let i = 0; i < 7; i++) {
                 const gx = ((col * 7 + row * 3 + i * 9) % (N - 1)) * PX;

@@ -144,13 +144,23 @@ async function main() {
     // Overworld örneğini teste açmak için global'e bağla
     await page.evaluate(() => { window.__testHook = true; });
 
+    // Yeni akış: macera düğmesi karakter seçimini açar
+    await page.evaluate(() => localStorage.removeItem('pokerpg-save-v1'));
     await page.click('#start-adventure-btn');
+    await page.waitForSelector('.picker-item', { visible: true, timeout: 20000 });
+    check('Macera karakter secimi aciliyor', true);
+    await page.click('.picker-item');
     await page.waitForFunction(() => window.__overworld && window.__overworld.running, { timeout: 20000 });
     await wait(800);
     const overworldVisible = await page.$eval('#overworld-screen', el => !el.classList.contains('hidden'));
     check('Ana harita acildi', overworldVisible);
     await shot('04-ana-harita');
 
+    const startLevel = await page.evaluate(() => window.__overworld.progress.level);
+    check('Yeni oyun 1. seviyede basliyor', startLevel === 1, `seviye ${startLevel}`);
+
+    // Sprite ve evrim zinciri istekleri otursun; ölçüm sabit duruma bakmalı
+    await wait(1500);
     const mainFps = await measureFps(3000);
     check('Ana harita 50+ FPS', mainFps.fps >= 50, JSON.stringify(mainFps));
 
@@ -358,6 +368,97 @@ async function main() {
     check('Bolge bossu yakalaninca bolge fethedildi', true);
     await wait(900);
     await shot('14-bolge-zaferi');
+
+    // --- Seviye, deneyim ve kayıt ---
+    const xpBefore = await page.evaluate(() => ({
+        level: window.__overworld.progress.level,
+        xp: window.__overworld.progress.xp
+    }));
+    check('Oynayarak seviye kazanildi', xpBefore.level > 1, `seviye ${xpBefore.level}`);
+
+    // Bir düşmanı bayılt: XP gelmeli
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        const e = w.enemies.find(e => !e.fainted);
+        if (e) e.takeDamage(9999);
+    });
+    await wait(200);
+    const afterXp = await page.evaluate(() => ({
+        level: window.__overworld.progress.level,
+        xp: window.__overworld.progress.xp
+    }));
+    check('Dusman yenince XP kazaniliyor', afterXp.xp > xpBefore.xp || afterXp.level > xpBefore.level,
+        `${xpBefore.xp} -> ${afterXp.xp} XP`);
+
+    // Kayıt localStorage'a yazılıyor mu
+    const saved = await page.evaluate(() => {
+        const raw = localStorage.getItem('pokerpg-save-v1');
+        return raw ? JSON.parse(raw) : null;
+    });
+    check('Ilerleme localStorage a kaydediliyor', saved !== null && typeof saved.level === 'number',
+        saved ? `seviye ${saved.level}, ${saved.captures.length} yakalanan` : 'kayit yok');
+
+    // Seviye 16 -> Ivysaur evrimi
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        w.progress.level = 15;
+        w.progress.xp = w.progress.xpNeeded - 1;
+        const e = w.enemies.find(e => !e.fainted);
+        if (e) e.takeDamage(9999);
+    });
+    await page.waitForFunction(() => window.__overworld.evolutionScene !== null, { timeout: 15000 });
+    check('16. seviyede evrim sahnesi basliyor', true);
+    await wait(600);
+    await shot('15-evrim-sahnesi');
+
+    await page.waitForFunction(() => window.__overworld.evolutionScene === null, { timeout: 20000 });
+    const evolved = await page.evaluate(() => ({
+        form: window.__overworld.progress.formId,
+        name: window.__overworld.player.name,
+        abilities: window.__overworld.abilities.length
+    }));
+    check('Bulbasaur Ivysaur a evrimlesti', evolved.form === 2, `form #${evolved.form} (${evolved.name})`);
+    check('Evrimle yeni yetenek acildi (Leech Seed)', evolved.abilities === 4, `${evolved.abilities} yetenek`);
+    await shot('16-ivysaur');
+
+    // Seviye 32 -> Venusaur
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        w.progress.level = 31;
+        w.progress.xp = w.progress.xpNeeded - 1;
+        const e = w.enemies.find(e => !e.fainted);
+        if (e) e.takeDamage(9999);
+    });
+    await page.waitForFunction(() => window.__overworld.progress.formId === 3, { timeout: 20000 });
+    await page.waitForFunction(() => window.__overworld.evolutionScene === null, { timeout: 20000 });
+    const venusaur = await page.evaluate(() => ({
+        form: window.__overworld.progress.formId,
+        abilities: window.__overworld.abilities.map(a => a.name),
+        maxHp: window.__overworld.player.maxHp
+    }));
+    check('Venusaur a evrimlesti', venusaur.form === 3, `form #${venusaur.form}, ${venusaur.maxHp} can`);
+    check('Petal Blizzard acildi', venusaur.abilities.includes('Petal Blizzard'), venusaur.abilities.join(', '));
+    await shot('17-venusaur');
+
+    // Yakalanan boss oynanabilir karakter listesine giriyor mu
+    const playable = await page.evaluate(() => window.__overworld.progress.playableCharacters);
+    check('Yakalanan bosslar oynanabilir', playable.includes(768), `oynanabilir: ${playable.join(', ')}`);
+
+    // Kayıttan geri yükleme: sayfa yenilenince ilerleme korunmalı
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForSelector('.char-card', { timeout: 20000 });
+    const restored = await page.evaluate(() => {
+        const raw = localStorage.getItem('pokerpg-save-v1');
+        return raw ? JSON.parse(raw) : null;
+    });
+    check('Sayfa yenilenince ilerleme korunuyor', restored && restored.level >= 32 && restored.formId === 3,
+        restored ? `seviye ${restored.level}, form #${restored.formId}` : 'kayit yok');
+
+    await page.click('#start-adventure-btn');
+    await page.waitForSelector('.picker-item', { visible: true, timeout: 20000 });
+    const pickerCount = await page.$$eval('.picker-item', els => els.length);
+    check('Secim ekraninda yakalanan boss listeleniyor', pickerCount >= 2, `${pickerCount} karakter`);
+    await shot('18-karakter-secimi');
 
     // --- Konsol ve ağ hataları ---
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));

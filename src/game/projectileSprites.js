@@ -483,6 +483,90 @@ export const PROJECTILE_SPRITES = {
         ],
     },
 
+    // Golisopod: Liquidation - basınçlı su darbesi
+    water: {
+        scale: 2,
+        frameMs: 90,
+        directional: true,
+        glow: { color: '#38bdf8', blur: 14 },
+        colors: { b: '#0369a1', B: '#38bdf8', w: '#e0f2fe' },
+        frames: [
+            [
+                '..bbb..',
+                '.bBBBb.',
+                'bBwwwBb',
+                'bBwwwBb',
+                'bBwwwBb',
+                '.bBBBb.',
+                '..bbb..',
+            ],
+            [
+                '..bBb..',
+                '.bBwBb.',
+                'bBwwwBb',
+                'BwwwwwB',
+                'bBwwwBb',
+                '.bBwBb.',
+                '..bBb..',
+            ],
+        ],
+    },
+
+    // Hawlucha: Sky Attack - beyaz tüylü dalış darbesi
+    sky: {
+        scale: 2.5,
+        frameMs: 70,
+        directional: true,
+        glow: { color: '#e0f2fe', blur: 20 },
+        colors: { c: '#38bdf8', w: '#ffffff', y: '#fef08a' },
+        frames: [
+            [
+                '....cc...',
+                '..ccwwc..',
+                '.cwwyywwc',
+                'cwwyyyywc',
+                '.cwwyywwc',
+                '..ccwwc..',
+                '....cc...',
+            ],
+            [
+                '...ccc...',
+                '..cwwwc..',
+                '.cwyyywc.',
+                'cwyywwyyc',
+                '.cwyyywc.',
+                '..cwwwc..',
+                '...ccc...',
+            ],
+        ],
+    },
+
+    // Venusaur: Petal Blizzard - savrulan taç yaprakları (alan etkisi)
+    petal: {
+        scale: 2,
+        spin: 4,
+        glow: { color: '#f472b6', blur: 10 },
+        colors: { p: '#db2777', P: '#f472b6', w: '#fce7f3' },
+        frames: [
+            [
+                '..pp..',
+                '.pPPp.',
+                'pPwwPp',
+                'pPwwPp',
+                '.pPPp.',
+                '..pp..',
+            ],
+            [
+                '..pp..',
+                '.pPwp.',
+                'pPwwPp',
+                'pPwwPp',
+                '.pwPp.',
+                '..pp..',
+            ],
+        ],
+    },
+
     // Mecha: Signal Beam - böcek tipi sinyal ışını
     signalbeam: {
         scale: 2,

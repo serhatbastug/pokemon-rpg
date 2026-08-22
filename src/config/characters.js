@@ -1,20 +1,10 @@
-// Macera modu başlangıç Pokemonu: Bulbasaur (#1).
-// İki kişilik moddaki Şövalye (#2 Ivysaur) bunun evrimleşmiş halidir;
-// ileride eklenecek evrim mekaniği bu zinciri kullanacak.
-export const ADVENTURE_STARTER = { id: 1, className: 'Başlangıç' };
+// Macera modu başlangıç Pokemonu Bulbasaur'dur (#1); oynanabilir karakterler
+// ve yetenekleri playableCharacters.js'te, evrim zinciri PokeAPI'den gelir.
 
 // Tüccar Pokemon: Kecleon (#352) - Pokemon Mystery Dungeon serisinin resmi
 // dükkan sahibi. Her bölgenin merkezinde (mekan portallarının olduğu haritada)
 // satış yeri bulunur. Alışveriş mekanikleri sonraki güncellemelerde gelecek.
 export const MERCHANT = { id: 352, className: 'Tüccar' };
-
-// Macera modunda Bulbasaur'un harita yetenekleri (hepsi resmi hamleleri).
-// type, projectileSprites.js'teki sprite anahtarıdır; 'sleep' alan etkisidir.
-export const STARTER_ABILITIES = [
-    { key: 'K', name: 'Razor Leaf', type: 'leaf', cooldown: 30, damage: 10, speed: 9, life: 55 },
-    { key: 'O', name: 'Seed Bomb', type: 'seedbomb', cooldown: 120, damage: 25, speed: 7, life: 80, pierce: true }, // duvarların arkasına da işler
-    { key: 'Ş', name: 'Sleep Powder', type: 'sleep', cooldown: 420, radius: 150, stun: 150 }
-];
 
 // Karakter sınıfları ve karşılık gelen Pokemon ID'leri.
 // Yeni bir sınıf eklemek için buraya bir kayıt ekleyin ve

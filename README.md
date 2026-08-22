@@ -46,6 +46,8 @@ src/
   config/
     characters.js       Karakter sınıfları ve Pokemon ID eşleşmeleri
     settings.js         Fizik sabitleri, tuş atamaları, oyuncu ayarları
+    progression.js      Seviye/XP eğrisi ve stat formülleri
+    playableCharacters.js  Oynanabilir karakterlerin resmi hamle setleri
     regions.js          Macera modu bölgeleri (5 bölge, portal renkleri)
     worldMap.js         Ana harita karo verisi ve portal konumları
   core/
@@ -64,6 +66,7 @@ src/
     Overworld.js        Macera modu: kuşbakışı harita motoru
   world/
     Enemy.js            Düşman Pokemon: AI, saldırı, durum
+    Progress.js         Seviye, deneyim, koleksiyon ve localStorage kaydı
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
     hud.js              Can barları ve cooldown göstergeleri
@@ -87,7 +90,21 @@ boss savaşı hazır; her mekan farklı bir harita tarzında:
 
 Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
 uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sahnesi.
-Sırada: 2. bölge, evrim mekaniği, Kecleon dükkanında alışveriş.
+
+### Seviye, evrim ve koleksiyon
+
+- **Seviye:** Yenilen ve yakalanan Pokemonlardan XP kazanılır; seviye atlayınca
+  can/hasar artar ve can tamamen dolar. 1. bölgeyi bitirmek ~16. seviyeye getirir.
+- **Evrim:** Zincir PokeAPI'den alınır (elle kodlanmaz). Bulbasaur 16'da Ivysaur,
+  32'de Venusaur olur; klasik evrim sahnesi (silüet geçişi + parlama) oynar.
+  Her evrim yeni bir resmi hamle açar: **L Leech Seed** (16), **P Petal Blizzard** (32).
+- **Oynanabilir bosslar:** Yakalanan bosslar karakter olarak seçilebilir —
+  Golisopod (Pin Missile / Liquidation / First Impression),
+  Hawlucha (Aerial Ace / Flying Press / Sky Attack),
+  Zarude (Power Whip / Dark Pulse / Jungle Healing).
+- **Kayıt:** İlerleme localStorage'a yazılır; karakter seçim ekranından sıfırlanabilir.
+
+Sırada: 2. bölge (Ateş Dağı), Kecleon dükkanında alışveriş.
 
 ## Yeni İçerik Ekleme
 

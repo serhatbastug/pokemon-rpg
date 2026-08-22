@@ -37,6 +37,17 @@
             <button id="start-battle-btn" class="start-battle-btn hidden">SAVAŞI BAŞLAT</button>
         </section>
 
+        <!-- Macera: Karakter Seçimi (yakalanan bosslar burada çıkar) -->
+        <section id="adventure-picker" class="detail-overlay hidden">
+            <div class="modal-card picker-card">
+                <button id="picker-close" class="close-btn">&times;</button>
+                <h3 class="picker-title">Maceraya Kiminle Devam Edeceksin?</h3>
+                <p id="picker-progress" class="picker-progress"></p>
+                <div id="picker-list" class="picker-list"></div>
+                <button id="picker-reset" class="picker-reset">Kaydı Sıfırla</button>
+            </div>
+        </section>
+
         <!-- Overworld (Macera Modu Ana Haritası) -->
         <section id="overworld-screen" class="screen hidden">
             <div class="overworld-topbar">

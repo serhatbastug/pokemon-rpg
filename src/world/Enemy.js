@@ -241,6 +241,7 @@ export class Enemy {
             this.fainted = true;
             this.windup = 0;
             this.world.spawnMapText(this.x, this.y - this.size / 2 - 14, 'BAYILDI!', '#fbbf24');
+            this.world.awardXp(this);
         }
     }
 

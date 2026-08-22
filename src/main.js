@@ -1,6 +1,8 @@
 // Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
-import { CHARACTER_CLASSES, ADVENTURE_STARTER } from './config/characters.js';
+import { CHARACTER_CLASSES } from './config/characters.js';
 import { loadCharacters, fetchCharacter } from './services/pokeapi.js';
+import { Progress } from './world/Progress.js';
+import { AdventurePicker } from './ui/adventurePicker.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
@@ -21,29 +23,39 @@ const game = new Game({
     }
 });
 
+// Macera modu ilerlemesi (seviye, deneyim, yakalananlar) localStorage'da tutulur
+const progress = new Progress();
+
 const overworld = new Overworld({
     canvas: document.getElementById('worldCanvas'),
     input,
+    progress,
     onExit: () => {
         overworld.stop();
         showSelectionScreen();
     }
 });
 
-// Macera her zaman başlangıç Pokemonu (Bulbasaur) ile başlar; ilk tıklamada yüklenir
-let adventureStarter = null;
-document.getElementById('start-adventure-btn').addEventListener('click', async () => {
-    if (!adventureStarter) {
-        try {
-            adventureStarter = await fetchCharacter(ADVENTURE_STARTER);
-        } catch (error) {
-            console.error('Başlangıç Pokemonu yüklenemedi:', error);
-            return;
-        }
+// Seçilen karakterle maceraya başlar. Doğru evrim formu, Overworld evrim
+// zincirini çekince seviyeye göre kendiliğinden uygulanır.
+async function startAdventure() {
+    try {
+        const character = await fetchCharacter({ id: progress.formId });
+        showOverworldScreen();
+        overworld.start(character);
+    } catch (error) {
+        console.error('Karakter yüklenemedi:', error);
     }
+}
 
-    showOverworldScreen();
-    overworld.start(adventureStarter);
+const picker = new AdventurePicker({
+    progress,
+    onStart: () => startAdventure(),
+    onReset: () => overworld.stop()
+});
+
+document.getElementById('start-adventure-btn').addEventListener('click', () => {
+    picker.open();
 });
 
 // Otomatik UI testleri (tests/ui.test.mjs) oyun durumunu buradan okur

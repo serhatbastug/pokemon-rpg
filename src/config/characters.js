@@ -2,13 +2,13 @@
 // Yeni bir sınıf eklemek için buraya bir kayıt ekleyin ve
 // src/game/abilities.js içinde yeteneklerini tanımlayın.
 export const CHARACTER_CLASSES = [
-    { id: 2, className: 'Şövalye', themeColor: 'var(--color-knight)', baseStats: { hp: 120, attack: 75, defense: 90, speed: 4 }, description: 'Yüksek savunma gücüyle ön saflarda savaşan, tohum tabanlı kalkan taşıyıcısı.' },
+    { id: 2, className: 'Şövalye', themeColor: 'var(--color-knight)', baseStats: { hp: 120, attack: 75, defense: 90, speed: 4 }, description: 'Ön saflarda savaşan, keskin yaprakları, tohum bombaları ve güneş ışınıyla rakibini ezen bitki ustası.' },
     { id: 6, className: 'Büyücü', themeColor: 'var(--color-mage)', baseStats: { hp: 95, attack: 95, defense: 60, speed: 4.5 }, description: 'Yıkıcı alev büyüleriyle rakiplerini küle çeviren güçlü büyü ustası.' },
     { id: 94, className: 'Suikastçı', themeColor: 'var(--color-assassin)', baseStats: { hp: 90, attack: 110, defense: 50, speed: 6 }, description: 'Gölgelerden saldıran, zehirli ve illüzyon yeteneklerine sahip ölümcül savaşçı.' },
     { id: 123, className: 'Okçu', themeColor: 'var(--color-archer)', baseStats: { hp: 90, attack: 95, defense: 65, speed: 5.5 }, description: 'Kollarıyla havayı keserek çok hızlı giden ve rakibi delen rüzgar bıçakları fırlatır.' },
     { id: 145, className: 'Elementalist', themeColor: 'var(--color-elementalist)', baseStats: { hp: 100, attack: 85, defense: 75, speed: 5 }, description: 'Yıldırımların ve doğanın gücünü kontrol eden kadim elementalist.' },
     { id: 42, className: 'Vampir', themeColor: 'var(--color-vampire)', baseStats: { hp: 90, attack: 80, defense: 70, speed: 5 }, description: 'Rakiplerinin canını sömürerek hayatta kalan, gecenin karanlık yaratığı.' },
-    { id: 649, className: 'Mecha', themeColor: 'var(--color-mecha)', baseStats: { hp: 110, attack: 100, defense: 95, speed: 3.5 }, description: 'Sırtındaki yüksek teknolojili lazer topuyla donatılmış çelik savaş makinesi.' },
-    { id: 291, className: 'Ninja', themeColor: 'var(--color-ninja)', baseStats: { hp: 85, attack: 90, defense: 45, speed: 6.5 }, description: 'İnanılmaz hızıyla gözle görülmesi imkansız, hızlı suikast teknikleri ustası.' },
+    { id: 649, className: 'Mecha', themeColor: 'var(--color-mecha)', baseStats: { hp: 110, attack: 100, defense: 95, speed: 3.5 }, description: 'Sinyal ışınları, rakibi takip eden manyetik bombaları ve lazer topuyla donatılmış çelik savaş makinesi.' },
+    { id: 291, className: 'Ninja', themeColor: 'var(--color-ninja)', baseStats: { hp: 85, attack: 90, defense: 45, speed: 6.5 }, description: 'İnanılmaz hızıyla gözle görülmesi imkansız, keskin X-makas kesikleri ustası.' },
     { id: 144, className: 'Buz Şövalyesi', themeColor: 'var(--color-ice-knight)', baseStats: { hp: 105, attack: 85, defense: 80, speed: 4.5 }, description: 'Rakiplerini donduran buz kristalleri ve dondurucu zırhıyla yenilmez şövalye.' }
 ];

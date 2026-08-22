@@ -146,6 +146,8 @@ export class Game {
             }
 
             if (p.duration <= 0) {
+                // Tohum bombası isabet etmese de zeminde patlar
+                if (p.type === 'seedbomb') effects.createExplosion(p.x, p.y, '#65a30d');
                 this.projectiles.splice(i, 1);
             }
         }

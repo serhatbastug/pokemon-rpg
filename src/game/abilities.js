@@ -10,10 +10,9 @@ export function castAbility(player, index, game) {
         case 'Şövalye':
             if (index === 0) { // Razor Leaf
                 projectiles.push(new Projectile(player.x, player.y, player.dir * 10, 0, 10, 10, player.color, 'leaf', player.playerNum));
-            } else if (index === 1) { // Shield Wall
-                player.shield = 40;
-                effects.createPulse(player.x, player.y, player.color);
-                setTimeout(() => player.shield = 0, 2000);
+            } else if (index === 1) { // Seed Bomb (Ivysaur'un orijinal hamlesi)
+                // Yerçekimiyle kavis çizen, zemine çarpınca patlayan tohum bombası
+                projectiles.push(new Projectile(player.x, player.y - 20, player.dir * 7, -8, 12, 18, player.color, 'seedbomb', player.playerNum));
             } else if (index === 2) { // Solar Beam
                 createSolarBeam(player, game);
             }
@@ -112,16 +111,11 @@ export function castAbility(player, index, game) {
             break;
 
         case 'Mecha':
-            if (index === 0) { // Metal Claw
-                projectiles.push(new Projectile(player.x + player.dir * 40, player.y, player.dir * 3, 0, 15, 12, player.color, 'claw', player.playerNum, 15));
-            } else if (index === 1) { // Barrier Mode
-                player.shield = 60;
-                player.speedMultiplier = 0.5;
-                effects.createPulse(player.x, player.y, player.color);
-                setTimeout(() => {
-                    player.shield = 0;
-                    player.speedMultiplier = 1.0;
-                }, 3000);
+            if (index === 0) { // Signal Beam (Genesect'in orijinal hamlesi) - uzak menzilli ışın
+                projectiles.push(new Projectile(player.x, player.y, player.dir * 13, 0, 9, 12, player.color, 'signalbeam', player.playerNum));
+            } else if (index === 1) { // Magnet Bomb (Genesect'in orijinal hamlesi)
+                // Rakibi takip eden manyetik bomba
+                projectiles.push(new Projectile(player.x, player.y, player.dir * 5, 0, 11, 16, player.color, 'magnetbomb', player.playerNum, 180));
             } else if (index === 2) { // Techno Blast
                 projectiles.push(new Projectile(player.x, player.y, player.dir * 15, 0, 45, 40, player.color, 'laser', player.playerNum));
             }
@@ -130,13 +124,9 @@ export function castAbility(player, index, game) {
         case 'Ninja':
             if (index === 0) { // Slash
                 projectiles.push(new Projectile(player.x + player.dir * 40, player.y, player.dir * 4, 0, 10, 10, player.color, 'slash', player.playerNum, 10));
-            } else if (index === 1) { // Double Team
-                player.speedMultiplier = 2.0;
-                player.invulnerable = true;
-                setTimeout(() => {
-                    player.speedMultiplier = 1.0;
-                    player.invulnerable = false;
-                }, 2000);
+            } else if (index === 1) { // X-Scissor (Ninjask'in orijinal hamlesi)
+                // Hızla ilerleyen X biçimli enerji kesiği
+                projectiles.push(new Projectile(player.x, player.y, player.dir * 12, 0, 13, 16, player.color, 'xscissor', player.playerNum));
             } else if (index === 2) { // Giga Impact
                 // İleri atılıp ezme
                 let count = 0;

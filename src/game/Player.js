@@ -29,10 +29,8 @@ export class Player {
         if (char.className === 'Okçu') this.maxCooldowns = [120, 200, 540];
 
         // Dinamik güçlendirme/zayıflatma durumları
-        this.shield = 0;
         this.invulnerable = false;
         this.frozen = false;
-        this.silenced = false;
         this.damageMultiplier = 1.0;
         this.speedMultiplier = 1.0;
         this.flashFrames = 0;
@@ -59,15 +57,6 @@ export class Player {
             ctx.shadowColor = '#38bdf8';
             ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
             ctx.fillRect(this.x - this.width/2 - 5, this.y - this.height/2 - 5, this.width + 10, this.height + 10);
-        }
-
-        // Kalkan halkası
-        if (this.shield > 0) {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 45, 0, Math.PI * 2);
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = 4;
-            ctx.stroke();
         }
 
         // Sprite
@@ -137,18 +126,7 @@ export class Player {
             effects.triggerFlash('rgba(255, 255, 255, 0.25)', 4);
         }
 
-        if (this.shield > 0) {
-            this.shield -= amount;
-            color = '#38bdf8';
-            txt = 'ENGELLENDİ!';
-            if (this.shield < 0) {
-                this.hp += this.shield; // kalkanı aşan hasar cana işler
-                txt = `-${Math.ceil(Math.abs(this.shield))}`;
-                this.shield = 0;
-            }
-        } else {
-            this.hp -= amount;
-        }
+        this.hp -= amount;
 
         effects.spawnText(this.x, this.y - 60, txt, color, isCrit);
 

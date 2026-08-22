@@ -114,12 +114,11 @@ export class EffectsManager {
                 continue;
             }
 
+            // Pixel art bütünlüğü için parçacıklar kare çizilir
             ctx.save();
             ctx.globalAlpha = pt.alpha;
             ctx.fillStyle = pt.color;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(pt.x - pt.radius, pt.y - pt.radius, pt.radius * 2, pt.radius * 2);
             ctx.restore();
         }
     }

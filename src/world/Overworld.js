@@ -5,6 +5,8 @@ import { fetchCharacter } from '../services/pokeapi.js';
 import { preloadTypes } from '../services/typeChart.js';
 import { FIELD_MOVES, fieldMoveForTile } from '../config/fieldMoves.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
+import { TRAINER, HIT_STOP } from '../config/balance.js';
+import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { Enemy } from './Enemy.js';
 
 // Overworld'un davranislari konu basliklarina gore ayri modullerde tutulur
@@ -16,6 +18,9 @@ import { CombatSystem } from './systems/CombatSystem.js';
 import { Scenes } from './scenes/Scenes.js';
 import { TerrainRenderer } from './render/TerrainRenderer.js';
 import { WorldRenderer } from './render/WorldRenderer.js';
+import { TrainerCombat } from './systems/TrainerCombat.js';
+import { AutoBattle } from './systems/AutoBattle.js';
+import { TrainerBattles } from './systems/TrainerBattles.js';
 
 // Kuşbakışı harita motoru: karo tabanlı pixel art haritalar, gezinen oyuncu ve
 // portallar. Hedefi (target) olan portala temas haritalar arasında geçiş yapar;
@@ -65,7 +70,18 @@ export class Overworld {
             dirX: 0,
             dirY: 1,
             moving: false,
-            aim: { x: 1, y: 0 }       // son hareket yönü; yetenekler bu yöne atılır
+            aim: { x: 1, y: 0 },      // son hareket yönü; yetenekler bu yöne atılır
+
+            // Antrenör de hasar alır; hayatta kalmak kaçınmaya bağlıdır
+            maxHp: TRAINER.maxHp,
+            hp: TRAINER.maxHp,
+            invuln: 0,
+            status: null,
+            jumpFrames: 0,
+            jumpCooldown: 0,
+            dashFrames: 0,
+            dashCooldown: 0,
+            dashDir: { x: 1, y: 0 }
         };
 
         // Harita savaşı durumu
@@ -80,6 +96,8 @@ export class Overworld {
         this.fireflies = [];    // atmosfer: ateşböcekleri
         this.debris = [];       // boss uyanışında savrulan enkaz
         this.shake = 0;         // ekran sarsıntısı
+        this.hitStop = 0;       // ağır vuruşlarda kısa donma
+        this.npcTrainers = [];  // haritadaki NPC antrenörler
         this.arenaOpened = false;
         this.victory = null;        // boss yenildiğinde zafer sahnesi
         this.pendingVictory = null; // jetonlar toplanana kadar bekleyen zafer
@@ -96,6 +114,7 @@ export class Overworld {
 
         input.onKeyDown(e => {
             if (!this.running) return;
+            unlockAudio(); // tarayıcı sesi ilk etkileşimde açar
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
 
@@ -114,6 +133,10 @@ export class Overworld {
                     this.castAbility(i);
                 }
             }
+
+            // Space: zıpla, Shift: atılım (kaçınma hareketleri)
+            if (e.code === 'Space') this.jump();
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dash();
 
             // 1-6: ekipteki Pokemonu değiştir
             const slot = Number(e.key);
@@ -227,7 +250,7 @@ export class Overworld {
         }
         this.secretRevealed = false;
         this.enemies = (map.spawns || []).map(spawn => {
-            const enemy = new Enemy({ ...spawn, world: this });
+            const enemy = new Enemy({ ...spawn, world: this, region: map.region || 1 });
             // Gizli odadakiler odalarını korur: dışarıdakine saldırmaz
             if (map.secretArea && this.isTileInsideArea(spawn.col, spawn.row, map.secretArea)) {
                 enemy.homeArea = map.secretArea;
@@ -238,6 +261,7 @@ export class Overworld {
             this.fetchEnemyData(enemy.id).then(data => {
                 enemy.name = data.name;
                 enemy.types = data.types || [];
+                this.progress.markSeen(enemy.id, data.name); // Pokedex: görüldü
                 enemy.img.src = data.battleSprite || data.sprite;
                 preloadTypes(enemy.types);
             }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));
@@ -246,11 +270,15 @@ export class Overworld {
         this.bakeTerrain();
         this.updateCamera(true);
 
+        // Harita temasına göre müzik
+        playMusic(map.ambience === 'shadow' ? 'shadow' : (map.spawns?.length ? 'forest' : 'town'));
+
         const title = document.getElementById('overworld-title');
         if (title) title.textContent = map.name;
     }
 
     stop() {
+        stopMusic();
         this.running = false;
         if (this.rafId) cancelAnimationFrame(this.rafId);
         this.rafId = null;
@@ -314,6 +342,7 @@ export class Overworld {
             });
         }
         this.shake = 8;
+        Sfx.fieldMove();
         this.spawnMapText(px, py - 30, `${move.name}!`, move.color);
     }
 
@@ -349,10 +378,20 @@ export class Overworld {
         }
         if (this.victory) return;
 
+        // Hit-stop: ağır vuruşlarda birkaç kare dünya donar, darbe ağırlaşır
+        if (this.hitStop > 0) {
+            this.hitStop--;
+            return;
+        }
+
+        this.updateDodge();
         this.movePlayer();
         this.checkPortals();
         this.checkSecretDiscovery();
         this.updateCombat();
+        this.updateAutoBattle();
+        this.updateTrainerBattles();
+        this.updateStatuses();
         this.updatePendingVictory();
         this.updateCamera();
     }
@@ -371,6 +410,7 @@ export class Overworld {
         this.drawTiles();
         this.drawPortals();
         this.drawShops();
+        this.drawTrainerNpcs();
         for (const enemy of this.enemies) {
             // Pokeball'a girmiş (sallanan toptaki) Pokemon görünmez
             if (this.ballAnim && this.ballAnim.enemy === enemy && this.ballAnim.frame >= 15) continue;
@@ -441,5 +481,8 @@ applyMixins(
     CombatSystem,
     Scenes,
     TerrainRenderer,
-    WorldRenderer
+    WorldRenderer,
+    TrainerCombat,
+    AutoBattle,
+    TrainerBattles
 );

@@ -1,6 +1,6 @@
-import { preloadTypes } from '../../services/typeChart.js';
-import { effectiveness, effectivenessLabel } from '../../services/typeChart.js';
-import { AIM, CATCH, DEPLOY, TOKENS } from '../../config/balance.js';
+import { preloadTypes, effectiveness, effectivenessLabel } from '../../services/typeChart.js';
+import { AIM, CATCH, DEPLOY, TOKENS, TRAINER, HIT_STOP } from '../../config/balance.js';
+import { Sfx } from '../../services/audio.js';
 
 // Harita savaşı: yetenek kullanımı, mermiler, hasar ve tip etkililiği,
 // yakalama ve yetenek jetonları.
@@ -57,10 +57,19 @@ export const CombatSystem = {
                 continue;
             }
 
-            // Düşman mermileri sahadaki Pokemona isabet eder (antrenör vurulmaz)
-            const target = this.active;
-            if (target && !target.fainted && Math.hypot(p.x - target.x, p.y - target.y) < 26) {
+            // Mermiler hem sahadaki Pokemona hem antrenöre isabet edebilir:
+            // antrenör de hasar alır, kaçınmak oyuncunun işidir
+            const pokemon = this.active;
+            if (pokemon && !pokemon.fainted && Math.hypot(p.x - pokemon.x, p.y - pokemon.y) < 26) {
                 this.damageActive(p.damage, p, p.moveType);
+                this.enemyProjectiles.splice(i, 1);
+                continue;
+            }
+
+            const trainer = this.player;
+            if (!this.trainerInvulnerable &&
+                Math.hypot(p.x - trainer.x, p.y - (trainer.y - this.trainerLift)) < TRAINER.hitRadius) {
+                this.damageTrainer(p.damage, p.moveType);
                 this.enemyProjectiles.splice(i, 1);
             }
         }
@@ -86,8 +95,15 @@ export const CombatSystem = {
                     const damage = p.damage * mult;
                     const label = effectivenessLabel(mult);
                     if (label) this.spawnMapText(enemy.x, enemy.y - 66, label.text, label.color);
+                    if (mult >= 2) Sfx.superEffective();
+                    else if (mult > 0 && mult < 1) Sfx.weak();
+                    else if (mult > 0) Sfx.hit();
 
-                    if (mult > 0) enemy.takeDamage(damage);
+                    if (mult > 0) {
+                        enemy.takeDamage(damage);
+                        this.tryApplyStatus(enemy, p.moveType);
+                        if (damage >= HIT_STOP.threshold) this.hitStop = HIT_STOP.frames;
+                    }
 
                     // Leech Seed: verilen hasarın bir kısmı sahadaki Pokemonun canına döner
                     if (p.leech && this.active && mult > 0) {
@@ -110,33 +126,55 @@ export const CombatSystem = {
             if (s.life <= 0) this.spores.splice(i, 1);
         }
 
-        // Pokeball animasyonu
+        // Pokeball animasyonu: uçuş -> sallanmalar -> sonuç
         if (this.ballAnim) {
             const ball = this.ballAnim;
             ball.frame++;
-            if (ball.frame === 15) {
+
+            if (ball.frame === CATCH.flightFrames) {
                 // Topa girdi: sallanma başlar
                 ball.x = ball.enemy.x;
                 ball.y = ball.enemy.y;
+                Sfx.ballWobble();
             }
-            if (ball.frame >= 55) {
-                // Yakalandı
+
+            // Her sallanmada bir "acaba?" anı
+            const wobbleStart = CATCH.flightFrames;
+            const wobbleTotal = CATCH.wobbleFrames * CATCH.wobbles;
+            if (ball.frame > wobbleStart && (ball.frame - wobbleStart) % CATCH.wobbleFrames === 0) {
+                const wobbleIndex = (ball.frame - wobbleStart) / CATCH.wobbleFrames;
+                if (wobbleIndex < CATCH.wobbles) Sfx.ballWobble();
+            }
+
+            if (ball.frame >= wobbleStart + wobbleTotal) {
                 const caught = ball.enemy;
-                const joinedParty = this.progress.addCapture(caught.id, caught.name);
-                this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
-                if (!joinedParty) {
-                    this.spawnMapText(caught.x, caught.y - 54, 'Ekip dolu - kütüphaneye gönderildi', '#94a3b8');
-                } else {
-                    // Yeni üye ekibe katıldı: sahaya hazırlansın
-                    this.buildMember(this.progress.party[this.progress.party.length - 1])
-                        .then(pokemon => {
-                            this.partyPokemon.push(pokemon);
-                            preloadTypes(pokemon.types);
-                        })
-                        .catch(error => console.error('Yeni ekip üyesi hazırlanamadı:', error));
-                }
-                this.enemies = this.enemies.filter(e => e !== caught);
                 this.ballAnim = null;
+
+                if (ball.success) {
+                    const joinedParty = this.progress.addCapture(caught.id, caught.name);
+                    this.progress.markSeen(caught.id, caught.name, true);
+                    this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
+                    Sfx.catchSuccess();
+                    if (!joinedParty) {
+                        this.spawnMapText(caught.x, caught.y - 54, 'Ekip dolu - kütüphaneye gönderildi', '#94a3b8');
+                    } else {
+                        // Yeni üye ekibe katıldı: sahaya hazırlansın
+                        this.buildMember(this.progress.party[this.progress.party.length - 1])
+                            .then(pokemon => {
+                                this.partyPokemon.push(pokemon);
+                                preloadTypes(pokemon.types);
+                            })
+                            .catch(error => console.error('Yeni ekip üyesi hazırlanamadı:', error));
+                    }
+                    this.enemies = this.enemies.filter(e => e !== caught);
+                } else {
+                    // Kurtuldu: Pokemon topu kırıp ayağa kalkar
+                    caught.fainted = false;
+                    caught.hp = Math.max(1, Math.round(caught.maxHp * 0.25));
+                    caught.aggro = true;
+                    this.spawnMapText(caught.x, caught.y - 40, 'Kurtuldu!', '#f87171');
+                    Sfx.catchFail();
+                }
             }
         }
 
@@ -161,7 +199,7 @@ export const CombatSystem = {
         }
     },
 
-    castAbility(index) {
+    castAbility(index, autoTarget = null) {
         const caster = this.active;
         if (!caster || caster.fainted) return;
 
@@ -238,7 +276,7 @@ export const CombatSystem = {
         } else {
             // Nişan: en yakın ayakta düşmanın ATIŞ ANINDAKİ konumuna kilitlenir.
             // Duvar delen hamleler (Seed Bomb) hedefi duvar arkasında da seçer.
-            const target = this.findAimTarget(ability.pierce);
+            const target = autoTarget || this.findAimTarget(ability.pierce);
             const aim = target
                 ? this.normalize(target.x - player.x, target.y - player.y)
                 : this.aimVector();
@@ -263,6 +301,7 @@ export const CombatSystem = {
         }
 
         this.shotsFired++;
+        Sfx.shoot();
 
         // Uyuyan bossun yakınında ateş etmek onu uyandırır
         for (const enemy of this.enemies) {
@@ -326,7 +365,7 @@ export const CombatSystem = {
         let target = null;
         let best = CATCH.throwRange; // maksimum atış mesafesi
         for (const enemy of this.enemies) {
-            if (!enemy.fainted || enemy.isBoss) continue;
+            if (!enemy.fainted || !enemy.isCatchable) continue;
             const dist = Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y);
             if (dist < best) {
                 best = dist;
@@ -339,15 +378,29 @@ export const CombatSystem = {
             return;
         }
 
-        // Poke Ball tükenen bir kaynaktır; Kecleon'dan satın alınır
-        if (!this.progress.consumeItem('poke-ball')) {
+        // Poke Ball tükenen bir kaynaktır; Kecleon'dan satın alınır.
+        // Elde birden fazla tür varsa en iyisi kullanılır.
+        const ball = this.progress.bestBall();
+        if (!ball || !this.progress.consumeItem(ball.id)) {
             this.spawnMapText(this.player.x, this.player.y - 50, 'Poke Ball kalmadı! (Tüccar)', '#f87171');
+            Sfx.deny();
             return;
         }
+
+        // Yakalama şansı: topun gücü x türün zorluğu.
+        // Gizli Pokemonlar zor, bosslar hiç yakalanmaz.
+        const kindModifier = CATCH.kindModifier[target.kind] ?? 1;
+        const chance = Math.min(0.95, CATCH.baseRate * ball.catchRate * kindModifier);
+        const success = Math.random() < chance;
+
+        Sfx.ballThrow();
+        this.spawnMapText(this.player.x, this.player.y - 60, ball.name, ball.color);
 
         this.ballAnim = {
             enemy: target,
             frame: 0,
+            success,
+            ballColor: ball.color,
             fromX: this.player.x,
             fromY: this.player.y - 20,
             x: this.player.x,
@@ -371,11 +424,26 @@ export const CombatSystem = {
 
         target.takeDamage(final);
         this.spawnMapText(target.x, target.y - 46, `-${Math.ceil(final)}`, '#ff4444');
+        this.tryApplyStatus(target, moveType);
+        Sfx.playerHurt();
+        if (final >= HIT_STOP.threshold) this.hitStop = HIT_STOP.frames;
     },
 
     // Eski çağrılar için: düşman teması da sahadaki Pokemona işler
+    // Düşman teması: yakınındakine (Pokemon ya da antrenör) vurur
     damagePlayer(amount, from) {
-        this.damageActive(amount, from, from?.attack?.moveType);
+        const pokemon = this.active;
+        const moveType = from?.attack?.moveType;
+
+        if (pokemon && !pokemon.fainted && from) {
+            const toPokemon = Math.hypot(from.x - pokemon.x, from.y - pokemon.y);
+            const toTrainer = Math.hypot(from.x - this.player.x, from.y - this.player.y);
+            if (toPokemon <= toTrainer) {
+                this.damageActive(amount, from, moveType);
+                return;
+            }
+        }
+        this.damageTrainer(TRAINER.contactDamage, moveType);
     },
 
     spawnMapText(x, y, text, color) {
@@ -427,6 +495,7 @@ export const CombatSystem = {
 
         if (collected > 0) {
             progress.addTokens(collected);
+            Sfx.token();
             this.spawnMapText(player.x, player.y - 40, `+${collected} jeton`, '#fbbf24');
         }
     }

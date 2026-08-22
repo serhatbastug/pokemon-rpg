@@ -1,4 +1,4 @@
-import { ENEMY } from '../config/balance.js';
+import { ENEMY, REGION_SCALING } from '../config/balance.js';
 ﻿import { TILE_SIZE } from '../config/worldMap.js';
 
 // Tür (kind) bazlı temel istatistikler. aggroTiles: labirent yolu üzerinden
@@ -10,7 +10,9 @@ const KIND_STATS = {
     // Boss: uyanana kadar hareketsiz uyur
     boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8, sleeps: true },
     // Bölge bossu: mekan bosslarından belirgin şekilde güçlü
-    regionBoss: { hp: 240, speed: 2.4, size: 116, aggroTiles: 10, sleeps: true }
+    regionBoss: { hp: 240, speed: 2.4, size: 116, aggroTiles: 10, sleeps: true },
+    // NPC antrenörün gönderdiği Pokemon: yabaniden güçlü, yakalanamaz
+    trainer: { hp: 60, speed: 2.4, size: 66, aggroTiles: 12 }
 };
 
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
@@ -39,8 +41,13 @@ export const SPECIES_ATTACKS = {
 // (akış alanı), görüş hattı açıkken resmi hamlesiyle uzaktan vurur.
 // HP bitince bayılır; bayılınca Pokeball ile yakalanabilir.
 export class Enemy {
-    constructor({ id, kind, col, row, world }) {
+    constructor({ id, kind, col, row, world, region = 1 }) {
         const stats = KIND_STATS[kind];
+        // Bölge ilerledikçe düşmanlar sertleşir; yoksa 2. bölge 1. gibi hissettirir
+        const scale = REGION_SCALING[region] || REGION_SCALING[1];
+        this.region = region;
+        this.level = scale.level;
+        this.damageScale = scale.damage;
         this.id = id;
         this.kind = kind;
         this.world = world;
@@ -55,8 +62,8 @@ export class Enemy {
         this.guardRadius = stats.guardRadius || 0;
         this.homeArea = null;  // gizli odayı koruyanlar: sadece oda içinde saldırır
         this.asleep = !!stats.sleeps; // boss uyanana kadar uyur
-        this.maxHp = stats.hp;
-        this.hp = stats.hp;
+        this.maxHp = Math.round(stats.hp * scale.hp);
+        this.hp = this.maxHp;
         this.speed = stats.speed;
         this.size = stats.size;
         this.aggroTiles = stats.aggroTiles;
@@ -73,6 +80,11 @@ export class Enemy {
         this.wanderTimer = 0;
         this.wanderDir = { x: 0, y: 0 };
         this.strafePhase = Math.random() * Math.PI * 2;
+    }
+
+    // Antrenör Pokemonları da yakalanamaz (sahibi var)
+    get isCatchable() {
+        return this.kind === 'common' || this.kind === 'hidden';
     }
 
     get isBoss() {
@@ -146,7 +158,7 @@ export class Enemy {
 
         // Temas hasarı (oyuncu üstüne yapışırsa)
         if (dist < this.size / 2 + 22 && this.contactCooldown === 0) {
-            this.world.damagePlayer(ENEMY.contactDamage, this);
+            this.world.damagePlayer(ENEMY.contactDamage * this.damageScale, this);
             this.contactCooldown = ENEMY.contactCooldown;
         }
 
@@ -223,7 +235,7 @@ export class Enemy {
                 vy: Math.sin(a) * atk.speed,
                 type: atk.type,
                 moveType: atk.moveType,
-                damage: atk.damage,
+                damage: atk.damage * this.damageScale,
                 life: 90
             });
         }

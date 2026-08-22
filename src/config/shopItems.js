@@ -7,7 +7,34 @@ export const SHOP_ITEMS = [
         price: 4,
         stack: 5,               // bir alışta kaç adet gelir
         color: '#dc2626',
-        description: 'Bayılmış yabani Pokemonları yakalamak için gerekir.'
+        catchRate: 1,
+        description: 'Bayılmış yabani Pokemonları yakalar. Kaçma ihtimali vardır.'
+    },
+    {
+        id: 'great-ball',
+        name: 'Great Ball',
+        price: 9,
+        stack: 3,
+        color: '#3b82f6',
+        catchRate: 1.5,
+        description: 'Daha güvenilir top. Gizli Pokemonlar için iyi seçim.'
+    },
+    {
+        id: 'ultra-ball',
+        name: 'Ultra Ball',
+        price: 18,
+        stack: 2,
+        color: '#facc15',
+        catchRate: 2.2,
+        description: 'En güçlü top. Zor yakalananlar için saklayın.'
+    },
+    {
+        id: 'antidote',
+        name: 'Panzehir',
+        price: 6,
+        stack: 2,
+        color: '#a855f7',
+        description: 'Zehir, yanık ve felç durumunu geçirir.'
     },
     {
         id: 'potion',
@@ -36,6 +63,11 @@ export const SHOP_ITEMS = [
 ];
 
 export const STARTING_ITEMS = { 'poke-ball': 8 };
+
+// Yakalama topları, güçlüden zayıfa (elde olan en iyisi kullanılır)
+export const BALLS = SHOP_ITEMS
+    .filter(item => item.catchRate)
+    .sort((a, b) => b.catchRate - a.catchRate);
 
 export function itemById(id) {
     return SHOP_ITEMS.find(item => item.id === id) || null;

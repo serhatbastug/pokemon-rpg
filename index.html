@@ -61,10 +61,14 @@
                 <button id="library-close" class="close-btn">&times;</button>
                 <h3 class="picker-title">Pokemon Kütüphanesi</h3>
                 <p id="library-tokens" class="picker-progress"></p>
+                <div id="library-detail" class="lib-detail hidden"></div>
                 <h4 class="lib-section">Ekip</h4>
                 <div id="library-party" class="lib-list"></div>
                 <h4 class="lib-section">Koleksiyon</h4>
                 <div id="library-collection" class="lib-list"></div>
+                <h4 class="lib-section">Pokedex</h4>
+                <p id="library-dex-summary" class="picker-progress"></p>
+                <div id="library-dex" class="dex-grid"></div>
             </div>
         </section>
 
@@ -73,7 +77,7 @@
             <div class="overworld-topbar">
                 <button id="overworld-back-btn" class="back-btn">&larr; Ana Menü</button>
                 <h2 id="overworld-title" class="overworld-title">Ana Harita</h2>
-                <span class="overworld-hint">WASD: hareket &middot; K O Ş: yetenek &middot; N: Pokeball &middot; 1-6: poke top &middot; F: saha hamlesi &middot; E: kütüphane &middot; ESC: çık</span>
+                <span class="overworld-hint">WASD: hareket &middot; K O Ş: yetenek &middot; N: Pokeball &middot; 1-6: poke top &middot; F: saha hamlesi &middot; Space: zıpla &middot; Shift: atıl &middot; E: kütüphane &middot; ESC: çık</span>
             </div>
             <div class="canvas-container">
                 <canvas id="worldCanvas" width="1000" height="500"></canvas>

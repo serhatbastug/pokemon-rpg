@@ -88,6 +88,7 @@ export const MAPS = {
     // (Pokemonlar henüz haritada değil; liste regions.js'te hazır)
     'loc-1-1': {
         id: 'loc-1-1',
+        region: 1,
         name: region1.locations[0].name,
         ambience: 'forest',
         theme: 'dark', // derin orman: loş palet + vinyet + ateşböcekleri
@@ -145,6 +146,7 @@ export const MAPS = {
     // dolambaçlı doğal geçitler. Gizli oda sol altta, gizli çalının ardında.
     'loc-1-2': {
         id: 'loc-1-2',
+        region: 1,
         name: region1.locations[1].name,
         ambience: 'shadow',
         theme: 'dark',
@@ -200,6 +202,7 @@ export const MAPS = {
     // kapı, dışta ışınsal yollarla bağlı kutsal korular. Gizli oda kuzeybatıda.
     'loc-1-3': {
         id: 'loc-1-3',
+        region: 1,
         name: region1.locations[2].name,
         ambience: 'forest',
         start: { col: 5, row: 12 }, // portalın üstünde olmamalı (ölünce oraya doğulur)

@@ -1,5 +1,6 @@
 import { TILE_SIZE } from '../../config/worldMap.js';
 import { unlockedMoves } from '../../config/fieldMoves.js';
+import { DODGE, STATUS } from '../../config/balance.js';
 import { PROJECTILE_SPRITES, drawPixelSprite } from '../../game/projectileSprites.js';
 import { drawTrainer } from '../trainerSprite.js';
 
@@ -174,18 +175,55 @@ export const WorldRenderer = {
         ctx.restore();
     },
 
-    // Antrenör (elle çizilmiş piksel sprite; vurulmaz)
+    // Antrenör: zıplayınca yükselir, gölgesi yerde kalır, dokunulmazken yanıp söner
     drawPlayer() {
         const { ctx, player } = this;
+        const lift = this.trainerLift;
 
-        // Gölge
+        // Gölge (zıplayınca küçülür)
         ctx.save();
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.3 - lift * 0.006;
         ctx.fillStyle = '#000000';
-        ctx.fillRect(player.x - 11, player.y + 22, 22, 4);
+        const shadowW = 22 - lift * 0.25;
+        ctx.fillRect(player.x - shadowW / 2, player.y + 22, shadowW, 4);
         ctx.restore();
 
-        drawTrainer(ctx, player.x, player.y, player.dir, player.moving, 3);
+        // Atılım hayaleti
+        if (player.dashFrames > 0) {
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            drawTrainer(ctx, player.x - player.dashDir.x * 14, player.y - player.dashDir.y * 14,
+                player.dir, true, 3);
+            ctx.restore();
+        }
+
+        // Hasar sonrası yanıp sönme
+        if (player.invuln > 0 && player.invuln % 8 < 4) return;
+
+        ctx.save();
+        if (this.trainerInvulnerable && player.invuln === 0) ctx.globalAlpha = 0.75; // kaçınma anı
+        drawTrainer(ctx, player.x, player.y - lift, player.dir, player.moving, 3);
+        ctx.restore();
+
+        // Durum etkisi göstergesi
+        if (player.status) this.drawStatusBadge(player.x, player.y - lift - 34, player.status.kind);
+    },
+
+    // Zehir/yanık/felç rozetleri (hem antrenör hem Pokemonlar için)
+    drawStatusBadge(x, y, kind) {
+        const { ctx } = this;
+        const config = STATUS[kind];
+        if (!config) return;
+
+        ctx.save();
+        ctx.font = "bold 10px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'center';
+        const bob = Math.sin(Date.now() / 200) * 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(x - 22, y - 10 + bob, 44, 13);
+        ctx.fillStyle = config.color;
+        ctx.fillText(config.label, x, y + bob);
+        ctx.restore();
     },
 
     // Sahaya sürülen Pokemonun havada dönen topu
@@ -414,35 +452,79 @@ export const WorldRenderer = {
 
         const { progress, active } = this;
 
-        // Sahadaki Pokemon paneli (sol üst)
+        // --- Antrenör paneli (sol üst): can ve kaçınma hareketleri ---
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(12, 12, 232, 42);
+        ctx.fillRect(12, 12, 232, 40);
+        ctx.font = "bold 12px 'Space Grotesk', sans-serif";
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText('Antrenör', 18, 26);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(18, 31, 160, 9);
+        ctx.fillStyle = player.hp / player.maxHp > 0.35 ? '#38bdf8' : '#ef4444';
+        ctx.fillRect(18, 31, 160 * Math.max(0, player.hp / player.maxHp), 9);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(`${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}`, 238, 39);
+
+        // Zıplama ve atılım hazır mı
+        const dodges = [
+            { key: 'Space', label: 'Zıpla', cd: player.jumpCooldown, max: DODGE.jumpFrames + DODGE.jumpCooldown },
+            { key: 'Shift', label: 'Atıl', cd: player.dashCooldown, max: DODGE.dashFrames + DODGE.dashCooldown }
+        ];
+        ctx.textAlign = 'center';
+        dodges.forEach((dodge, i) => {
+            const x = 256 + i * 62;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(x, 12, 56, 40);
+            if (dodge.cd > 0) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(x, 12, 56, 40 * (dodge.cd / dodge.max));
+            }
+            ctx.strokeStyle = dodge.cd > 0 ? '#475569' : '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, 12, 56, 40);
+            ctx.font = "bold 11px 'Space Grotesk', sans-serif";
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(dodge.key, x + 28, 30);
+            ctx.font = "9px 'Space Grotesk', sans-serif";
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(dodge.label, x + 28, 44);
+        });
+
+        // Sahadaki Pokemon paneli (antrenör panelinin altında)
+        const panelY = 58;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(12, panelY, 232, 42);
 
         ctx.font = "bold 12px 'Space Grotesk', sans-serif";
         ctx.textAlign = 'left';
         ctx.fillStyle = active ? '#f8fafc' : '#facc15';
-        ctx.fillText(active ? active.name : '1-6: Poke top fırlat', 18, 26);
+        ctx.textAlign = 'left';
+        ctx.font = "bold 12px 'Space Grotesk', sans-serif";
+        ctx.fillText(active ? active.name : '1-6: Poke top fırlat', 18, panelY + 14);
         if (active) {
             ctx.fillStyle = '#facc15';
-            ctx.fillText(`Sv. ${active.level}`, 150, 26);
+            ctx.fillText(`Sv. ${active.level}`, 150, panelY + 14);
             ctx.fillStyle = '#94a3b8';
-            ctx.fillText(active.types.join('/'), 186, 26);
+            ctx.fillText(active.types.join('/'), 186, panelY + 14);
 
             // Can barı
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(18, 32, 160, 10);
+            ctx.fillRect(18, panelY + 20, 160, 10);
             ctx.fillStyle = active.hp / active.maxHp > 0.3 ? '#22c55e' : '#ef4444';
-            ctx.fillRect(18, 32, 160 * Math.max(0, active.hp / active.maxHp), 10);
+            ctx.fillRect(18, panelY + 20, 160 * Math.max(0, active.hp / active.maxHp), 10);
             ctx.textAlign = 'right';
             ctx.fillStyle = '#f8fafc';
-            ctx.fillText(`${Math.max(0, Math.ceil(active.hp))}/${active.maxHp}`, 238, 41);
+            ctx.fillText(`${Math.max(0, Math.ceil(active.hp))}/${active.maxHp}`, 238, panelY + 29);
         }
 
         // Ekip göstergesi (sol üst, panelin altında): 1-6 tuşlarıyla değişir
         ctx.textAlign = 'center';
         this.partyPokemon.forEach((pokemon, i) => {
             const x = 14 + i * 38;
-            const y = 60;
+            const y = 106;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
             ctx.fillRect(x, y, 34, 26);
             ctx.strokeStyle = pokemon === active ? '#4ade80' : (pokemon.fainted ? '#7f1d1d' : '#475569');

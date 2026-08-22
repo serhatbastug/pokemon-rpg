@@ -5,6 +5,7 @@ import { buildAbilities } from '../../services/moveAbilities.js';
 import { preloadTypes } from '../../services/typeChart.js';
 import { fetchCharacter } from '../../services/pokeapi.js';
 import { DEPLOY, MAP } from '../../config/balance.js';
+import { Sfx } from '../../services/audio.js';
 
 // Ekip yönetimi: Pokemon hazırlama, poke top fırlatma/geri çağırma,
 // eşya kullanımı ve bayılma sonrası devreye girme.
@@ -116,6 +117,7 @@ export const PartyControls = {
             toY: ty
         };
         this.swapCooldown = DEPLOY.swapCooldown;
+        Sfx.ballThrow();
     },
 
     // Topun havada geçirdiği süre ve açılma anı
@@ -150,6 +152,7 @@ export const PartyControls = {
             });
         }
         this.spawnMapText(ball.toX, ball.toY - 50, `Hadi ${pokemon.name}!`, '#38bdf8');
+        Sfx.ballWobble();
     },
 
     recallActive(reason) {
@@ -165,6 +168,16 @@ export const PartyControls = {
         const { progress } = this;
         if (progress.itemCount(id) <= 0) return { ok: false, message: 'Elinde yok' };
 
+        if (id === 'antidote') {
+            const targets = [this.player, this.active, ...this.partyPokemon].filter(t => t?.status);
+            if (!targets.length) return { ok: false, message: 'Kimsede durum etkisi yok' };
+            for (const target of targets) target.status = null;
+            progress.consumeItem(id);
+            Sfx.heal();
+            this.spawnMapText(this.player.x, this.player.y - 50, 'DURUM TEMİZLENDİ', '#a855f7');
+            return { ok: true, message: 'Durum etkileri geçti' };
+        }
+
         if (id === 'potion') {
             const target = this.active || this.partyPokemon.find(p => !p.fainted && p.hp < p.maxHp);
             if (!target) return { ok: false, message: 'İyileştirilecek Pokemon yok' };
@@ -174,6 +187,7 @@ export const PartyControls = {
             target.heal(healed);
             progress.consumeItem(id);
             this.spawnMapText(target.x, target.y - 50, `+${healed} CAN`, '#f472b6');
+            Sfx.heal();
             return { ok: true, message: `${target.name} +${healed} can` };
         }
 
@@ -185,6 +199,7 @@ export const PartyControls = {
             pokemon.fainted = false;
             pokemon.hp = Math.round(pokemon.maxHp * 0.5);
             progress.consumeItem(id);
+            Sfx.heal();
             return { ok: true, message: `${pokemon.name} ayağa kalktı` };
         }
 
@@ -198,6 +213,7 @@ export const PartyControls = {
             }
             progress.consumeItem(id);
             this.spawnMapText(this.player.x, this.player.y - 50, 'EKİP İYİLEŞTİ!', '#4ade80');
+            Sfx.heal();
             return { ok: true, message: 'Tüm ekip iyileşti' };
         }
 
@@ -207,6 +223,7 @@ export const PartyControls = {
     // Sahadaki Pokemon bayıldı: sıradaki sağlıklı Pokemon gelir
     onPokemonFainted(pokemon) {
         this.spawnMapText(pokemon.x, pokemon.y - 40, `${pokemon.name} bayıldı!`, '#ef4444');
+        Sfx.faint();
         this.effects?.triggerShake?.(10);
 
         const next = this.partyPokemon.findIndex(p => !p.fainted);

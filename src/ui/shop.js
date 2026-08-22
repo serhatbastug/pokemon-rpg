@@ -1,4 +1,5 @@
 import { SHOP_ITEMS } from '../config/shopItems.js';
+import { Sfx } from '../services/audio.js';
 
 // Kecleon'un dükkanı: jeton karşılığı eşya satın alma ve çantadaki eşyaları
 // kullanma ekranı. Tezgahın önünde F ile açılır.
@@ -72,8 +73,10 @@ export class Shop {
                 const bought = progress.buyItem(item.id);
                 if (!bought) {
                     this.say('Jetonun yetmiyor, önce biraz Pokemon yen.');
+                    Sfx.deny();
                     return;
                 }
+                Sfx.buy();
                 this.say(`${bought} adet ${item.name}, iyi alışverişler!`);
                 this.render();
             });

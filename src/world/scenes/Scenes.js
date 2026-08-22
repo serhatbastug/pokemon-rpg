@@ -4,6 +4,7 @@ import { drawTrainer } from '../trainerSprite.js';
 import { preloadTypes } from '../../services/typeChart.js';
 import { fetchCharacter, fetchEvolutionChain } from '../../services/pokeapi.js';
 import { VICTORY } from '../../config/balance.js';
+import { Sfx } from '../../services/audio.js';
 
 // Sahneler: boss uyanışı ve arena yıkımı, zafer ekranı ve evrim sahnesi.
 // Overworld prototipine karıştırılır (applyMixins) - bu yüzden 'this' Overworld örneğidir.
@@ -169,6 +170,7 @@ export const Scenes = {
         const newImg = new Image();
         newImg.src = character.battleSprite || character.sprite;
 
+        Sfx.evolve();
         this.evolutionScene = {
             frame: 0,
             oldImg,
@@ -290,6 +292,7 @@ export const Scenes = {
         const map = this.currentMap;
         const arena = map.bossArena;
         this.shake = 26;
+        Sfx.bossWake();
         this.spawnMapText(boss.x, boss.y - 70, `${boss.name} UYANDI!`, '#f97316');
         if (!arena || this.arenaOpened) return;
         this.arenaOpened = true;
@@ -340,6 +343,7 @@ export const Scenes = {
         // Bossun düşürdüğü jetonları toplamak için süre tanı; zafer ekranı
         // ancak jetonlar alındıktan (ya da süre dolduktan) sonra açılır
         this.pendingVictory = { boss, badge, wait: VICTORY.tokenGraceFrames };
+        if (badge) Sfx.badge();
         this.spawnMapText(boss.x, boss.y - 90, 'Jetonları topla!', '#fbbf24');
     },
 
@@ -358,6 +362,7 @@ export const Scenes = {
     },
 
     startVictory(boss, badge) {
+        Sfx.victory();
         this.victory = {
             frame: 0,
             name: boss.name,

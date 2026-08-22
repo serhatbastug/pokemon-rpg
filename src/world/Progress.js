@@ -1,5 +1,5 @@
 ﻿import { levelUpCost, MAX_LEVEL, PARTY_SIZE, STARTING_LEVEL, TOKEN_DROP } from '../config/progression.js';
-import { itemById, STARTING_ITEMS } from '../config/shopItems.js';
+import { BALLS, itemById, STARTING_ITEMS } from '../config/shopItems.js';
 
 const SAVE_KEY = 'pokerpg-save-v2';
 const STARTER_ID = 1; // Bulbasaur
@@ -20,6 +20,8 @@ export class Progress {
         this.badges = [];          // yenilen bossların mekan id'leri
         this.activeIndex = 0;      // sahadaki Pokemon
         this.items = { ...STARTING_ITEMS }; // çanta: eşya id -> adet
+        this.dex = {};             // Pokedex: id -> { name, seen, caught }
+        this.beatenTrainers = [];  // yenilen NPC antrenörlerin id'leri
     }
 
     // --- Kalıcılık ---
@@ -33,7 +35,9 @@ export class Progress {
                 tokens: this.tokens,
                 badges: this.badges,
                 activeIndex: this.activeIndex,
-                items: this.items
+                items: this.items,
+                dex: this.dex,
+                beatenTrainers: this.beatenTrainers
             }));
         } catch (error) {
             console.warn('Kayıt yazılamadı:', error);
@@ -53,6 +57,8 @@ export class Progress {
             this.badges = Array.isArray(data.badges) ? data.badges : [];
             this.activeIndex = Math.min(data.activeIndex ?? 0, this.party.length - 1);
             this.items = data.items && typeof data.items === 'object' ? data.items : { ...STARTING_ITEMS };
+            this.dex = data.dex && typeof data.dex === 'object' ? data.dex : {};
+            this.beatenTrainers = Array.isArray(data.beatenTrainers) ? data.beatenTrainers : [];
             return true;
         } catch (error) {
             console.warn('Kayıt okunamadı:', error);
@@ -175,6 +181,37 @@ export class Progress {
         this.items[id] = this.itemCount(id) + item.stack;
         this.save();
         return item.stack;
+    }
+
+    // Elde olan en güçlü yakalama topu
+    bestBall() {
+        return BALLS.find(ball => this.itemCount(ball.id) > 0) || null;
+    }
+
+    beatTrainer(id) {
+        if (!this.beatenTrainers.includes(id)) {
+            this.beatenTrainers.push(id);
+            this.save();
+        }
+    }
+
+    // --- Pokedex ---
+
+    markSeen(id, name, caught = false) {
+        const entry = this.dex[id] || { name, seen: false, caught: false };
+        entry.name = name || entry.name;
+        entry.seen = true;
+        if (caught) entry.caught = true;
+        this.dex[id] = entry;
+        this.save();
+    }
+
+    get dexStats() {
+        const entries = Object.values(this.dex);
+        return {
+            seen: entries.length,
+            caught: entries.filter(e => e.caught).length
+        };
     }
 
     consumeItem(id) {

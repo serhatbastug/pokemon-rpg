@@ -21,7 +21,7 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 | Komut | Ne yapar | Süre |
 |---|---|---|
 | `npm run check` | Veri ve saf mantık testleri (313 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (67 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (71 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -37,6 +37,9 @@ GitHub Actions yapılandırması `.github/workflows/ci.yml` içindedir.
 | Yetenek 2 | Sol Shift | , (virgül) |
 | Yetenek 3 (Ulti) | Space | Enter |
 
+**Macera modu:** WASD hareket · K O Ş L P yetenek · **Space zıpla** · **Shift atıl** ·
+1-6 poke top fırlat/geri çağır · N Pokeball · F saha hamlesi / dükkan · E kütüphane
+
 ## Proje Yapısı
 
 ```
@@ -49,7 +52,8 @@ src/
     settings.js         Fizik sabitleri, tuş atamaları, oyuncu ayarları
     balance.js          Oynanış denge ayarları (menzil, süre, hasar sabitleri)
     fieldMoves.js       Rozetler ve saha hamleleri (Cut / Rock Smash / Surf)
-    shopItems.js        Kecleon dükkanının eşyaları
+    shopItems.js        Kecleon dükkanının eşyaları (toplar, iksirler)
+    trainers.js         Haritalardaki NPC antrenörler
     progression.js      Seviye/XP eğrisi ve stat formülleri
     playableCharacters.js  Oynanabilir karakterlerin resmi hamle setleri
     regions.js          Macera modu bölgeleri (5 bölge, portal renkleri)
@@ -61,6 +65,7 @@ src/
     apiCache.js         API yanıtları için bellek + localStorage önbelleği
     typeChart.js        Tip etkililik tablosu (PokeAPI kaynaklı)
     moveAbilities.js    Gerçek hamle verisinden yetenek üretimi
+    audio.js            Web Audio ile üretilen ses efektleri ve müzik
   game/
     Game.js             Oyun motoru: döngü, çarpışmalar, tur durumu
     Player.js           Oyuncu: hareket, fizik, can, durum etkileri
@@ -79,6 +84,9 @@ src/
       PartyControls.js  Ekip, poke top fırlatma/geri çağırma, eşya kullanımı
       Navigation.js     Yürünebilirlik, kamera, portallar, akış alanı (BFS)
       CombatSystem.js   Yetenekler, mermiler, hasar, yakalama, jetonlar
+      TrainerCombat.js  Antrenörün canı, zıplama/atılım ve durum etkileri
+      AutoBattle.js     Sahadaki Pokemonun kendi kendine savaşması
+      TrainerBattles.js NPC antrenör savaşları
     scenes/Scenes.js    Boss uyanışı, zafer ve evrim sahneleri
     render/
       TerrainRenderer.js  Karo desenleri ve zemin pişirme
@@ -112,8 +120,12 @@ uyuyan ve uyanınca arenayı parçalayan boss, bossu yenince rozet ve zafer sahn
 ### Antrenör, ekip ve ilerleme
 
 - **Antrenör:** Haritada gezdirdiğiniz karakter bir antrenördür (elle çizilmiş
-  piksel sprite) ve **vurulmaz**. Saldırıları sahadaki Pokemonunuz yapar,
-  hasarı da o alır.
+  piksel sprite). Saldırıyı Pokemonunuz yapar ama **antrenör de hasar alır** —
+  hayatta kalmak sizin işiniz: **Space** ile zıplayıp mermileri altınızdan
+  geçirir, **Shift** ile atılıp tam dokunulmazlıkla sıyrılırsınız.
+- **Otomatik savaş:** Sahadaki Pokemon kendi kendine savaşır — hedef seçer,
+  tip üstünlüğüne göre hamlesini belirler, canı azalınca iyileşir. K/O/Ş/L/P
+  ile istediğiniz an siz de müdahale edebilirsiniz.
 - **Poke top fırlatma:** Pokemonlar peşinizden gelmez. **1-6** tuşlarıyla o
   ekip üyesinin topunu baktığınız yöne fırlatırsınız; Pokemon orada açılır ve
   o noktayı tutarak savaşır. Aynı tuşa tekrar basmak onu topuna geri çağırır.
@@ -167,6 +179,26 @@ jetonudur — yani her jeton için "Pokemon seviyesi mi, eşya mı?" kararı ver
 
 Çanta da aynı ekranda: alınan eşyalar oradan kullanılır. Oyuna 8 Poke Ball ile
 başlanır, bitince Kecleon'a uğramak gerekir.
+
+### Ses, durum etkileri ve diğerleri
+
+- **Ses:** Tüm efektler ve müzik Web Audio ile koddan üretilir (ses dosyası yok):
+  vuruş, süper etkili, yakalama, seviye, evrim fanfarı, boss uyanışı ve her
+  haritaya göre değişen chiptune melodi.
+- **Durum etkileri:** Zehir ve yanık zamanla can götürür, felç yavaşlatır.
+  Zehir/ateş/elektrik tipli saldırılar ihtimalle bulaştırır; Kecleon'dan alınan
+  **Panzehir** temizler.
+- **Yakalama artık şansa bağlı:** Poke Ball / Great Ball / Ultra Ball farklı
+  başarı oranlarına sahip; kurtulan Pokemon topu kırıp tekrar savaşır.
+  Gizli Pokemonlar belirgin şekilde zor yakalanır.
+- **NPC antrenör savaşları:** Her mekanda görüş alanına girince meydan okuyan
+  bir antrenör var; ekibindeki Pokemonları sırayla gönderir, yenince jeton verir.
+- **Pokedex:** Kütüphanede görülen/yakalanan takibi. Bir Pokemona tıklayınca
+  **karakter bilgisi** açılır: istatistikler, hamleleri ve tipleriyle birlikte
+  **hangi tiplere zayıf, hangilerine dayanıklı, hamlelerinin neye üstün olduğu**.
+- **Bölge ölçeklendirmesi:** Düşmanların canı ve hasarı bölgeye göre artar
+  (config/balance.js), böylece yeni bölgeler gerçekten zorlaşır.
+- **Hit-stop:** Ağır vuruşlarda oyun birkaç kare donar, darbe ağırlaşır.
 
 Sırada: 2. bölge (Ateş Dağı).
 

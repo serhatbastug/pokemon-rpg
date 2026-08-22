@@ -285,13 +285,33 @@ async function main() {
     check('Jetonlar toplaniyor', tokensAfter > tokensBefore, `${tokensBefore} -> ${tokensAfter} jeton`);
     await shot('07a-jeton');
 
-    await page.keyboard.press('KeyN');
-    await page.waitForFunction(() => window.__overworld.progress.collection.length > 0, { timeout: 15000 });
+    // Yakalama artık şansa bağlı: kurtulursa Pokemon ayağa kalkar, tekrar denenir
+    let attempts = 0;
+    let caughtCount = 0;
+    while (attempts < 10 && caughtCount === 0) {
+        attempts++;
+        await page.evaluate(() => {
+            const w = window.__overworld;
+            const e = w.enemies.find(e => e.kind === 'common');
+            if (!e) return;
+            e.x = w.player.x + 60;
+            e.y = w.player.y;
+            if (!e.fainted) { e.hp = 1; e.takeDamage(5); }
+            w.progress.items['ultra-ball'] = 5; // testte zaman kazanmak için iyi top
+        });
+        await wait(150);
+        await page.keyboard.press('KeyN');
+        await page.waitForFunction(() => window.__overworld.ballAnim === null, { timeout: 15000 });
+        await wait(200);
+        caughtCount = await page.evaluate(() => window.__overworld.progress.collection.length);
+    }
+
     const party = await page.evaluate(() => ({
         collection: window.__overworld.progress.collection.length,
         party: window.__overworld.progress.party.length
     }));
-    check('Pokeball ile yakalama calisiyor', party.collection === 1, `${party.collection} yakalanan`);
+    check('Pokeball ile yakalama calisiyor', party.collection >= 1,
+        `${party.collection} yakalanan (${attempts} deneme)`);
     await page.waitForFunction(() => window.__overworld.partyPokemon.length >= 2, { timeout: 40000 });
     check('Yakalanan Pokemon ekibe katiliyor', party.party === 2, `ekip: ${party.party}`);
 
@@ -462,6 +482,34 @@ async function main() {
     check('Jeton harcayip seviye yukseltiliyor',
         afterLevel.level === beforeLevel.level + 1 && afterLevel.tokens < beforeLevel.tokens,
         `Sv.${beforeLevel.level} -> Sv.${afterLevel.level}, ${beforeLevel.tokens} -> ${afterLevel.tokens} jeton`);
+
+    // Karakter bilgisi: tip zayıflıkları ve hamleler
+    await page.click('#library-party .lib-card .lib-name');
+    await page.waitForFunction(
+        () => document.querySelector('#library-detail .detail-name') !== null,
+        { timeout: 20000 }
+    );
+    await wait(400);
+    const detail = await page.evaluate(() => {
+        const root = document.getElementById('library-detail');
+        const headings = [...root.querySelectorAll('.detail-heading')].map(h => h.textContent.trim());
+        const weakRow = root.querySelector('.detail-heading.danger')?.nextElementSibling;
+        return {
+            name: root.querySelector('.detail-name')?.textContent.trim(),
+            headings,
+            weakTypes: weakRow ? [...weakRow.querySelectorAll('.type-chip')].map(c => c.textContent.trim()) : [],
+            moves: [...root.querySelectorAll('.move-list li')].map(li => li.textContent.trim()),
+            stats: root.querySelectorAll('.stat-line').length
+        };
+    });
+    check('Karakter bilgisi paneli aciliyor', !!detail.name, detail.name);
+    check('Zayif oldugu tipler listeleniyor', detail.weakTypes.length >= 3, detail.weakTypes.join(', '));
+    // Bulbasaur (Grass/Poison): Ateş 2x, Uçan 2x, Buz 2x, Psişik 2x
+    check('Bulbasaur Ates tipine zayif gosteriliyor',
+        detail.weakTypes.some(t => t.startsWith('Ateş')), detail.weakTypes.join(', '));
+    check('Istatistikler ve hamleler gosteriliyor',
+        detail.stats === 4 && detail.moves.length >= 3, `${detail.stats} stat, ${detail.moves.length} hamle`);
+    await shot('21-karakter-bilgisi');
 
     // 16. seviyeye kadar yatır: evrim tetiklenmeli
     await page.evaluate(async () => {
@@ -656,7 +704,8 @@ async function main() {
     // Poke Ball tükenince yakalama yapılamamalı
     const noBallResult = await page.evaluate(() => {
         const w = window.__overworld;
-        w.progress.items['poke-ball'] = 0;
+        // Tüm top türlerini boşalt (artık Great/Ultra Ball da var)
+        for (const id of ['poke-ball', 'great-ball', 'ultra-ball']) delete w.progress.items[id];
         w.loadMap('loc-1-1');
         return true;
     });
@@ -678,6 +727,7 @@ async function main() {
     // Top alınca yakalama tekrar çalışmalı
     const catchWithBall = await page.evaluate(() => {
         const w = window.__overworld;
+        for (const id of ['great-ball', 'ultra-ball']) delete w.progress.items[id];
         w.progress.items['poke-ball'] = 3;
         const before = w.progress.itemCount('poke-ball');
         w.tryCatch();

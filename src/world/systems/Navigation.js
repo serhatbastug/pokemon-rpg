@@ -212,6 +212,7 @@ export const Navigation = {
 
     movePlayer() {
         const { input, player } = this;
+        if (player.dashFrames > 0) return; // atılım sırasında yön değiştirilemez
         let dx = 0, dy = 0;
 
         // Hem WASD hem yön tuşları çalışır
@@ -240,11 +241,14 @@ export const Navigation = {
         // Yetenekler son hareket yönüne atılır
         player.aim = { x: dx, y: dy };
 
+        // Felç yavaşlatır
+        const speed = player.speed * this.statusSpeedFactor(player);
+
         // Eksenleri ayrı dene: duvara sürtünerek kaymaya izin verir
-        const nx = player.x + dx * player.speed;
+        const nx = player.x + dx * speed;
         if (this.canMoveTo(nx, player.y)) player.x = nx;
 
-        const ny = player.y + dy * player.speed;
+        const ny = player.y + dy * speed;
         if (this.canMoveTo(player.x, ny)) player.y = ny;
     }
 };

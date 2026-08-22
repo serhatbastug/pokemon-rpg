@@ -65,8 +65,19 @@ src/
   world/
     Overworld.js        Macera modu: kuşbakışı harita motoru
   world/
+    Overworld.js        Macera motoru: yaşam döngüsü, harita yükleme, girdi
+    ActivePokemon.js    Sahadaki Pokemon: statlar, hasar, tutuş davranışı
     Enemy.js            Düşman Pokemon: AI, saldırı, durum
-    Progress.js         Seviye, deneyim, koleksiyon ve localStorage kaydı
+    Progress.js         Ekip, koleksiyon, jeton, rozet ve localStorage kaydı
+    trainerSprite.js    Elle çizilmiş antrenör piksel sprite'ı
+    systems/            Overworld davranışları (prototipe karıştırılır)
+      PartyControls.js  Ekip, poke top fırlatma/geri çağırma, eşya kullanımı
+      Navigation.js     Yürünebilirlik, kamera, portallar, akış alanı (BFS)
+      CombatSystem.js   Yetenekler, mermiler, hasar, yakalama, jetonlar
+    scenes/Scenes.js    Boss uyanışı, zafer ve evrim sahneleri
+    render/
+      TerrainRenderer.js  Karo desenleri ve zemin pişirme
+      WorldRenderer.js    Portallar, tüccar, oyuncu, efektler ve HUD
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
     hud.js              Can barları ve cooldown göstergeleri

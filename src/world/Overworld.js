@@ -50,12 +50,24 @@ export class Overworld {
 
         // Harita savaşı durumu
         this.enemies = [];
-        this.projectiles = [];
+        this.projectiles = [];       // oyuncu mermileri
+        this.enemyProjectiles = [];  // düşman mermileri
         this.mapTexts = [];
         this.spores = [];
         this.ballAnim = null;   // aktif Pokeball atışı animasyonu
         this.captures = [];     // yakalanan Pokemonlar
         this.enemyDataCache = new Map(); // PokeAPI verisi (id -> Promise)
+        this.flow = null;       // oyuncuya BFS mesafe alanı (labirent takibi için)
+        this.fireflies = [];    // atmosfer: ateşböcekleri
+
+        // Atmosfer: kenarları karartan vinyet (bir kez oluşturulur)
+        const vg = this.ctx.createRadialGradient(
+            canvas.width / 2, canvas.height / 2, canvas.height * 0.45,
+            canvas.width / 2, canvas.height / 2, canvas.height * 0.95
+        );
+        vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        vg.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+        this.vignette = vg;
 
         input.onKeyDown(e => {
             if (!this.running) return;
@@ -121,9 +133,27 @@ export class Overworld {
 
         // Harita savaşı durumu sıfırlanır; düşmanlar spawn listesinden kurulur
         this.projectiles = [];
+        this.enemyProjectiles = [];
         this.mapTexts = [];
         this.spores = [];
         this.ballAnim = null;
+        this.flow = null;
+
+        // Orman atmosferli haritalarda ateşböcekleri
+        this.fireflies = [];
+        if (map.ambience === 'forest') {
+            const mapW = map.grid[0].length * TILE_SIZE;
+            const mapH = map.grid.length * TILE_SIZE;
+            const count = Math.round((mapW * mapH) / 40000);
+            for (let i = 0; i < count; i++) {
+                this.fireflies.push({
+                    x: Math.random() * mapW,
+                    y: Math.random() * mapH,
+                    angle: Math.random() * Math.PI * 2,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
         this.enemies = (map.spawns || []).map(spawn => new Enemy({ ...spawn, world: this }));
         for (const enemy of this.enemies) {
             this.fetchEnemyData(enemy.id).then(data => {
@@ -212,6 +242,95 @@ export class Overworld {
         return this.enemyDataCache.get(id);
     }
 
+    // Oyuncudan tüm karolara BFS mesafesi (akış alanı). Düşmanlar bu alanı
+    // izleyerek labirentte duvarları dolaşıp oyuncuya ulaşır.
+    computeFlowField() {
+        const grid = this.currentMap.grid;
+        const W = grid[0].length;
+        const H = grid.length;
+        const dist = new Int16Array(W * H).fill(-1);
+
+        const pc = Math.floor(this.player.x / TILE_SIZE);
+        const pr = Math.floor(this.player.y / TILE_SIZE);
+        if (pr < 0 || pr >= H || pc < 0 || pc >= W || SOLID_TILES.has(grid[pr][pc])) {
+            this.flow = { dist, W, H };
+            return;
+        }
+
+        dist[pr * W + pc] = 0;
+        const queue = [[pc, pr]];
+        while (queue.length) {
+            const [c, r] = queue.shift();
+            const d = dist[r * W + c];
+            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nc = c + dc, nr = r + dr;
+                if (nc < 0 || nc >= W || nr < 0 || nr >= H) continue;
+                if (dist[nr * W + nc] !== -1 || SOLID_TILES.has(grid[nr][nc])) continue;
+                dist[nr * W + nc] = d + 1;
+                queue.push([nc, nr]);
+            }
+        }
+        this.flow = { dist, W, H };
+    }
+
+    // (col,row) karosunun oyuncuya labirent yolu mesafesi (karo cinsinden)
+    tileDistAt(col, row) {
+        if (!this.flow) return Infinity;
+        const { dist, W, H } = this.flow;
+        if (col < 0 || col >= W || row < 0 || row >= H) return Infinity;
+        const d = dist[row * W + col];
+        return d === -1 ? Infinity : d;
+    }
+
+    // (x,y) konumundan oyuncuya doğru akış alanını izleyen birim adım yönü
+    flowStepFrom(x, y) {
+        const c = Math.floor(x / TILE_SIZE);
+        const r = Math.floor(y / TILE_SIZE);
+        const here = this.tileDistAt(c, r);
+
+        if (here <= 1) {
+            // Oyuncuyla aynı/komşu karoda: doğrudan üstüne yürü
+            const dx = this.player.x - x;
+            const dy = this.player.y - y;
+            const len = Math.hypot(dx, dy) || 1;
+            return { x: dx / len, y: dy / len };
+        }
+
+        let best = null;
+        let bestDist = here;
+        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const d = this.tileDistAt(c + dc, r + dr);
+            if (d < bestDist) {
+                bestDist = d;
+                best = { c: c + dc, r: r + dr };
+            }
+        }
+        if (!best) return { x: 0, y: 0 };
+
+        // Seçilen karonun merkezine yönel
+        const tx = best.c * TILE_SIZE + TILE_SIZE / 2;
+        const ty = best.r * TILE_SIZE + TILE_SIZE / 2;
+        const dx = tx - x;
+        const dy = ty - y;
+        const len = Math.hypot(dx, dy) || 1;
+        return { x: dx / len, y: dy / len };
+    }
+
+    // İki nokta arasında duvar var mı? (düşman atışları için görüş hattı)
+    hasLineOfSight(x1, y1, x2, y2) {
+        const dist = Math.hypot(x2 - x1, y2 - y1);
+        const steps = Math.max(1, Math.ceil(dist / 20));
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            if (!this.isWalkable(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false;
+        }
+        return true;
+    }
+
+    spawnEnemyProjectile(projectile) {
+        this.enemyProjectiles.push(projectile);
+    }
+
     movePlayer() {
         const { input, player } = this;
         let dx = 0, dy = 0;
@@ -270,6 +389,7 @@ export class Overworld {
         this.drawPlayer();
         this.drawSpores();
         this.drawBallAnim();
+        this.drawFireflies();
         this.drawPortalLabels();
         this.drawShopLabels();
         this.drawCatchHints();
@@ -277,8 +397,46 @@ export class Overworld {
 
         ctx.restore();
 
+        // Atmosfer: loş orman tonu + kenar karartması (ekran sabiti)
+        if (this.currentMap.theme === 'dark') {
+            ctx.fillStyle = 'rgba(6, 18, 10, 0.18)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        if (this.currentMap.ambience === 'forest') {
+            ctx.fillStyle = this.vignette;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
         // Ekran sabiti arayüz (HP, yetenekler, yakalananlar)
         this.drawHud();
+    }
+
+    // Atmosfer: yavaşça süzülen, parlaklığı nefes alan ateşböcekleri
+    drawFireflies() {
+        if (!this.fireflies.length) return;
+        const { ctx } = this;
+        const mapW = this.currentMap.grid[0].length * TILE_SIZE;
+        const mapH = this.currentMap.grid.length * TILE_SIZE;
+        const t = Date.now() / 1000;
+
+        ctx.save();
+        for (const fly of this.fireflies) {
+            fly.angle += (Math.random() - 0.5) * 0.15;
+            fly.x += Math.cos(fly.angle) * 0.4;
+            fly.y += Math.sin(fly.angle) * 0.4;
+            if (fly.x < 0) fly.x = mapW;
+            if (fly.x > mapW) fly.x = 0;
+            if (fly.y < 0) fly.y = mapH;
+            if (fly.y > mapH) fly.y = 0;
+
+            const pulse = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.5 + fly.phase));
+            ctx.globalAlpha = pulse * 0.9;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#bef264';
+            ctx.fillStyle = '#d9f99d';
+            ctx.fillRect(fly.x - 2, fly.y - 2, 4, 4);
+        }
+        ctx.restore();
     }
 
     // ---- Harita savaşı ----
@@ -291,7 +449,26 @@ export class Overworld {
         }
         if (player.invuln > 0) player.invuln--;
 
+        this.computeFlowField();
         for (const enemy of this.enemies) enemy.update();
+
+        // Düşman mermileri: hareket, duvar ve oyuncu çarpışması
+        for (let i = this.enemyProjectiles.length - 1; i >= 0; i--) {
+            const p = this.enemyProjectiles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+
+            if (p.life <= 0 || !this.isWalkable(p.x, p.y)) {
+                this.enemyProjectiles.splice(i, 1);
+                continue;
+            }
+
+            if (Math.hypot(p.x - player.x, p.y - player.y) < 26) {
+                this.damagePlayer(p.damage, p);
+                this.enemyProjectiles.splice(i, 1);
+            }
+        }
 
         // Mermiler: hareket, duvar ve düşman çarpışması
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -474,7 +651,15 @@ export class Overworld {
         const x0 = col * TILE_SIZE;
         const y0 = row * TILE_SIZE;
 
-        const palettes = {
+        // Koyu temalı haritalar (derin orman) daha loş bir palet kullanır
+        const dark = this.currentMap.theme === 'dark';
+        const palettes = dark ? {
+            '.': ['#0c3a1e', '#0f4a26', '#0d4022', '#0f4a26'],
+            'p': ['#4a2c0a', '#5b370d', '#66400f', '#5b370d'],
+            's': ['#6b4a08', '#7c5306', '#6b4a08', '#5b420a'],
+            'R': ['#26303f', '#333e4f', '#455267', '#333e4f'],
+            'W': ['#082f49', '#0a3a5c', '#0c4a6e', '#0a3a5c']
+        } : {
             '.': ['#14532d', '#15803d', '#166534', '#15803d'],
             'p': ['#713f12', '#854d0e', '#92400e', '#854d0e'],
             's': ['#a16207', '#ca8a04', '#a16207', '#92400e'],
@@ -512,9 +697,11 @@ export class Overworld {
 
         if (tile === 'T') {
             // Ağaç: gövde + yaprak yığını
-            ctx.fillStyle = '#451a03';
+            ctx.fillStyle = dark ? '#2e1503' : '#451a03';
             ctx.fillRect(x0 + PX * 2, y0 + PX * 3, PX, PX * 2);
-            const leafColors = ['#052e16', '#14532d', '#166534', '#16a34a'];
+            const leafColors = dark
+                ? ['#02180b', '#052e16', '#0a3a1c', '#0d4a24']
+                : ['#052e16', '#14532d', '#166534', '#16a34a'];
             for (let by = 0; by < 3; by++) {
                 for (let bx = 0; bx < 5; bx++) {
                     const d = Math.abs(bx - 2) + by;
@@ -713,7 +900,7 @@ export class Overworld {
 
     drawProjectiles() {
         const { ctx } = this;
-        for (const p of this.projectiles) {
+        for (const p of [...this.projectiles, ...this.enemyProjectiles]) {
             const def = PROJECTILE_SPRITES[p.type];
             if (def) {
                 const opts = {};

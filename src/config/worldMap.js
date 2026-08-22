@@ -49,6 +49,7 @@ export const MAPS = {
     'region-1': {
         id: 'region-1',
         name: region1.name,
+        ambience: 'forest',
         start: { col: 9, row: 7 },
         grid: [
             'TTTTTTTTTTTTTTTTTTTT',
@@ -78,6 +79,8 @@ export const MAPS = {
     'loc-1-1': {
         id: 'loc-1-1',
         name: region1.locations[0].name,
+        ambience: 'forest',
+        theme: 'dark', // derin orman: loş palet + vinyet + ateşböcekleri
         start: { col: 2, row: 7 },
         grid: [
             'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',

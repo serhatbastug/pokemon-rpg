@@ -394,6 +394,95 @@ export const PROJECTILE_SPRITES = {
         ],
     },
 
+    // Ursaring: Focus Blast - odaklanmış enerji küresi
+    focusblast: {
+        scale: 3,
+        frameMs: 100,
+        glow: { color: '#f97316', blur: 16 },
+        colors: { o: '#f97316', y: '#fde047', w: '#fff7ed' },
+        frames: [
+            [
+                '...ooo...',
+                '..oyyyo..',
+                '.oywwyyo.',
+                'ooywwwyoo',
+                'oywwwwwyo',
+                'ooywwwyoo',
+                '.oyywwyo.',
+                '..oyyyo..',
+                '...ooo...',
+            ],
+            [
+                '...ooo...',
+                '..oyyyo..',
+                '.oyywwyo.',
+                'ooywwwyoo',
+                'oywwwwwyo',
+                'ooywwwyoo',
+                '.oywwyyo.',
+                '..oyyyo..',
+                '...ooo...',
+            ],
+        ],
+    },
+
+    // Trevenant: Shadow Ball - karanlık gölge küresi
+    shadowball: {
+        scale: 3,
+        frameMs: 110,
+        glow: { color: '#7e22ce', blur: 16 },
+        colors: { k: '#2e1065', p: '#7e22ce', P: '#a855f7', w: '#e9d5ff' },
+        frames: [
+            [
+                'w..ppp...',
+                '..pkkkp..',
+                '.pkkPkkp.',
+                'pkkPPPkkp',
+                'pkPPwPPkp',
+                'pkkPPPkkp',
+                '.pkkPkkp.',
+                '..pkkkp..',
+                '...ppp..w',
+            ],
+            [
+                '...ppp..w',
+                '..pkkkp..',
+                '.pkkPkkp.',
+                'pkkPPPkkp',
+                'pkPwPPPkp',
+                'pkkPPPkkp',
+                '.pkkPkkp.',
+                '..pkkkp..',
+                'w..ppp...',
+            ],
+        ],
+    },
+
+    // Golisopod: Pin Missile - iğne füzesi
+    pinmissile: {
+        scale: 3,
+        frameMs: 70,
+        directional: true,
+        glow: { color: '#a3e635', blur: 10 },
+        colors: { g: '#65a30d', G: '#a3e635', w: '#f7fee7' },
+        frames: [
+            [
+                '......G..',
+                '..GGGGGw.',
+                'gGGGGGGww',
+                '..GGGGGw.',
+                '......G..',
+            ],
+            [
+                '......G..',
+                '.GGGGGGw.',
+                'GgGGGGGww',
+                '.GGGGGGw.',
+                '......G..',
+            ],
+        ],
+    },
+
     // Mecha: Signal Beam - böcek tipi sinyal ışını
     signalbeam: {
         scale: 3,

@@ -4,6 +4,8 @@
 //
 // PokeAPI her hamle için güç, tip, sınıf (physical/special/status), isabet ve
 // öncelik verir; bunları oyunun yetenek biçimine çeviririz.
+import { cachedJson } from './apiCache.js';
+
 const API_BASE = 'https://pokeapi.co/api/v2';
 
 const moveCache = new Map();
@@ -49,9 +51,11 @@ const STATUS_EFFECTS = {
 async function fetchMove(name) {
     if (moveCache.has(name)) return moveCache.get(name);
 
-    const promise = fetch(`${API_BASE}/move/${name}`)
-        .then(res => (res.ok ? res.json() : null))
-        .catch(() => null);
+    const promise = cachedJson(
+        `${API_BASE}/move/${name}`,
+        `move:${name}`,
+        (raw) => ({ name: raw.name, power: raw.power, type: { name: raw.type.name } })
+    ).catch(() => null);
 
     moveCache.set(name, promise);
     return promise;

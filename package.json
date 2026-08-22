@@ -6,7 +6,9 @@
   "private": true,
   "scripts": {
     "start": "npx --yes http-server -p 8765 -c-1 .",
-    "test": "node tests/ui.test.mjs"
+    "check": "node tests/data.test.mjs",
+    "test:ui": "node tests/ui.test.mjs",
+    "test": "npm run check && npm run test:ui"
   },
   "devDependencies": {
     "puppeteer": "^25.8.0"

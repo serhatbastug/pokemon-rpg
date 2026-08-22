@@ -1,6 +1,6 @@
 // Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
 import { CHARACTER_CLASSES } from './config/characters.js';
-import { loadCharacters, fetchCharacter } from './services/pokeapi.js';
+import { loadCharacters } from './services/pokeapi.js';
 import { Progress } from './world/Progress.js';
 import { Library } from './ui/library.js';
 import { Shop } from './ui/shop.js';

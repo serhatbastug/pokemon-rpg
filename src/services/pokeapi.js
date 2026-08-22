@@ -1,13 +1,32 @@
 // PokeAPI erişim katmanı. API ile ilgili her şey bu dosyada kalır.
+// Yanıtlar apiCache üzerinden önbelleğe alınır: aynı istek iki kez atılmaz
+// ve sonraki açılışlarda localStorage'dan okunur.
+import { cachedJson } from './apiCache.js';
+
 const API_BASE = 'https://pokeapi.co/api/v2';
 
 // Tek bir sınıf tanımını PokeAPI verisiyle birleştirip oynanabilir karaktere çevirir
 export async function fetchCharacter(charClass) {
-    const response = await fetch(`${API_BASE}/pokemon/${charClass.id}`);
-    if (!response.ok) {
-        throw new Error(`PokeAPI ${response.status}: pokemon/${charClass.id}`);
-    }
-    const data = await response.json();
+    const data = await cachedJson(
+        `${API_BASE}/pokemon/${charClass.id}`,
+        `pokemon:${charClass.id}`,
+        // Yanıtın tamamı çok büyük; yalnızca kullandığımız alanları saklarız
+        (raw) => ({
+            name: raw.name,
+            sprites: {
+                front_default: raw.sprites.front_default,
+                other: { 'official-artwork': { front_default: raw.sprites.other['official-artwork'].front_default } }
+            },
+            types: raw.types,
+            stats: raw.stats,
+            moves: raw.moves.map(m => ({
+                move: { name: m.move.name },
+                version_group_details: m.version_group_details.map(d => ({
+                    move_learn_method: { name: d.move_learn_method.name }
+                }))
+            }))
+        })
+    );
 
     // Kart görselleri için resmi çizim, savaş alanı için piksel sprite kullanılır
     const officialArtwork = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
@@ -40,13 +59,17 @@ export async function fetchCharacter(charClass) {
 // [{ id, name, minLevel }] — minLevel, o forma geçmek için gereken seviye.
 // Evrimleşmeyen Pokemonlarda tek elemanlı dizi döner.
 export async function fetchEvolutionChain(id) {
-    const speciesRes = await fetch(`${API_BASE}/pokemon-species/${id}`);
-    if (!speciesRes.ok) throw new Error(`PokeAPI ${speciesRes.status}: pokemon-species/${id}`);
-    const species = await speciesRes.json();
+    const species = await cachedJson(
+        `${API_BASE}/pokemon-species/${id}`,
+        `species:${id}`,
+        (raw) => ({ evolution_chain: raw.evolution_chain })
+    );
 
-    const chainRes = await fetch(species.evolution_chain.url);
-    if (!chainRes.ok) throw new Error(`PokeAPI ${chainRes.status}: evolution-chain`);
-    const { chain } = await chainRes.json();
+    const { chain } = await cachedJson(
+        species.evolution_chain.url,
+        `chain:${species.evolution_chain.url}`,
+        (raw) => ({ chain: raw.chain })
+    );
 
     // URL'den tür numarasını çıkarır: .../pokemon-species/2/ -> 2
     const idFromUrl = (url) => Number(url.split('/').filter(Boolean).pop());

@@ -16,17 +16,17 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 ## Testler
 
-Puppeteer ile uçtan uca UI testleri (67 test): ekran geçişleri, karakter seçimi,
-savaş, harita gezinme, portallar, yetenekler, ekip ve poke top fırlatma, yakalama,
-jetonlar, evrim, kayıt, gizli odalar, rozetler ve saha hamleleri, tüccar ve her
-ekranda FPS ölçümü.
+İki katman var:
 
-```
-npm start           # ayrı bir terminalde sunucu çalışıyor olmalı
-npm test
-```
+| Komut | Ne yapar | Süre |
+|---|---|---|
+| `npm run check` | Veri ve saf mantık testleri (313 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (67 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm test` | İkisini sırayla çalıştırır. | |
 
+UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
 Ekran görüntüleri `tests/screenshots/` altına yazılır (git'e dahil değil).
+GitHub Actions yapılandırması `.github/workflows/ci.yml` içindedir.
 
 ## Kontroller
 
@@ -47,6 +47,9 @@ src/
   config/
     characters.js       Karakter sınıfları ve Pokemon ID eşleşmeleri
     settings.js         Fizik sabitleri, tuş atamaları, oyuncu ayarları
+    balance.js          Oynanış denge ayarları (menzil, süre, hasar sabitleri)
+    fieldMoves.js       Rozetler ve saha hamleleri (Cut / Rock Smash / Surf)
+    shopItems.js        Kecleon dükkanının eşyaları
     progression.js      Seviye/XP eğrisi ve stat formülleri
     playableCharacters.js  Oynanabilir karakterlerin resmi hamle setleri
     regions.js          Macera modu bölgeleri (5 bölge, portal renkleri)
@@ -55,6 +58,9 @@ src/
     input.js            Klavye durumu takibi (InputManager)
   services/
     pokeapi.js          PokeAPI erişim katmanı
+    apiCache.js         API yanıtları için bellek + localStorage önbelleği
+    typeChart.js        Tip etkililik tablosu (PokeAPI kaynaklı)
+    moveAbilities.js    Gerçek hamle verisinden yetenek üretimi
   game/
     Game.js             Oyun motoru: döngü, çarpışmalar, tur durumu
     Player.js           Oyuncu: hareket, fizik, can, durum etkileri
@@ -79,6 +85,8 @@ src/
       WorldRenderer.js    Portallar, tüccar, oyuncu, efektler ve HUD
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
+    library.js          Pokemon kütüphanesi (ekip, koleksiyon, jeton harcama)
+    shop.js             Kecleon dükkanı ve çanta
     hud.js              Can barları ve cooldown göstergeleri
     screens.js          Ekranlar arası geçişler
 ```

@@ -1,4 +1,4 @@
-import { PARTY_SIZE, MAX_LEVEL } from '../config/progression.js';
+import { PARTY_SIZE } from '../config/progression.js';
 import { fetchCharacter } from '../services/pokeapi.js';
 
 // Pokemon kütüphanesi: ekip, koleksiyon ve jeton harcama ekranı.

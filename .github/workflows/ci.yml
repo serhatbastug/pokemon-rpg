@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Hizli kontrol: harita, sprite ve yapilandirma tutarliligi (taraycisiz)
+      - name: Veri testleri
+        run: node tests/data.test.mjs
+
+      - name: Bagimliliklar
+        run: npm ci
+
+      # Ucdan uca UI testleri: sunucu arka planda calisir
+      - name: Sunucuyu baslat
+        run: npx --yes http-server -p 8765 -c-1 . &
+
+      - name: Sunucuyu bekle
+        run: npx --yes wait-on http://localhost:8765 --timeout 60000
+
+      - name: UI testleri
+        run: node tests/ui.test.mjs

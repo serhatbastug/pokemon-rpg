@@ -1,5 +1,6 @@
 import { preloadTypes } from '../../services/typeChart.js';
 import { effectiveness, effectivenessLabel } from '../../services/typeChart.js';
+import { AIM, CATCH, DEPLOY, TOKENS } from '../../config/balance.js';
 
 // Harita savaşı: yetenek kullanımı, mermiler, hasar ve tip etkililiği,
 // yakalama ve yetenek jetonları.
@@ -35,7 +36,7 @@ export const CombatSystem = {
             this.active.update();
 
             // Tasma: antrenör çok uzaklaşırsa Pokemon topuna döner
-            if (Math.hypot(this.player.x - this.active.x, this.player.y - this.active.y) > 430) {
+            if (Math.hypot(this.player.x - this.active.x, this.player.y - this.active.y) > DEPLOY.leashRange) {
                 this.recallActive('topuna döndü');
             }
         }
@@ -122,7 +123,6 @@ export const CombatSystem = {
                 // Yakalandı
                 const caught = ball.enemy;
                 const joinedParty = this.progress.addCapture(caught.id, caught.name);
-                this.captures = this.progress.collection;
                 this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
                 if (!joinedParty) {
                     this.spawnMapText(caught.x, caught.y - 54, 'Ekip dolu - kütüphaneye gönderildi', '#94a3b8');
@@ -306,7 +306,7 @@ export const CombatSystem = {
     findAimTarget(pierce) {
         const { player } = this;
         let best = null;
-        let bestDist = 420;
+        let bestDist = AIM.autoTargetRange;
 
         for (const enemy of this.enemies) {
             if (enemy.fainted) continue;
@@ -324,7 +324,7 @@ export const CombatSystem = {
 
         // En yakın bayılmış Pokemonu bul (bosslar yakalanamaz, yenilir)
         let target = null;
-        let best = 110; // maksimum atış mesafesi
+        let best = CATCH.throwRange; // maksimum atış mesafesi
         for (const enemy of this.enemies) {
             if (!enemy.fainted || enemy.isBoss) continue;
             const dist = Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y);
@@ -397,7 +397,7 @@ export const CombatSystem = {
                 x: x + Math.cos(angle) * dist,
                 y: y + Math.sin(angle) * dist,
                 phase: Math.random() * Math.PI * 2,
-                life: 3600 // ~1 dakika sonra kaybolur
+                life: TOKENS.lifeFrames
             });
         }
     },
@@ -413,11 +413,11 @@ export const CombatSystem = {
 
             const dist = Math.hypot(token.x - player.x, token.y - player.y);
             // Yakındaki jetonlar antrenöre doğru çekilir
-            if (dist < 70) {
-                token.x += (player.x - token.x) * 0.16;
-                token.y += (player.y - token.y) * 0.16;
+            if (dist < TOKENS.magnetRange) {
+                token.x += (player.x - token.x) * TOKENS.magnetStrength;
+                token.y += (player.y - token.y) * TOKENS.magnetStrength;
             }
-            if (dist < 22) {
+            if (dist < TOKENS.pickupRange) {
                 this.tokenDrops.splice(i, 1);
                 collected++;
                 continue;

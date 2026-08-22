@@ -46,7 +46,6 @@ export class Overworld {
         this.shops = [];
         this.portalCooldown = 0; // haritaya girişte anında geri ışınlanmayı önler
         this.camera = { x: 0, y: 0 };
-        this.interval = null;
         this.running = false;
 
         // Tüccar (Kecleon) ilk maceraya girişte bir kez yüklenir
@@ -76,7 +75,6 @@ export class Overworld {
         this.mapTexts = [];
         this.spores = [];
         this.ballAnim = null;   // aktif Pokeball atışı animasyonu
-        this.captures = [];     // yakalanan Pokemonlar
         this.enemyDataCache = new Map(); // PokeAPI verisi (id -> Promise)
         this.flow = null;       // oyuncuya BFS mesafe alanı (labirent takibi için)
         this.fireflies = [];    // atmosfer: ateşböcekleri

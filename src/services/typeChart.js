@@ -1,5 +1,7 @@
 // Tip etkililik tablosu. Veriler PokeAPI'den alınır (elle kodlanmaz),
 // bir kez indirilip önbelleğe alınır.
+import { cachedJson } from './apiCache.js';
+
 const API_BASE = 'https://pokeapi.co/api/v2';
 
 const cache = new Map();       // tip adı -> { double, half, none } (Set)
@@ -9,11 +11,11 @@ async function fetchType(name) {
     if (cache.has(name)) return cache.get(name);
     if (pending.has(name)) return pending.get(name);
 
-    const promise = fetch(`${API_BASE}/type/${name}`)
-        .then(res => {
-            if (!res.ok) throw new Error(`PokeAPI ${res.status}: type/${name}`);
-            return res.json();
-        })
+    const promise = cachedJson(
+        `${API_BASE}/type/${name}`,
+        `type:${name}`,
+        (raw) => ({ damage_relations: raw.damage_relations })
+    )
         .then(data => {
             const rel = data.damage_relations;
             const entry = {

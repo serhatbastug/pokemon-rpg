@@ -4,6 +4,7 @@ import { abilityOverride, withKeys } from '../../config/playableCharacters.js';
 import { buildAbilities } from '../../services/moveAbilities.js';
 import { preloadTypes } from '../../services/typeChart.js';
 import { fetchCharacter } from '../../services/pokeapi.js';
+import { DEPLOY, MAP } from '../../config/balance.js';
 
 // Ekip yönetimi: Pokemon hazırlama, poke top fırlatma/geri çağırma,
 // eşya kullanımı ve bayılma sonrası devreye girme.
@@ -93,8 +94,8 @@ export const PartyControls = {
 
         // Topun düşeceği nokta: antrenörün baktığı yönde, duvara girmeyecek şekilde
         const aim = this.aimVector();
-        let tx = this.player.x + aim.x * 120;
-        let ty = this.player.y + aim.y * 120;
+        let tx = this.player.x + aim.x * DEPLOY.throwDistance;
+        let ty = this.player.y + aim.y * DEPLOY.throwDistance;
         for (let i = 0; i < 8 && !this.canBoxMoveTo(tx, ty, 16, 12); i++) {
             tx -= aim.x * 14;
             ty -= aim.y * 14;
@@ -114,7 +115,7 @@ export const PartyControls = {
             toX: tx,
             toY: ty
         };
-        this.swapCooldown = 20;
+        this.swapCooldown = DEPLOY.swapCooldown;
     },
 
     // Topun havada geçirdiği süre ve açılma anı
@@ -123,7 +124,7 @@ export const PartyControls = {
         if (!ball) return;
 
         ball.frame++;
-        if (ball.frame < 18) return;
+        if (ball.frame < DEPLOY.flightFrames) return;
 
         const pokemon = this.partyPokemon[ball.index];
         this.deployBall = null;
@@ -131,7 +132,7 @@ export const PartyControls = {
 
         pokemon.x = ball.toX;
         pokemon.y = ball.toY;
-        pokemon.invuln = 30;
+        pokemon.invuln = DEPLOY.spawnInvuln;
         this.active = pokemon;
         this.progress.setActive(ball.index);
 
@@ -227,7 +228,7 @@ export const PartyControls = {
             this.player.y = start.row * TILE_SIZE + TILE_SIZE / 2;
             this.active.x = this.player.x;
             this.active.y = this.player.y;
-            this.portalCooldown = 45;
+            this.portalCooldown = MAP.portalCooldown;
             this.updateCamera(true);
             this.spawnMapText(this.player.x, this.player.y - 60, 'Ekip bayıldı! Girişe dönüldü', '#ef4444');
         }, 900);

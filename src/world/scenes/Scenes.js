@@ -3,6 +3,7 @@ import { FIELD_MOVES } from '../../config/fieldMoves.js';
 import { drawTrainer } from '../trainerSprite.js';
 import { preloadTypes } from '../../services/typeChart.js';
 import { fetchCharacter, fetchEvolutionChain } from '../../services/pokeapi.js';
+import { VICTORY } from '../../config/balance.js';
 
 // Sahneler: boss uyanışı ve arena yıkımı, zafer ekranı ve evrim sahnesi.
 // Overworld prototipine karıştırılır (applyMixins) - bu yüzden 'this' Overworld örneğidir.
@@ -338,7 +339,7 @@ export const Scenes = {
 
         // Bossun düşürdüğü jetonları toplamak için süre tanı; zafer ekranı
         // ancak jetonlar alındıktan (ya da süre dolduktan) sonra açılır
-        this.pendingVictory = { boss, badge, wait: 420 };
+        this.pendingVictory = { boss, badge, wait: VICTORY.tokenGraceFrames };
         this.spawnMapText(boss.x, boss.y - 90, 'Jetonları topla!', '#fbbf24');
     },
 
@@ -349,7 +350,7 @@ export const Scenes = {
 
         pending.wait--;
         // Haritada jeton kalmadıysa beklemeye gerek yok (kısa bir tampon bırak)
-        if (this.tokenDrops.length === 0 && pending.wait > 60) pending.wait = 60;
+        if (this.tokenDrops.length === 0 && pending.wait > VICTORY.minGraceFrames) pending.wait = VICTORY.minGraceFrames;
         if (pending.wait > 0) return;
 
         this.pendingVictory = null;

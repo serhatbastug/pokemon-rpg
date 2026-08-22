@@ -1,7 +1,8 @@
 import { maxHpFor, speedFor, damageMultiplierFor } from '../config/progression.js';
+import { ACTIVE_POKEMON } from '../config/balance.js';
 
-// Sahadaki Pokemon: antrenörü takip eder, yetenekleri o kullanır ve hasarı o alır.
-// Antrenör vurulmaz — kanonda olduğu gibi savaşan Pokemondur.
+// Sahadaki Pokemon: poke topla sahaya sürülür, yetenekleri o kullanır ve
+// hasarı o alır. Antrenör vurulmaz - kanonda olduğu gibi savaşan Pokemondur.
 export class ActivePokemon {
     constructor({ member, data, abilities, world }) {
         this.member = member;       // Progress'teki kayıt { id, formId, level, name }
@@ -22,7 +23,7 @@ export class ActivePokemon {
 
         this.x = 0;
         this.y = 0;
-        this.size = 62;
+        this.size = ACTIVE_POKEMON.size;
         this.facing = 1;
         this.cooldowns = abilities.map(() => 0);
         this.invuln = 0;
@@ -45,16 +46,16 @@ export class ActivePokemon {
             // Çok yakınsa geri çekil, uzaksa hafifçe yaklaş
             const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
             let dx = 0, dy = 0;
-            if (dist < 90) {
+            if (dist < ACTIVE_POKEMON.retreatRange) {
                 dx = (this.x - enemy.x) / dist;
                 dy = (this.y - enemy.y) / dist;
-            } else if (dist > 240) {
+            } else if (dist > ACTIVE_POKEMON.advanceRange) {
                 dx = (enemy.x - this.x) / dist;
                 dy = (enemy.y - this.y) / dist;
             }
 
             if (dx || dy) {
-                const step = this.followSpeed * this.speedBoost * 0.5;
+                const step = this.followSpeed * this.speedBoost * ACTIVE_POKEMON.holdSpeedFactor;
                 const hw = this.size * 0.24;
                 const hh = this.size * 0.16;
                 if (this.world.canBoxMoveTo(this.x + dx * step, this.y, hw, hh)) this.x += dx * step;
@@ -82,8 +83,8 @@ export class ActivePokemon {
         if (this.fainted || this.invuln > 0) return;
 
         this.hp -= amount;
-        this.invuln = 45;
-        this.flash = 20;
+        this.invuln = ACTIVE_POKEMON.hitInvuln;
+        this.flash = ACTIVE_POKEMON.hitFlash;
 
         if (this.hp <= 0) {
             this.hp = 0;

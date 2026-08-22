@@ -1,3 +1,4 @@
+import { ENEMY } from '../config/balance.js';
 ﻿import { TILE_SIZE } from '../config/worldMap.js';
 
 // Tür (kind) bazlı temel istatistikler. aggroTiles: labirent yolu üzerinden
@@ -14,7 +15,7 @@ const KIND_STATS = {
 
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
 // type, projectileSprites.js'teki sprite anahtarıdır.
-const SPECIES_ATTACKS = {
+export const SPECIES_ATTACKS = {
     127: { type: 'xscissor', name: 'X-Scissor', moveType: 'bug', damage: 12, speed: 6.5, cooldown: 110, range: 260 },       // Pinsir
     217: { type: 'focusblast', name: 'Focus Blast', moveType: 'fighting', damage: 16, speed: 5.5, cooldown: 140, range: 280 },   // Ursaring
     709: { type: 'shadowball', name: 'Shadow Ball', moveType: 'ghost', damage: 14, speed: 5, cooldown: 120, range: 300 },     // Trevenant
@@ -33,8 +34,6 @@ const SPECIES_ATTACKS = {
     143: { type: 'focusblast', name: 'Body Slam', moveType: 'normal', damage: 22, speed: 5, cooldown: 130, range: 280 },        // Snorlax
     893: { type: 'leaf', name: 'Power Whip', moveType: 'grass', damage: 16, speed: 8, cooldown: 85, range: 380, spread: 3 }    // Zarude (bölge bossu)
 };
-
-const CONTACT_DAMAGE = 8;
 
 // Haritada dolaşan düşman Pokemon. Oyuncuyu labirent yolunu izleyerek kovalar
 // (akış alanı), görüş hattı açıkken resmi hamlesiyle uzaktan vurur.
@@ -101,7 +100,7 @@ export class Enemy {
 
         // Uyuyan boss: yaklaşılınca uyanır, o ana kadar hareketsiz
         if (this.asleep) {
-            if (dist < 150) this.wakeUp();
+            if (dist < ENEMY.wakeRange) this.wakeUp();
             return;
         }
 
@@ -118,7 +117,7 @@ export class Enemy {
         );
         if (!this.aggro) {
             if (pathDist <= this.aggroTiles) this.aggro = true;
-        } else if (pathDist > this.aggroTiles + 5) {
+        } else if (pathDist > this.aggroTiles + ENEMY.aggroDropTiles) {
             this.aggro = false;
             this.windup = 0;
         }
@@ -147,8 +146,8 @@ export class Enemy {
 
         // Temas hasarı (oyuncu üstüne yapışırsa)
         if (dist < this.size / 2 + 22 && this.contactCooldown === 0) {
-            this.world.damagePlayer(CONTACT_DAMAGE, this);
-            this.contactCooldown = 60;
+            this.world.damagePlayer(ENEMY.contactDamage, this);
+            this.contactCooldown = ENEMY.contactCooldown;
         }
 
         let dx = 0, dy = 0;
@@ -161,12 +160,12 @@ export class Enemy {
                 this.windup--;
                 if (this.windup === 0) this.fireAt(player);
             } else if (los && dist < this.attack.range && this.attackCooldown === 0) {
-                this.windup = 18;
+                this.windup = ENEMY.windupFrames;
                 this.attackCooldown = this.attack.cooldown;
             }
 
             if (los && dist < this.attack.range * 0.8) {
-                if (dist < 110) {
+                if (dist < ENEMY.retreatRange) {
                     // Fazla yaklaştı: geri çekil
                     dx = (this.x - player.x) / dist;
                     dy = (this.y - player.y) / dist;

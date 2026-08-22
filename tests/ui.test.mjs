@@ -43,7 +43,7 @@ async function worldState() {
             enemiesFainted: w.enemies.filter(e => e.fainted).length,
             projectiles: w.projectiles.length,
             enemyProjectiles: w.enemyProjectiles.length,
-            captures: w.captures.length,
+            captures: w.progress.collection.length,
             secretRevealed: w.secretRevealed,
             victory: !!w.victory
         };

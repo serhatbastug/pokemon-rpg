@@ -148,9 +148,9 @@ export class Overworld {
         this.arenaOpened = false;
         this.victory = null;
 
-        // Orman atmosferli haritalarda ateşböcekleri
+        // Atmosfer zerrecikleri: ormanda ateşböceği, derinliklerde gölge zerresi
         this.fireflies = [];
-        if (map.ambience === 'forest') {
+        if (map.ambience === 'forest' || map.ambience === 'shadow') {
             const mapW = map.grid[0].length * TILE_SIZE;
             const mapH = map.grid.length * TILE_SIZE;
             const count = Math.round((mapW * mapH) / 40000);
@@ -163,7 +163,15 @@ export class Overworld {
                 });
             }
         }
-        this.enemies = (map.spawns || []).map(spawn => new Enemy({ ...spawn, world: this }));
+        this.secretRevealed = false;
+        this.enemies = (map.spawns || []).map(spawn => {
+            const enemy = new Enemy({ ...spawn, world: this });
+            // Gizli odadakiler odalarını korur: dışarıdakine saldırmaz
+            if (map.secretArea && this.isTileInsideArea(spawn.col, spawn.row, map.secretArea)) {
+                enemy.homeArea = map.secretArea;
+            }
+            return enemy;
+        });
         for (const enemy of this.enemies) {
             this.fetchEnemyData(enemy.id).then(data => {
                 enemy.name = data.name;
@@ -340,6 +348,34 @@ export class Overworld {
         this.enemyProjectiles.push(projectile);
     }
 
+    isTileInsideArea(col, row, area) {
+        return col >= area.col0 && col <= area.col1 && row >= area.row0 && row <= area.row1;
+    }
+
+    isInsideArea(x, y, area) {
+        return this.isTileInsideArea(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE), area);
+    }
+
+    // Gizli oda: içine girilene kadar haritada ağaçlık gibi görünür,
+    // içindeki Pokemon da çizilmez.
+    get secretArea() {
+        return this.currentMap.secretArea;
+    }
+
+    isHiddenTile(col, row) {
+        const area = this.secretArea;
+        return !!area && !this.secretRevealed && this.isTileInsideArea(col, row, area);
+    }
+
+    checkSecretDiscovery() {
+        const area = this.secretArea;
+        if (!area || this.secretRevealed) return;
+        if (this.isInsideArea(this.player.x, this.player.y, area)) {
+            this.secretRevealed = true;
+            this.spawnMapText(this.player.x, this.player.y - 60, 'GİZLİ ODA BULUNDU!', '#fbbf24');
+        }
+    }
+
     movePlayer() {
         const { input, player } = this;
         let dx = 0, dy = 0;
@@ -377,6 +413,7 @@ export class Overworld {
         if (!this.victory) {
             this.movePlayer();
             this.checkPortals();
+            this.checkSecretDiscovery();
             this.updateCombat();
             this.updateCamera();
         }
@@ -397,6 +434,8 @@ export class Overworld {
         for (const enemy of this.enemies) {
             // Pokeball'a girmiş (sallanan toptaki) Pokemon görünmez
             if (this.ballAnim && this.ballAnim.enemy === enemy && this.ballAnim.frame >= 15) continue;
+            // Keşfedilmemiş gizli odadaki Pokemon da görünmez
+            if (this.isHiddenTile(Math.floor(enemy.x / TILE_SIZE), Math.floor(enemy.y / TILE_SIZE))) continue;
             enemy.draw(ctx);
         }
         this.drawProjectiles();
@@ -412,14 +451,20 @@ export class Overworld {
 
         ctx.restore();
 
-        // Atmosfer: loş orman tonu + kenar karartması (ekran sabiti)
+        // Atmosfer: loş tonlama + kenar karartması (ekran sabiti)
+        const shadowy = this.currentMap.ambience === 'shadow';
         if (this.currentMap.theme === 'dark') {
-            ctx.fillStyle = 'rgba(6, 18, 10, 0.18)';
+            ctx.fillStyle = shadowy ? 'rgba(8, 6, 20, 0.34)' : 'rgba(6, 18, 10, 0.18)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        if (this.currentMap.ambience === 'forest') {
+        if (this.currentMap.ambience) {
             ctx.fillStyle = this.vignette;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (shadowy) {
+                // Derinlikler: ikinci kat karartma, koridorlar iyice daralır
+                ctx.fillStyle = this.vignette;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
 
         // Ekran sabiti arayüz (HP, yetenekler, yakalananlar)
@@ -521,10 +566,11 @@ export class Overworld {
             if (fly.y > mapH) fly.y = 0;
 
             const pulse = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.5 + fly.phase));
-            ctx.globalAlpha = pulse * 0.9;
+            const shadowy = this.currentMap.ambience === 'shadow';
+            ctx.globalAlpha = pulse * (shadowy ? 0.7 : 0.9);
             ctx.shadowBlur = 8;
-            ctx.shadowColor = '#bef264';
-            ctx.fillStyle = '#d9f99d';
+            ctx.shadowColor = shadowy ? '#818cf8' : '#bef264';
+            ctx.fillStyle = shadowy ? '#c7d2fe' : '#d9f99d';
             ctx.fillRect(fly.x - 2, fly.y - 2, 4, 4);
         }
         ctx.restore();
@@ -839,7 +885,9 @@ export class Overworld {
 
         for (let row = rowStart; row <= rowEnd; row++) {
             for (let col = colStart; col <= colEnd; col++) {
-                this.drawTile(ctx, grid[row][col], col, row);
+                // Keşfedilmemiş gizli oda dışarıdan ağaçlık görünür
+                const tile = this.isHiddenTile(col, row) ? 'T' : grid[row][col];
+                this.drawTile(ctx, tile, col, row);
             }
         }
     }

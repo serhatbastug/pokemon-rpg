@@ -67,7 +67,7 @@ export const MAPS = {
         ],
         portalDefs: {
             '1': { target: 'loc-1-1', label: region1.locations[0].name, colors: region1.locations[0].colors },
-            '2': { target: null, label: region1.locations[1].name, colors: region1.locations[1].colors },
+            '2': { target: 'loc-1-2', label: region1.locations[1].name, colors: region1.locations[1].colors },
             '3': { target: null, label: region1.locations[2].name, colors: region1.locations[2].colors },
             '0': { target: 'main', label: 'Ana Harita', colors: EXIT_COLORS }
         }
@@ -126,7 +126,64 @@ export const MAPS = {
             // Gizli Scolipede: sağdaki gizli çalının (H) ardındaki mağarada
             { id: 545, kind: 'hidden', col: 41, row: 4 },
             { id: 768, kind: 'boss', col: 34, row: 15 }
-        ]
+        ],
+        // Keşfedilene kadar haritada görünmeyen gizli oda (ağaçlık gibi çizilir)
+        secretArea: { col0: 40, row0: 3, col1: 42, row1: 5 }
+    },
+
+    // 1. Bölge / 2. Mekan: Gölgeli Derinlikler
+    // Organik mağara sistemi (46x22); scratchpad/gen-cave.mjs ile üretildi
+    // (hücresel otomat, seed 771103). Labirentten farklı: geniş salonlar ve
+    // dolambaçlı doğal geçitler. Gizli oda sol altta, gizli çalının ardında.
+    'loc-1-2': {
+        id: 'loc-1-2',
+        name: region1.locations[1].name,
+        ambience: 'shadow',
+        theme: 'dark',
+        start: { col: 3, row: 11 },
+        grid: [
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'TTTTTTTTT.g..TTTTTTT.s.TTTTTTT..f...g..TTTTTTT',
+            'TTTT....f...g.TTTT...g........g...g.fs.TTTTTTT',
+            'TTTT.......sf.TTT..gf.......g...gf.....TTTTTTT',
+            'TTTTT........TTT......gs...f.s.g...g...TTTTTTT',
+            'TTTTTs.....gTTTT....gs..g.TTTfs..g....fTTTT..T',
+            'TTTT.g.s.gffTTTT..g...g..TTTT..gs.....TTTTT..T',
+            'TTTT.f..s...TTTTg....f...TTT......g...gTTT.fTT',
+            'TT......s.g........gss.TTTTT....gsf.g.......TT',
+            'TTs.g...g........g.f....TTTT...f.s.g...g....TT',
+            'TT0.s.g......s.g...g..s.TTT.gs.s.....gs.s...TT',
+            'TT..g...TTTTTTT..g.............g......s.g.sTTT',
+            'TT.....TTTTTT.....s..s.TTg...g...gf.....f..TTT',
+            'T....gTTTTTT..g...gf...TT..g..sgf..........TTT',
+            'T...f.TTTTT.g........g.f......gs...f.s.g...TTT',
+            'T.TTTHTTT...f.gg.....f.g......f.g......s.g.TTT',
+            'TTTsssssT....g...g..s...s.g.f..ff..g...g...TTT',
+            'TTTsssssTs..s.......g..TTTT.g..s..s.......gTTT',
+            'TTTsssssTg..TTTT..gsf.TTTTTT...gsf......g..TTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.TTTTT',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
+        ],
+        portalDefs: {
+            '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }
+        },
+        bossArena: { col0: 31, row0: 11, col1: 43, row1: 19 },
+        spawns: [
+            { id: 123, kind: 'common', col: 20, row: 4 },
+            { id: 123, kind: 'common', col: 35, row: 9 },
+            { id: 123, kind: 'common', col: 18, row: 15 },
+            { id: 455, kind: 'common', col: 6, row: 3 },
+            { id: 455, kind: 'common', col: 30, row: 11 },
+            { id: 455, kind: 'common', col: 12, row: 17 },
+            { id: 553, kind: 'common', col: 9, row: 10 },
+            { id: 553, kind: 'common', col: 33, row: 7 },
+            { id: 553, kind: 'common', col: 25, row: 17 },
+            // Gizli Umbreon: sol alttaki gizli odada, sadece odaya girilince saldırır
+            { id: 197, kind: 'hidden', col: 5, row: 18 },
+            { id: 701, kind: 'boss', col: 37, row: 16 }
+        ],
+        secretArea: { col0: 3, row0: 17, col1: 7, row1: 19 }
     }
 };
 

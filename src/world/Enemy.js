@@ -17,7 +17,13 @@ const SPECIES_ATTACKS = {
     217: { type: 'focusblast', name: 'Focus Blast', damage: 16, speed: 5.5, cooldown: 140, range: 280 },   // Ursaring
     709: { type: 'shadowball', name: 'Shadow Ball', damage: 14, speed: 5, cooldown: 120, range: 300 },     // Trevenant
     545: { type: 'poison', name: 'Sludge Bomb', damage: 16, speed: 6, cooldown: 100, range: 300 },         // Scolipede
-    768: { type: 'pinmissile', name: 'Pin Missile', damage: 12, speed: 7, cooldown: 130, range: 340, spread: 3 } // Golisopod
+    768: { type: 'pinmissile', name: 'Pin Missile', damage: 12, speed: 7, cooldown: 130, range: 340, spread: 3 }, // Golisopod
+    // Gölgeli Derinlikler
+    123: { type: 'xscissor', name: 'X-Scissor', damage: 13, speed: 7.5, cooldown: 100, range: 280 },      // Scyther
+    455: { type: 'leaf', name: 'Razor Leaf', damage: 11, speed: 6.5, cooldown: 90, range: 300, spread: 2 }, // Carnivine
+    553: { type: 'seedbomb', name: 'Stone Edge', damage: 17, speed: 6, cooldown: 140, range: 300 },        // Krookodile
+    197: { type: 'shadowball', name: 'Shadow Ball', damage: 15, speed: 6, cooldown: 95, range: 320 },      // Umbreon
+    701: { type: 'focusblast', name: 'Flying Press', damage: 15, speed: 6.5, cooldown: 120, range: 360, spread: 2 } // Hawlucha
 };
 
 const CONTACT_DAMAGE = 8;
@@ -39,6 +45,7 @@ export class Enemy {
         this.homeX = this.x;   // gizli Pokemon buradan uzaklaşmaz
         this.homeY = this.y;
         this.guardRadius = stats.guardRadius || 0;
+        this.homeArea = null;  // gizli odayı koruyanlar: sadece oda içinde saldırır
         this.asleep = !!stats.sleeps; // boss uyanana kadar uyur
         this.maxHp = stats.hp;
         this.hp = stats.hp;
@@ -102,10 +109,13 @@ export class Enemy {
             this.windup = 0;
         }
 
-        // Gizli Pokemon bölgesini korur: oyuncu mağaradan çıkınca peşinden gitmez
-        if (this.guardRadius) {
-            const playerHomeDist = Math.hypot(player.x - this.homeX, player.y - this.homeY);
-            if (playerHomeDist > this.guardRadius) {
+        // Gizli Pokemon bölgesini korur: oyuncu mağaradan çıkınca peşinden gitmez.
+        // homeArea varsa yalnızca oyuncu odanın içindeyken saldırır.
+        if (this.guardRadius || this.homeArea) {
+            const outside = this.homeArea
+                ? !this.world.isInsideArea(player.x, player.y, this.homeArea)
+                : Math.hypot(player.x - this.homeX, player.y - this.homeY) > this.guardRadius;
+            if (outside) {
                 this.aggro = false;
                 this.windup = 0;
                 // Yuvasına dön

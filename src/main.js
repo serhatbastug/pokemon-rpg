@@ -4,8 +4,9 @@ import { loadCharacters } from './services/pokeapi.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
-import { showBattleScreen, showGameOver, hideGameOver } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
+import { Overworld } from './world/Overworld.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -18,6 +19,28 @@ const game = new Game({
     onGameOver: (winnerNum, winner) => {
         showGameOver(`Oyuncu ${winnerNum} (${winner.char.className}) Kazandı!`);
     }
+});
+
+const overworld = new Overworld({
+    canvas: document.getElementById('worldCanvas'),
+    input,
+    onExit: () => {
+        overworld.stop();
+        showSelectionScreen();
+    }
+});
+
+document.getElementById('start-adventure-btn').addEventListener('click', () => {
+    const { p1 } = characterSelect.getSelection();
+    if (!p1) return;
+
+    showOverworldScreen();
+    overworld.start(p1);
+});
+
+document.getElementById('overworld-back-btn').addEventListener('click', () => {
+    overworld.stop();
+    showSelectionScreen();
 });
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {

@@ -692,3 +692,73 @@ canvas {
         opacity: 1;
     }
 }
+
+/* ---- Macera Modu (Overworld) ---- */
+
+.start-adventure-btn {
+    display: block;
+    margin: 2rem auto 0 auto;
+    padding: 1rem 3rem;
+    font-family: var(--font-header);
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: white;
+    background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(168, 85, 247, 0.3);
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite;
+}
+
+.start-adventure-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 25px rgba(168, 85, 247, 0.5);
+    filter: brightness(1.1);
+}
+
+/* Macera düğmesinin hemen ardından gelen savaş düğmesinin boşluğunu daralt */
+.start-adventure-btn + .start-battle-btn {
+    margin-top: 1rem;
+}
+
+.overworld-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.overworld-title {
+    font-family: var(--font-header);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+}
+
+.overworld-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.back-btn {
+    padding: 0.6rem 1.2rem;
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}

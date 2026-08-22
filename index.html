@@ -31,7 +31,20 @@
             <div id="character-grid" class="character-grid">
                 <div class="loading-spinner">Pokemonlar çağrılıyor...</div>
             </div>
+            <button id="start-adventure-btn" class="start-adventure-btn hidden">MACERAYA BAŞLA (TEK KİŞİLİK)</button>
             <button id="start-battle-btn" class="start-battle-btn hidden">SAVAŞI BAŞLAT</button>
+        </section>
+
+        <!-- Overworld (Macera Modu Ana Haritası) -->
+        <section id="overworld-screen" class="screen hidden">
+            <div class="overworld-topbar">
+                <button id="overworld-back-btn" class="back-btn">&larr; Ana Menü</button>
+                <h2 class="overworld-title">Ana Harita</h2>
+                <span class="overworld-hint">WASD / Yön tuşları ile hareket &middot; ESC ile çık</span>
+            </div>
+            <div class="canvas-container">
+                <canvas id="worldCanvas" width="1000" height="500"></canvas>
+            </div>
         </section>
 
         <!-- Battle Screen -->

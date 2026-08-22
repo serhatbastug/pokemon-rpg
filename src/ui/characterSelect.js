@@ -9,6 +9,7 @@ export class CharacterSelect {
         this.status = document.getElementById('selection-status');
         this.overlay = document.getElementById('detail-overlay');
         this.startBtn = document.getElementById('start-battle-btn');
+        this.adventureBtn = document.getElementById('start-adventure-btn');
 
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         this.overlay.addEventListener('click', (e) => {
@@ -98,6 +99,9 @@ export class CharacterSelect {
 
             this.selectionTurn = 2;
             this.status.querySelector('.p2-status-badge').textContent = 'Oyuncu 2: Seçim Yapıyor...';
+
+            // P1 karakterini seçtiği anda tek kişilik macera başlatılabilir
+            this.adventureBtn.classList.remove('hidden');
         } else {
             this.player2Selected = character;
             this.grid.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected-p2'));

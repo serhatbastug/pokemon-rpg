@@ -33,6 +33,8 @@ src/
   config/
     characters.js       Karakter sınıfları ve Pokemon ID eşleşmeleri
     settings.js         Fizik sabitleri, tuş atamaları, oyuncu ayarları
+    regions.js          Macera modu bölgeleri (5 bölge, portal renkleri)
+    worldMap.js         Ana harita karo verisi ve portal konumları
   core/
     input.js            Klavye durumu takibi (InputManager)
   services/
@@ -44,11 +46,21 @@ src/
     abilities.js        Sınıf bazlı yetenek tanımları
     arenas.js           Pixel art arena arka planları
     effects.js          Parçacıklar, sarsıntı, flaş, uçan yazılar
+    projectileSprites.js Kare kare pixel art mermi sprite desenleri
+  world/
+    Overworld.js        Macera modu: kuşbakışı harita motoru
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
     hud.js              Can barları ve cooldown göstergeleri
     screens.js          Ekranlar arası geçişler
 ```
+
+## Macera Modu (geliştirme aşamasında)
+
+Undertale tarzı, kuşbakışı tek kişilik mod. Plan: 5 bölge x 3 mekan x 5 Pokemon
+(3 yaygın + 1 boss + 1 gizli) = 75 karakter. Yetenekler o Pokemonun resmi
+hamlelerinden seçilir. Şu an: ana harita ve 5 bölge portalı (portallar henüz pasif).
+Sırada: portaldan mekan geçişleri, harita üzerinde savaş, evrim mekaniği.
 
 ## Yeni İçerik Ekleme
 

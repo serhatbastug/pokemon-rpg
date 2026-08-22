@@ -123,16 +123,23 @@ Oyunun iki modu bilinçli olarak **farklı görsel dile** sahip:
 
 | | 2 Kişilik Arena | Tek Kişilik Macera |
 |---|---|---|
-| Tarz | Pixel art (korundu) | Gerçekçi, yumuşatılmış |
+| Tarz | Pixel art (korundu) | **Anime / cel-shading** |
 | Çözünürlük | 1000x500 | 1000x560 mantıksal, **2x** arka plan (2000x1120) |
 | Pokemon görseli | Piksel sprite | Yüksek çözünürlüklü resmi çizim |
-| Zemin | Piksel bloklar | Degrade dolgular, yumuşak eğriler, gölgeler |
-| Mermiler | Piksel desenler | Parıltılı enerji efektleri (degrade) |
+| Zemin | Piksel bloklar | Düz renk alanları, sert gölge bantları, koyu konturlar |
+| Mermiler | Piksel desenler | Anime enerji efektleri (düz renk + kontur + beyaz çekirdek) |
+| Antrenör | — | Elle çizilmiş cel-shading karakter (önbelleğe alınmış sprite) |
 | Kamera | Sabit | 1.55x yakınlaştırma (karakterler büyük görünür) |
 
-Macera modunda karakterler belirgin şekilde büyük: sahadaki Pokemon 96px,
-bosslar 140-168px, antrenör elle çizilmiş yumuşak bir karakter. Zemin haritayı
-bir kez offscreen canvas'a pişirdiği için yüksek çözünürlük FPS'i düşürmez.
+Anime tarzının teknik özü **degrade kullanmamaktır**: bir şekil düz renkle
+doldurulur, içine sert kenarlı bir gölge bandı konur ve çevresine koyu bir
+kontur çizilir (`render/celShading.js`). Yumuşak degradeler görüntüyü plastik
+gösterirken bu yöntem çizgi film hissi verir.
+
+Karakterler belirgin şekilde büyük: sahadaki Pokemon 96px, bosslar 140-168px.
+Performans için zemin harita başına bir kez, antrenör de yön/kare başına bir kez
+offscreen canvas'a çizilip önbelleğe alınır - bu yüzden 4 kat piksele ve
+cel-shading maliyetine rağmen tüm ekranlar 60 FPS.
 
 Bu ayrım `npm run check` ile korunuyor: arena dosyaları piksel çizimi
 kapatmamalı, macera dosyaları da piksel moduna dönmemeli.

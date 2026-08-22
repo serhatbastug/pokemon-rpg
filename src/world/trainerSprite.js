@@ -1,176 +1,256 @@
 // Antrenör karakteri (PokeAPI'de antrenör görseli yok, elle çiziyoruz).
-// Macera modu piksel sanatı değil: yumuşak eğriler, degradeler ve gölgelerle
-// çizilir. Boyut `scale` ile ayarlanır (1 birim ≈ 4 piksel gövde yüksekliği).
+// ANIME tarzı: degrade yok - düz renk alanları, sert kenarlı gölge bantları
+// ve koyu konturlar.
+//
+// PERFORMANS: cel-shading çok sayıda fill/stroke/clip gerektirir; bunu her
+// karede yapmak kare hızını düşürür. Bu yüzden her (yön, yürüyüş karesi)
+// birleşimi BİR KEZ offscreen canvas'a çizilip önbelleğe alınır, sonra tek
+// drawImage ile ekrana kopyalanır - klasik sprite sheet mantığı.
 
-const SKIN = { light: '#f8cfa6', mid: '#e8b184', dark: '#c98f63' };
-const CAP = { light: '#ef4444', mid: '#c81e1e', dark: '#8f1414' };
-const JACKET = { light: '#e5484d', mid: '#bb2d33', dark: '#7f1d1d' };
-const JEANS = { light: '#3b6fd4', mid: '#2a4fa8', dark: '#1b3a78' };
-const HAIR = '#3b2412';
-const SHOE = '#1f2937';
+const C = {
+    outline: '#241a2e',
+    skin: '#ffd7ae', skinShade: '#e0ab7d',
+    hair: '#3a2415',
+    cap: '#ef4444', capShade: '#b91c1c', capFront: '#f8fafc',
+    jacket: '#3b82f6', jacketShade: '#1d4ed8', jacketTrim: '#f8fafc',
+    jeans: '#2f4f7a', jeansShade: '#22385a',
+    shoe: '#e5e7eb', shoeShade: '#9ca3af'
+};
 
-// Dikey degrade yardımcı
-function shade(ctx, x, y, w, h, top, bottom) {
-    const g = ctx.createLinearGradient(x, y, x, y + h);
-    g.addColorStop(0, top);
-    g.addColorStop(1, bottom);
-    return g;
-}
+const SUPER = 2;              // önbellek çözünürlüğü (keskinlik için)
+const FRAMES = 2;             // yürüyüş döngüsü kare sayısı
+const cache = new Map();
 
-// Yuvarlak köşeli gövde parçası
-function limb(ctx, x, y, w, h, color, radius = w / 2) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, radius);
+// Düz dolgu + koyu kontur (anime temel birimi)
+function shape(ctx, pathFn, fill, lineWidth) {
+    pathFn();
+    ctx.fillStyle = fill;
     ctx.fill();
+    ctx.strokeStyle = C.outline;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
 }
 
-// Antrenörü (x, y) ayak hizasında merkezleyerek çizer.
-// dir: 'down' | 'up' | 'left' | 'right'
-export function drawTrainer(ctx, x, y, dir, moving, scale = 4) {
-    const u = scale;                    // temel birim
-    const bob = moving ? Math.sin(Date.now() / 130) * u * 0.35 : 0;
-    const stride = moving ? Math.sin(Date.now() / 130) * u * 0.9 : 0;
+// Şeklin içine sert kenarlı gölge bandı
+function shadeInside(ctx, pathFn, color, x, y, w, h) {
+    ctx.save();
+    pathFn();
+    ctx.clip();
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+}
+
+// Tek bir kareyi çizer. Kaynak (0,0) ayakların ortasıdır.
+function paintTrainer(ctx, dir, frame, u) {
+    const swing = frame === 0 ? 0 : 1;      // 2 karelik yürüyüş döngüsü
+    const stride = swing ? u * 0.8 : 0;
+    const armSwing = swing ? u * 0.7 : 0;
     const side = dir === 'left' || dir === 'right';
     const back = dir === 'up';
 
-    ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.translate(x, y + bob);
-    if (dir === 'left') ctx.scale(-1, 1);
+    ctx.lineJoin = 'round';
 
     // --- Bacaklar ---
-    limb(ctx, -u * 1.5, -u * 3.2, u * 1.3, u * 3.4, shade(ctx, 0, -u * 3.2, 0, u * 3.4, JEANS.light, JEANS.dark));
-    limb(ctx, u * 0.2 + stride * 0.3, -u * 3.2, u * 1.3, u * 3.4,
-        shade(ctx, 0, -u * 3.2, 0, u * 3.4, JEANS.mid, JEANS.dark));
+    const legY = -u * 3.4;
+    const legH = u * 3.1;
+    for (const [lx, offset, color] of [
+        [-u * 1.35, -stride * 0.3, C.jeansShade],
+        [u * 0.25, stride * 0.3, C.jeans]
+    ]) {
+        shape(ctx, () => {
+            ctx.beginPath();
+            ctx.roundRect(lx + offset, legY, u * 1.1, legH, u * 0.28);
+        }, color, u * 0.36);
+    }
 
     // Ayakkabılar
-    limb(ctx, -u * 1.6, -u * 0.5, u * 1.5, u * 0.7, SHOE, u * 0.3);
-    limb(ctx, u * 0.1 + stride * 0.3, -u * 0.5, u * 1.5, u * 0.7, SHOE, u * 0.3);
+    for (const [sx, offset] of [[-u * 1.5, -stride * 0.3], [u * 0.15, stride * 0.3]]) {
+        const shoePath = () => {
+            ctx.beginPath();
+            ctx.roundRect(sx + offset, -u * 0.62, u * 1.45, u * 0.72, u * 0.3);
+        };
+        shape(ctx, shoePath, C.shoe, u * 0.34);
+        shadeInside(ctx, shoePath, C.shoeShade, sx + offset, -u * 0.25, u * 1.5, u * 0.4);
+    }
 
     // --- Gövde (ceket) ---
-    const torsoY = -u * 7.4;
+    const torsoY = -u * 7.6;
     const torsoH = u * 4.4;
-    ctx.fillStyle = shade(ctx, 0, torsoY, 0, torsoH, JACKET.light, JACKET.dark);
-    ctx.beginPath();
-    ctx.roundRect(-u * 2, torsoY, u * 4, torsoH, [u * 1.4, u * 1.4, u * 0.6, u * 0.6]);
-    ctx.fill();
+    const torsoPath = () => {
+        ctx.beginPath();
+        ctx.roundRect(-u * 1.95, torsoY, u * 3.9, torsoH, [u * 1.2, u * 1.2, u * 0.5, u * 0.5]);
+    };
+    shape(ctx, torsoPath, C.jacket, u * 0.4);
+    shadeInside(ctx, torsoPath, C.jacketShade, u * 0.35, torsoY, u * 2, torsoH);
 
-    // Ceket fermuarı / sırt dikişi
-    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-    ctx.lineWidth = Math.max(1, u * 0.18);
-    ctx.beginPath();
-    ctx.moveTo(0, torsoY + u * 0.5);
-    ctx.lineTo(0, torsoY + torsoH - u * 0.4);
-    ctx.stroke();
-
-    // Omuz ışığı
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.ellipse(-u * 0.8, torsoY + u * 0.8, u * 1, u * 0.5, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    // Ceket önü: beyaz düz bant
+    if (!back) {
+        shadeInside(ctx, torsoPath, C.jacketTrim, -u * 0.32, torsoY, u * 0.64, torsoH);
+        ctx.strokeStyle = C.outline;
+        ctx.lineWidth = u * 0.16;
+        ctx.beginPath();
+        ctx.moveTo(0, torsoY + u * 0.4);
+        ctx.lineTo(0, torsoY + torsoH - u * 0.3);
+        ctx.stroke();
+    }
 
     // --- Kollar ---
-    const armSwing = moving ? Math.sin(Date.now() / 130) * u * 0.8 : 0;
-    limb(ctx, -u * 2.9, torsoY + u * 0.6 - armSwing * 0.4, u * 1.1, u * 3,
-        shade(ctx, 0, torsoY, 0, u * 3, JACKET.mid, JACKET.dark));
-    limb(ctx, u * 1.8, torsoY + u * 0.6 + armSwing * 0.4, u * 1.1, u * 3,
-        shade(ctx, 0, torsoY, 0, u * 3, JACKET.light, JACKET.mid));
+    for (const [ax, sw, color] of [
+        [-u * 2.85, -armSwing * 0.5, C.jacketShade],
+        [u * 1.85, armSwing * 0.5, C.jacket]
+    ]) {
+        shape(ctx, () => {
+            ctx.beginPath();
+            ctx.roundRect(ax, torsoY + u * 0.7 + sw, u * 1, u * 2.9, u * 0.45);
+        }, color, u * 0.34);
+    }
 
     // Eller
-    ctx.fillStyle = SKIN.mid;
-    ctx.beginPath();
-    ctx.arc(-u * 2.35, torsoY + u * 3.5 - armSwing * 0.4, u * 0.55, 0, Math.PI * 2);
-    ctx.arc(u * 2.35, torsoY + u * 3.5 + armSwing * 0.4, u * 0.55, 0, Math.PI * 2);
-    ctx.fill();
+    for (const [hx, sw] of [[-u * 2.35, -armSwing * 0.5], [u * 2.35, armSwing * 0.5]]) {
+        ctx.beginPath();
+        ctx.arc(hx, torsoY + u * 3.5 + sw, u * 0.52, 0, Math.PI * 2);
+        ctx.fillStyle = C.skin;
+        ctx.fill();
+        ctx.strokeStyle = C.outline;
+        ctx.lineWidth = u * 0.3;
+        ctx.stroke();
+    }
 
     // --- Baş ---
-    const headY = -u * 9.3;
-    const headR = u * 1.75;
+    const headY = -u * 9.5;
+    const headR = u * 1.85;
 
-    // Boyun
-    limb(ctx, -u * 0.5, headY + headR * 0.5, u * 1, u * 1, SKIN.dark, u * 0.4);
+    ctx.fillStyle = C.skinShade;
+    ctx.fillRect(-u * 0.45, headY + headR * 0.55, u * 0.9, u * 0.9);
 
-    // Yüz
-    const face = ctx.createRadialGradient(-headR * 0.3, headY - headR * 0.3, headR * 0.2, 0, headY, headR);
-    face.addColorStop(0, SKIN.light);
-    face.addColorStop(1, SKIN.mid);
-    ctx.fillStyle = face;
-    ctx.beginPath();
-    ctx.arc(0, headY, headR, 0, Math.PI * 2);
-    ctx.fill();
+    const headPath = () => {
+        ctx.beginPath();
+        ctx.arc(0, headY, headR, 0, Math.PI * 2);
+    };
+    shape(ctx, headPath, C.skin, u * 0.4);
+    shadeInside(ctx, headPath, C.skinShade, headR * 0.35, headY - headR, headR * 1.2, headR * 2);
 
-    // Saç (arkadan bakışta tüm kafa saç)
-    ctx.fillStyle = HAIR;
-    ctx.beginPath();
+    // Saç: düz koyu kütle
+    ctx.save();
+    headPath();
+    ctx.clip();
+    ctx.fillStyle = C.hair;
     if (back) {
-        ctx.arc(0, headY, headR * 0.98, 0, Math.PI * 2);
+        ctx.fillRect(-headR, headY - headR, headR * 2, headR * 2);
     } else {
-        ctx.arc(0, headY, headR * 0.98, Math.PI * 1.05, Math.PI * 2.05);
+        ctx.beginPath();
+        ctx.moveTo(-headR, headY + headR * 0.1);
+        ctx.quadraticCurveTo(-headR * 0.5, headY - headR * 0.7, 0, headY - headR * 0.55);
+        ctx.quadraticCurveTo(headR * 0.6, headY - headR * 0.75, headR, headY + headR * 0.05);
+        ctx.lineTo(headR, headY - headR);
+        ctx.lineTo(-headR, headY - headR);
         ctx.closePath();
+        ctx.fill();
     }
-    ctx.fill();
+    ctx.restore();
 
-    // Yüz hatları (öne ve yana bakışta)
+    // Anime gözleri
     if (!back) {
-        ctx.fillStyle = '#2b2b33';
+        const eyeR = u * 0.26;
+        ctx.fillStyle = '#1f2430';
         if (side) {
             ctx.beginPath();
-            ctx.arc(headR * 0.45, headY + headR * 0.05, u * 0.22, 0, Math.PI * 2);
+            ctx.ellipse(headR * 0.45, headY + headR * 0.1, eyeR * 0.8, eyeR * 1.2, 0, 0, Math.PI * 2);
             ctx.fill();
         } else {
+            for (const ex of [-headR * 0.4, headR * 0.4]) {
+                ctx.fillStyle = '#1f2430';
+                ctx.beginPath();
+                ctx.ellipse(ex, headY + headR * 0.1, eyeR * 0.85, eyeR * 1.25, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(ex + eyeR * 0.3, headY - eyeR * 0.2, eyeR * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.strokeStyle = '#8a4a3a';
+            ctx.lineWidth = u * 0.18;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(-headR * 0.38, headY + headR * 0.05, u * 0.22, 0, Math.PI * 2);
-            ctx.arc(headR * 0.38, headY + headR * 0.05, u * 0.22, 0, Math.PI * 2);
-            ctx.fill();
-            // Ağız
-            ctx.strokeStyle = 'rgba(120,60,40,0.7)';
-            ctx.lineWidth = Math.max(1, u * 0.16);
-            ctx.beginPath();
-            ctx.arc(0, headY + headR * 0.35, headR * 0.3, 0.25, Math.PI - 0.25);
+            ctx.moveTo(-headR * 0.15, headY + headR * 0.5);
+            ctx.lineTo(headR * 0.15, headY + headR * 0.5);
             ctx.stroke();
         }
     }
 
     // --- Şapka ---
-    const capY = headY - headR * 0.35;
-    ctx.fillStyle = shade(ctx, 0, capY - headR, 0, headR * 1.2, CAP.light, CAP.dark);
-    ctx.beginPath();
-    ctx.arc(0, capY, headR * 1.02, Math.PI, Math.PI * 2);
-    ctx.closePath();
-    ctx.fill();
+    const capY = headY - headR * 0.3;
+    const capPath = () => {
+        ctx.beginPath();
+        ctx.arc(0, capY, headR * 1.05, Math.PI, Math.PI * 2);
+        ctx.closePath();
+    };
+    shape(ctx, capPath, C.cap, u * 0.4);
+    shadeInside(ctx, capPath, C.capShade, headR * 0.3, capY - headR * 1.2, headR * 1.2, headR * 1.3);
 
-    // Şapka bandı
-    ctx.fillStyle = CAP.dark;
-    ctx.beginPath();
-    ctx.roundRect(-headR, capY - u * 0.15, headR * 2, u * 0.45, u * 0.2);
-    ctx.fill();
+    // Siperlik
+    shape(ctx, () => {
+        ctx.beginPath();
+        if (back) ctx.ellipse(0, capY - headR * 0.55, headR * 0.9, headR * 0.28, 0, 0, Math.PI * 2);
+        else if (side) ctx.ellipse(headR * 0.9, capY + u * 0.1, headR * 0.9, headR * 0.26, 0.08, 0, Math.PI * 2);
+        else ctx.ellipse(0, capY + u * 0.22, headR * 1.2, headR * 0.32, 0, 0, Math.PI * 2);
+    }, C.capShade, u * 0.34);
 
-    // Siperlik (bakış yönüne göre)
-    ctx.fillStyle = CAP.mid;
-    ctx.beginPath();
-    if (back) {
-        ctx.ellipse(0, capY - headR * 0.5, headR * 0.9, headR * 0.3, 0, 0, Math.PI * 2);
-    } else if (side) {
-        ctx.ellipse(headR * 0.85, capY + u * 0.1, headR * 0.85, headR * 0.28, 0.1, 0, Math.PI * 2);
-    } else {
-        ctx.ellipse(0, capY + u * 0.25, headR * 1.15, headR * 0.34, 0, 0, Math.PI * 2);
-    }
-    ctx.fill();
-
-    // Şapkanın önündeki beyaz amblem
+    // Şapka amblemi: küçük pokeball
     if (!back) {
-        ctx.fillStyle = '#f8fafc';
-        ctx.beginPath();
-        ctx.arc(side ? headR * 0.35 : 0, capY - headR * 0.42, u * 0.42, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = CAP.mid;
-        ctx.beginPath();
-        ctx.arc(side ? headR * 0.35 : 0, capY - headR * 0.42, u * 0.18, 0, Math.PI * 2);
-        ctx.fill();
+        const ex = side ? headR * 0.3 : 0;
+        const ey = capY - headR * 0.45;
+        const emblemPath = () => {
+            ctx.beginPath();
+            ctx.arc(ex, ey, u * 0.45, 0, Math.PI * 2);
+        };
+        shape(ctx, emblemPath, C.capFront, u * 0.22);
+        shadeInside(ctx, emblemPath, C.cap, ex - u * 0.5, ey - u * 0.5, u, u * 0.5);
     }
+}
 
-    ctx.restore();
+// (yön, kare, ölçek) için hazır sprite; ilk istekte çizilip saklanır
+function trainerSprite(dir, frame, scale) {
+    const key = `${dir}|${frame}|${scale}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+
+    const u = scale;
+    const width = u * 8;
+    const height = u * 13;
+    const anchorX = width / 2;
+    const anchorY = height - u * 1.2; // ayak hizası
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width * SUPER;
+    canvas.height = height * SUPER;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.scale(SUPER, SUPER);
+    ctx.translate(anchorX, anchorY);
+
+    // Sola bakış, sağa bakışın aynası olarak çizilir
+    if (dir === 'left') ctx.scale(-1, 1);
+    paintTrainer(ctx, dir, frame, u);
+
+    const sprite = { canvas, width, height, anchorX, anchorY };
+    cache.set(key, sprite);
+    return sprite;
+}
+
+// Antrenörü (x, y) ayak hizasında merkezleyerek çizer.
+// dir: 'down' | 'up' | 'left' | 'right'
+export function drawTrainer(ctx, x, y, dir, moving, scale = 5) {
+    const frame = moving ? Math.floor(Date.now() / 150) % FRAMES : 0;
+    const bob = moving && frame === 1 ? -scale * 0.3 : 0;
+    const sprite = trainerSprite(dir, frame, scale);
+
+    ctx.drawImage(
+        sprite.canvas,
+        x - sprite.anchorX,
+        y - sprite.anchorY + bob,
+        sprite.width,
+        sprite.height
+    );
 }

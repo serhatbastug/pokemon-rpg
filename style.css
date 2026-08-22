@@ -833,6 +833,56 @@ canvas {
     font-size: 0.85rem;
 }
 
+/* Kecleon'un dükkanı */
+.shop-modal {
+    max-width: 720px;
+}
+
+.shop-speech {
+    padding: 0.7rem 1rem;
+    margin-bottom: 0.9rem;
+    background: rgba(74, 222, 128, 0.08);
+    border-left: 3px solid #4ade80;
+    border-radius: 8px;
+    font-style: italic;
+    color: var(--text-primary);
+    min-height: 2.4rem;
+}
+
+.shop-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px solid var(--border-glass);
+    border-radius: 14px;
+    padding: 0.75rem 0.6rem;
+    text-align: center;
+}
+
+.shop-icon {
+    width: 26px;
+    height: 26px;
+    margin: 0 auto 0.5rem;
+    border-radius: 6px;
+    box-shadow: 0 0 12px currentColor;
+}
+
+.shop-name {
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.shop-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    margin-bottom: 0.4rem;
+}
+
+.shop-owned {
+    font-size: 0.72rem;
+    color: #facc15;
+    margin-bottom: 0.5rem;
+}
+
 .picker-title {
     font-family: var(--font-header);
     font-size: 1.4rem;

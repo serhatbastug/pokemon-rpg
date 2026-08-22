@@ -37,6 +37,20 @@
             <button id="start-battle-btn" class="start-battle-btn hidden">SAVAŞI BAŞLAT</button>
         </section>
 
+        <!-- Kecleon'un Dükkanı: jetonla eşya al, çantayı kullan -->
+        <section id="shop-overlay" class="detail-overlay hidden">
+            <div class="modal-card shop-modal">
+                <button id="shop-close" class="close-btn">&times;</button>
+                <h3 class="picker-title">Tüccar Kecleon</h3>
+                <p id="shop-speech" class="shop-speech"></p>
+                <p id="shop-tokens" class="picker-progress"></p>
+                <h4 class="lib-section">Satılık</h4>
+                <div id="shop-list" class="lib-list"></div>
+                <h4 class="lib-section">Çanta</h4>
+                <div id="shop-bag" class="lib-list"></div>
+            </div>
+        </section>
+
         <!-- Pokemon Kütüphanesi: ekip, koleksiyon ve jeton harcama -->
         <section id="library-overlay" class="detail-overlay hidden">
             <div class="modal-card library-card">

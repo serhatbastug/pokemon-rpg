@@ -594,6 +594,97 @@ async function main() {
     check('Rozetsiz saha hamlesi calismiyor', lockedResult.before === lockedResult.after,
         `'${lockedResult.before}' -> '${lockedResult.after}'`);
 
+    // --- Tüccar Kecleon ---
+    // Bölge haritasındaki tezgahın önüne git: alışveriş açılmalı
+    await page.evaluate(() => {
+        const w = window.__overworld;
+        w.loadMap('region-1');
+    });
+    await wait(800);
+    const shopNear = await page.evaluate(() => {
+        const w = window.__overworld;
+        const shop = w.shops[0];
+        w.player.x = shop.col * 50 + 25;
+        w.player.y = shop.row * 50 + 70;
+        return { shops: w.shops.length, near: w.nearShop() };
+    });
+    check('Bolge merkezinde tuccar tezgahi var', shopNear.shops === 1 && shopNear.near === true,
+        `${shopNear.shops} tezgah, yakinda: ${shopNear.near}`);
+
+    await page.keyboard.press('KeyF');
+    await wait(500);
+    const shopOpen = await page.evaluate(() =>
+        !document.getElementById('shop-overlay').classList.contains('hidden'));
+    check('Tezgahta F ile dukkan aciliyor', shopOpen === true);
+    await shot('20-dukkan');
+
+    // Satın alma: jeton azalmalı, çantadaki adet artmalı
+    const buyBefore = await page.evaluate(() => ({
+        tokens: window.__overworld.progress.tokens,
+        balls: window.__overworld.progress.itemCount('poke-ball')
+    }));
+    await page.click('#shop-list .shop-card .lib-btn');
+    await wait(400);
+    const buyAfter = await page.evaluate(() => ({
+        tokens: window.__overworld.progress.tokens,
+        balls: window.__overworld.progress.itemCount('poke-ball')
+    }));
+    check('Jetonla esya satin aliniyor',
+        buyAfter.balls === buyBefore.balls + 5 && buyAfter.tokens === buyBefore.tokens - 4,
+        `${buyBefore.balls} -> ${buyAfter.balls} top, ${buyBefore.tokens} -> ${buyAfter.tokens} jeton`);
+
+    // Potion satın al ve kullan
+    const potionResult = await page.evaluate(() => {
+        const w = window.__overworld;
+        w.progress.buyItem('potion');
+        const before = w.progress.itemCount('potion');
+        // Bir ekip üyesinin canını düşür ki iksir işe yarasın
+        const target = w.active || w.partyPokemon[0];
+        target.hp = Math.round(target.maxHp * 0.3);
+        const hpBefore = target.hp;
+        const result = w.useItem('potion');
+        return { before, after: w.progress.itemCount('potion'), result, hpBefore, hpAfter: target.hp };
+    });
+    check('Potion kullanilinca can yeniliyor ve esya tukeniyor',
+        potionResult.result.ok === true &&
+        potionResult.after === potionResult.before - 1 &&
+        potionResult.hpAfter > potionResult.hpBefore,
+        `${potionResult.result.message} (${potionResult.hpBefore} -> ${potionResult.hpAfter} can)`);
+
+    // Poke Ball tükenince yakalama yapılamamalı
+    const noBallResult = await page.evaluate(() => {
+        const w = window.__overworld;
+        w.progress.items['poke-ball'] = 0;
+        w.loadMap('loc-1-1');
+        return true;
+    });
+    await wait(900);
+    const catchWithoutBall = await page.evaluate(() => {
+        const w = window.__overworld;
+        const enemy = w.enemies.find(e => e.kind === 'common');
+        enemy.x = w.player.x + 40;
+        enemy.y = w.player.y;
+        enemy.fainted = true;
+        const before = w.progress.collection.length;
+        w.tryCatch();
+        return { before, after: w.progress.collection.length, ball: !!w.ballAnim };
+    });
+    check('Poke Ball yoksa yakalama yapilamiyor',
+        catchWithoutBall.ball === false && catchWithoutBall.after === catchWithoutBall.before,
+        `koleksiyon ${catchWithoutBall.before} -> ${catchWithoutBall.after}`);
+
+    // Top alınca yakalama tekrar çalışmalı
+    const catchWithBall = await page.evaluate(() => {
+        const w = window.__overworld;
+        w.progress.items['poke-ball'] = 3;
+        const before = w.progress.itemCount('poke-ball');
+        w.tryCatch();
+        return { before, after: w.progress.itemCount('poke-ball'), ball: !!w.ballAnim };
+    });
+    check('Yakalama Poke Ball tuketiyor',
+        catchWithBall.ball === true && catchWithBall.after === catchWithBall.before - 1,
+        `${catchWithBall.before} -> ${catchWithBall.after} top`);
+
     // --- Konsol ve ağ hataları ---
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));

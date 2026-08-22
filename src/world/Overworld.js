@@ -16,12 +16,14 @@ import { Enemy } from './Enemy.js';
 // portallar. Hedefi (target) olan portala temas haritalar arasında geçiş yapar;
 // hedefi olmayan portallar görünür ama pasiftir (henüz açılmamış içerik).
 export class Overworld {
-    constructor({ canvas, input, onExit, progress }) {
+    constructor({ canvas, input, onExit, progress, onOpenShop, onMerchantLoaded }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.input = input;
         this.onExit = onExit;
         this.progress = progress;
+        this.onOpenShop = onOpenShop || (() => {});
+        this.onMerchantLoaded = onMerchantLoaded || null;
 
         this.partyPokemon = [];   // ActivePokemon örnekleri (ekip sırasıyla)
         this.active = null;       // sahadaki Pokemon
@@ -125,6 +127,7 @@ export class Overworld {
             fetchCharacter(MERCHANT)
                 .then(merchant => {
                     this.merchantLabel = `Tüccar ${merchant.name}`;
+                    this.onMerchantLoaded?.(merchant.name);
                     this.merchantImg.onload = () => { this.merchantReady = true; };
                     this.merchantImg.src = merchant.battleSprite || merchant.sprite;
                 })
@@ -306,6 +309,50 @@ export class Overworld {
         this.effectsTrail(pokemon.x, pokemon.y);
         if (reason) this.spawnMapText(pokemon.x, pokemon.y - 40, `${pokemon.name} ${reason}`, '#94a3b8');
         this.active = null;
+    }
+
+    // Çantadaki eşyayı kullanır; sonucu (kısa açıklama) döndürür
+    useItem(id) {
+        const { progress } = this;
+        if (progress.itemCount(id) <= 0) return { ok: false, message: 'Elinde yok' };
+
+        if (id === 'potion') {
+            const target = this.active || this.partyPokemon.find(p => !p.fainted && p.hp < p.maxHp);
+            if (!target) return { ok: false, message: 'İyileştirilecek Pokemon yok' };
+            if (target.hp >= target.maxHp) return { ok: false, message: `${target.name} zaten tam canlı` };
+
+            const healed = Math.round(target.maxHp * 0.5);
+            target.heal(healed);
+            progress.consumeItem(id);
+            this.spawnMapText(target.x, target.y - 50, `+${healed} CAN`, '#f472b6');
+            return { ok: true, message: `${target.name} +${healed} can` };
+        }
+
+        if (id === 'revive') {
+            const index = this.partyPokemon.findIndex(p => p.fainted);
+            if (index < 0) return { ok: false, message: 'Bayılmış Pokemon yok' };
+
+            const pokemon = this.partyPokemon[index];
+            pokemon.fainted = false;
+            pokemon.hp = Math.round(pokemon.maxHp * 0.5);
+            progress.consumeItem(id);
+            return { ok: true, message: `${pokemon.name} ayağa kalktı` };
+        }
+
+        if (id === 'team-tonic') {
+            const hurt = this.partyPokemon.filter(p => p.fainted || p.hp < p.maxHp);
+            if (!hurt.length) return { ok: false, message: 'Ekip zaten sağlıklı' };
+
+            for (const pokemon of this.partyPokemon) {
+                pokemon.fainted = false;
+                pokemon.hp = pokemon.maxHp;
+            }
+            progress.consumeItem(id);
+            this.spawnMapText(this.player.x, this.player.y - 50, 'EKİP İYİLEŞTİ!', '#4ade80');
+            return { ok: true, message: 'Tüm ekip iyileşti' };
+        }
+
+        return { ok: false, message: 'Bu eşya sahada kullanılmaz' };
     }
 
     // Sahadaki Pokemona en yakın ayakta düşman (menzil içinde)
@@ -498,9 +545,24 @@ export class Overworld {
         return !SOLID_TILES.has(tile);
     }
 
+    // Antrenör tüccar tezgahının önünde mi?
+    nearShop() {
+        return this.shops.some(shop => {
+            const cx = shop.col * TILE_SIZE + TILE_SIZE / 2;
+            const cy = shop.row * TILE_SIZE + TILE_SIZE / 2;
+            return Math.hypot(this.player.x - cx, this.player.y - cy) < 80;
+        });
+    }
+
     // Antrenörün baktığı yöndeki komşu karoya saha hamlesi uygular
+    // (tezgahın önündeyse önce dükkan açılır)
     useFieldMove() {
         const { player, progress } = this;
+
+        if (this.nearShop()) {
+            this.onOpenShop();
+            return;
+        }
         const aim = this.aimVector();
         const col = Math.floor((player.x + aim.x * TILE_SIZE * 0.8) / TILE_SIZE);
         const row = Math.floor((player.y + aim.y * TILE_SIZE * 0.8) / TILE_SIZE);
@@ -1280,6 +1342,12 @@ export class Overworld {
             return;
         }
 
+        // Poke Ball tükenen bir kaynaktır; Kecleon'dan satın alınır
+        if (!this.progress.consumeItem('poke-ball')) {
+            this.spawnMapText(this.player.x, this.player.y - 50, 'Poke Ball kalmadı! (Tüccar)', '#f87171');
+            return;
+        }
+
         this.ballAnim = {
             enemy: target,
             frame: 0,
@@ -2013,11 +2081,27 @@ export class Overworld {
         ctx.restore();
     }
 
-    // Önündeki engel saha hamlesiyle aşılabiliyorsa ipucu göster
+    // Önündeki engel saha hamlesiyle aşılabiliyorsa (ya da tezgahtaysa) ipucu göster
     drawFieldHint() {
+        const { ctx } = this;
+
+        // Tüccarın önünde: alışveriş ipucu
+        if (this.nearShop()) {
+            const bob = Math.sin(Date.now() / 250) * 2;
+            ctx.save();
+            ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText('F: Alışveriş', this.player.x, this.player.y - 34 + bob);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText('F: Alışveriş', this.player.x, this.player.y - 34 + bob);
+            ctx.restore();
+            return;
+        }
+
         const target = this.nearbyFieldTarget();
         if (!target) return;
-        const { ctx } = this;
 
         const x = target.col * TILE_SIZE + TILE_SIZE / 2;
         const y = target.row * TILE_SIZE + TILE_SIZE / 2;
@@ -2296,6 +2380,20 @@ export class Overworld {
         ctx.fillText(`${progress.tokens} jeton`, canvas.width - 20, 30);
         ctx.fillStyle = '#94a3b8';
         ctx.fillText(`${progress.collection.length} yakalanan · E: kütüphane`, canvas.width - 20, 47);
+
+        // Poke Ball sayacı (tükenince Kecleon'dan alınır)
+        const balls = progress.itemCount('poke-ball');
+        ctx.fillStyle = balls > 0 ? '#f8fafc' : '#f87171';
+        ctx.fillText(`${balls}x`, canvas.width - 158, 30);
+        ctx.save();
+        ctx.translate(canvas.width - 176, 26);
+        ctx.fillStyle = balls > 0 ? '#dc2626' : '#7f1d1d';
+        ctx.fillRect(-6, -6, 12, 6);
+        ctx.fillStyle = balls > 0 ? '#f8fafc' : '#475569';
+        ctx.fillRect(-6, 0, 12, 6);
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(-6, -1.5, 12, 3);
+        ctx.restore();
 
         // Kazanılan saha hamleleri (rozetler)
         const moves = unlockedMoves(progress.badges);

@@ -1,4 +1,5 @@
-import { levelUpCost, MAX_LEVEL, PARTY_SIZE, STARTING_LEVEL, TOKEN_DROP } from '../config/progression.js';
+﻿import { levelUpCost, MAX_LEVEL, PARTY_SIZE, STARTING_LEVEL, TOKEN_DROP } from '../config/progression.js';
+import { itemById, STARTING_ITEMS } from '../config/shopItems.js';
 
 const SAVE_KEY = 'pokerpg-save-v2';
 const STARTER_ID = 1; // Bulbasaur
@@ -15,9 +16,10 @@ export class Progress {
         // party: { id, formId, level, name }  (id = yakalanan tür, formId = güncel evrim)
         this.party = [{ id: STARTER_ID, formId: STARTER_ID, level: STARTING_LEVEL, name: 'Bulbasaur' }];
         this.collection = [];      // yakalanan her Pokemon (ekip dışındakiler dahil)
-        this.tokens = 0;           // yetenek jetonu
+        this.tokens = 0;           // yetenek jetonu (aynı zamanda para birimi)
         this.badges = [];          // yenilen bossların mekan id'leri
         this.activeIndex = 0;      // sahadaki Pokemon
+        this.items = { ...STARTING_ITEMS }; // çanta: eşya id -> adet
     }
 
     // --- Kalıcılık ---
@@ -30,7 +32,8 @@ export class Progress {
                 collection: this.collection,
                 tokens: this.tokens,
                 badges: this.badges,
-                activeIndex: this.activeIndex
+                activeIndex: this.activeIndex,
+                items: this.items
             }));
         } catch (error) {
             console.warn('Kayıt yazılamadı:', error);
@@ -49,6 +52,7 @@ export class Progress {
             this.tokens = data.tokens ?? 0;
             this.badges = Array.isArray(data.badges) ? data.badges : [];
             this.activeIndex = Math.min(data.activeIndex ?? 0, this.party.length - 1);
+            this.items = data.items && typeof data.items === 'object' ? data.items : { ...STARTING_ITEMS };
             return true;
         } catch (error) {
             console.warn('Kayıt okunamadı:', error);
@@ -154,5 +158,30 @@ export class Progress {
 
     hasBadge(mapId) {
         return this.badges.includes(mapId);
+    }
+
+    // --- Çanta ve dükkan ---
+
+    itemCount(id) {
+        return this.items[id] || 0;
+    }
+
+    // Jetonla eşya satın alır; kaç adet geldiğini döndürür (0 = alınamadı)
+    buyItem(id) {
+        const item = itemById(id);
+        if (!item || this.tokens < item.price) return 0;
+
+        this.tokens -= item.price;
+        this.items[id] = this.itemCount(id) + item.stack;
+        this.save();
+        return item.stack;
+    }
+
+    consumeItem(id) {
+        if (this.itemCount(id) <= 0) return false;
+        this.items[id]--;
+        if (this.items[id] <= 0) delete this.items[id];
+        this.save();
+        return true;
     }
 }

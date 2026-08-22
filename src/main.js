@@ -3,6 +3,7 @@ import { CHARACTER_CLASSES } from './config/characters.js';
 import { loadCharacters, fetchCharacter } from './services/pokeapi.js';
 import { Progress } from './world/Progress.js';
 import { Library } from './ui/library.js';
+import { Shop } from './ui/shop.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
@@ -33,7 +34,15 @@ const overworld = new Overworld({
     onExit: () => {
         overworld.stop();
         showSelectionScreen();
-    }
+    },
+    onOpenShop: () => shop.toggle(),
+    onMerchantLoaded: (name) => shop.setMerchantName(name)
+});
+
+// Kecleon'un dükkanı: tezgahın önünde F ile açılır
+const shop = new Shop({
+    progress,
+    onUseItem: (id) => overworld.useItem(id)
 });
 
 // Kütüphane: jetonları harcayıp Pokemon seviyesi yükseltme ve ekip düzenleme
@@ -57,6 +66,7 @@ document.getElementById('start-adventure-btn').addEventListener('click', async (
 window.__overworld = overworld;
 window.__game = game;
 window.__library = library;
+window.__shop = shop;
 window.__progress = progress;
 
 document.getElementById('overworld-back-btn').addEventListener('click', () => {

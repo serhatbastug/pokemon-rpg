@@ -104,6 +104,7 @@ uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sa
   bayılırsa mekan girişine dönülür.
 - **Yakalama:** Yalnızca yabani (yaygın/gizli) Pokemonlar yakalanır. **Bosslar
   yakalanmaz, yenilir** — mekanı tamamlamanın yolu onları alt etmektir.
+  Her yakalama bir **Poke Ball** harcar; toplar Kecleon'dan satın alınır.
 - **Yetenek jetonu:** Yenilen her düşman haritaya altın jeton düşürür; antrenör
   yaklaşınca toplanır. Jetonlar kütüphanede istenen Pokemona yatırılıp seviye
   yükseltilir — XP grindi yok, gelişimi siz yönlendirirsiniz.
@@ -134,7 +135,22 @@ Surf ile geçilen bir adaya, güneydeki kaya ve çalı duvarları Rock Smash ve 
 ile açılan gizli köşelere çıkar. Yani eski haritalar sonradan tekrar ziyaret
 edilmeye değer hâle gelir.
 
-Sırada: 2. bölge (Ateş Dağı), Kecleon dükkanında alışveriş.
+### Tüccar Kecleon
+
+Bölge merkezindeki tezgahın önünde **F** ile dükkan açılır. Para birimi yetenek
+jetonudur — yani her jeton için "Pokemon seviyesi mi, eşya mı?" kararı verirsiniz.
+
+| Eşya | Fiyat | Etkisi |
+|---|---|---|
+| Poke Ball (5 adet) | 4 jeton | Yakalama için gerekli |
+| Potion | 10 jeton | Sahadaki Pokemonun canının yarısını yeniler |
+| Revive | 25 jeton | Bayılmış bir üyeyi yarı canla kaldırır |
+| Ekip Toniği | 45 jeton | Tüm ekibi tamamen iyileştirir |
+
+Çanta da aynı ekranda: alınan eşyalar oradan kullanılır. Oyuna 8 Poke Ball ile
+başlanır, bitince Kecleon'a uğramak gerekir.
+
+Sırada: 2. bölge (Ateş Dağı).
 
 ## Yeni İçerik Ekleme
 

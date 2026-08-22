@@ -4,7 +4,8 @@ import { REGIONS } from './regions.js';
 //   '.' çim      'p' patika   'f' çiçekli çim   'g' uzun çim   's' kum
 //   'T' ağaç (engel)   'W' su (engel)   'R' kaya (engel)   'h' çalı (engel)
 //   Rakamlar o haritanın portalDefs tanımındaki portallardır ('0' çıkış geleneğidir).
-// Her satır tam 20 karakter olmalıdır (20 sütun x 10 satır, 50px karo = 1000x500).
+// Bir haritanın tüm satırları eşit uzunlukta olmalıdır. 20x10 (50px karo) tam bir
+// ekran doldurur; daha geniş/yüksek haritalarda kamera oyuncuyu takip eder.
 //
 // portalDefs: { karo karakteri: { target, label, colors } }
 //   target null ise portal görünür ama pasiftir (henüz açılmamış içerik).
@@ -69,22 +70,24 @@ export const MAPS = {
     },
 
     // 1. Bölge / 1. Mekan: Fısıltılı Orman Girişi
+    // Ekrandan geniş (40x10 = 2 ekran) yatay harita; kamera oyuncuyu takip eder.
+    // Giriş/çıkış solda, sağ uç ilerideki mekan bossunun alanı olacak.
     // (Pokemonlar henüz haritada değil; liste regions.js'te hazır)
     'loc-1-1': {
         id: 'loc-1-1',
         name: region1.locations[0].name,
-        start: { col: 10, row: 7 },
+        start: { col: 3, row: 5 },
         grid: [
-            'TTTTTTTTTTTTTTTTTTTT',
-            'Tg.f..TT....TT..fggT',
-            'Tgg....g.ff.g....ggT',
-            'T.WWW....gpg....h..T',
-            'T.WWW..ppppppp..g..T',
-            'T.gg...p..p..gg.f..T',
-            'T..hf..p..p..h..g..T',
-            'T.g....pppp....f...T',
-            'T....g....0..g.....T',
-            'TTTTTTTTTTTTTTTTTTTT'
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+            'TTg.f...TT..gg....f..TT...g...f....gg..T',
+            'Tg...g....f......gg......f......g....f.T',
+            'T..f..TT..g..gg..f..g...TT...g.f.......T',
+            'T..pppppppppppppppppppppppppppppppppp..T',
+            'T..p.f.....sWWWWs.....g...g.....f....g.T',
+            'T..0.g.....sWWWWs...g...f......g.....f.T',
+            'T.g...f.....ssss.......g...gg.....gg...T',
+            'T..g....h...f....g...h....f....g....hg.T',
+            'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
         ],
         portalDefs: {
             '0': { target: 'region-1', label: region1.name, colors: EXIT_COLORS }

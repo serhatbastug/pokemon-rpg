@@ -14,6 +14,7 @@ export class Overworld {
         this.currentMap = null;
         this.portals = [];
         this.portalCooldown = 0; // haritaya girişte anında geri ışınlanmayı önler
+        this.camera = { x: 0, y: 0 };
         this.interval = null;
         this.running = false;
 
@@ -60,9 +61,28 @@ export class Overworld {
         this.portalCooldown = 45;
         this.player.x = map.start.col * TILE_SIZE + TILE_SIZE / 2;
         this.player.y = map.start.row * TILE_SIZE + TILE_SIZE / 2;
+        this.updateCamera(true);
 
         const title = document.getElementById('overworld-title');
         if (title) title.textContent = map.name;
+    }
+
+    // Kamera oyuncuyu ortalayarak takip eder, harita kenarlarında durur.
+    // Ekrandan küçük/eşit haritalarda kamera sabit kalır.
+    updateCamera(snap = false) {
+        const mapW = this.currentMap.grid[0].length * TILE_SIZE;
+        const mapH = this.currentMap.grid.length * TILE_SIZE;
+        const targetX = Math.max(0, Math.min(mapW - this.canvas.width, this.player.x - this.canvas.width / 2));
+        const targetY = Math.max(0, Math.min(mapH - this.canvas.height, this.player.y - this.canvas.height / 2));
+
+        if (snap) {
+            this.camera.x = targetX;
+            this.camera.y = targetY;
+        } else {
+            // Yumuşak takip
+            this.camera.x += (targetX - this.camera.x) * 0.12;
+            this.camera.y += (targetY - this.camera.y) * 0.12;
+        }
     }
 
     // Hedefli bir portala yeterince yaklaşınca haritalar arası geçiş
@@ -141,25 +161,38 @@ export class Overworld {
     update() {
         this.movePlayer();
         this.checkPortals();
+        this.updateCamera();
 
         const { ctx, canvas } = this;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
 
+        // Dünya, kamera kadar kaydırılarak çizilir
+        ctx.save();
+        ctx.translate(-Math.round(this.camera.x), -Math.round(this.camera.y));
+
         this.drawTiles();
         this.drawPortals();
         this.drawPlayer();
         this.drawPortalLabels();
+
+        ctx.restore();
     }
 
     // ---- Çizim ----
 
     drawTiles() {
-        const { ctx } = this;
+        const { ctx, canvas, camera } = this;
         const grid = this.currentMap.grid;
 
-        for (let row = 0; row < grid.length; row++) {
-            for (let col = 0; col < grid[row].length; col++) {
+        // Yalnızca görünür karo aralığını çiz
+        const colStart = Math.max(0, Math.floor(camera.x / TILE_SIZE));
+        const colEnd = Math.min(grid[0].length - 1, Math.ceil((camera.x + canvas.width) / TILE_SIZE));
+        const rowStart = Math.max(0, Math.floor(camera.y / TILE_SIZE));
+        const rowEnd = Math.min(grid.length - 1, Math.ceil((camera.y + canvas.height) / TILE_SIZE));
+
+        for (let row = rowStart; row <= rowEnd; row++) {
+            for (let col = colStart; col <= colEnd; col++) {
                 this.drawTile(ctx, grid[row][col], col, row);
             }
         }

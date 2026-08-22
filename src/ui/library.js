@@ -183,7 +183,7 @@ export class Library {
             this.dexList.appendChild(cell);
             this.sprite(entry.id).then(data => {
                 const slot = cell.querySelector('.dex-img-slot');
-                const src = data.battleSprite || data.sprite;
+                const src = data.sprite || data.battleSprite;
                 if (slot) slot.innerHTML = `<img class="dex-img" src="${src}" alt="${data.name}">`;
             }).catch(() => {});
         }
@@ -238,7 +238,7 @@ export class Library {
         this.detail.innerHTML = `
             <button class="detail-close">&times;</button>
             <div class="detail-top">
-                <img class="detail-sprite" src="${data.battleSprite || data.sprite}" alt="${data.name}">
+                <img class="detail-sprite" src="${data.sprite || data.battleSprite}" alt="${data.name}">
                 <div>
                     <h4 class="detail-name">${data.name} <span class="detail-id">#${id}</span></h4>
                     ${member ? `<div class="detail-level">Seviye ${member.level}</div>` : ''}
@@ -292,9 +292,9 @@ export class Library {
     fillSprite(card, id) {
         this.sprite(id).then(data => {
             const slot = card.querySelector('.lib-img-slot');
-            // Sahada piksel sprite kullanılıyor; menüde de aynısı görünsün ki
+            // Sahada da resmi çizim kullanılıyor; menüde aynısı görünsün ki
             // Pokemonu sahaya sürdüğünde görseli değişmesin
-            const src = data.battleSprite || data.sprite;
+            const src = data.sprite || data.battleSprite;
             if (slot) slot.innerHTML = `<img class="lib-img" src="${src}" alt="${data.name}">`;
         }).catch(() => {});
     }

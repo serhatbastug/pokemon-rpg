@@ -254,6 +254,43 @@ check('hiç top yoksa null dönüyor', progress.bestBall() === null);
 
 progress.clear();
 
+// ---- Mod ayrımı: arena piksel sanatı, macera gerçekçi ----
+// Görsel elden geçirme YALNIZCA tek kişilik moda uygulandı; bu kontrol
+// arena modunun yanlışlıkla piksel tarzını kaybetmesini engeller.
+const { readFileSync: readSource } = await import('fs');
+const readSrc = (path) => readSource(new URL(`../${path}`, import.meta.url), 'utf8');
+
+const arenaFiles = ['src/game/Game.js', 'src/game/Player.js', 'src/game/Projectile.js'];
+for (const file of arenaFiles) {
+    const source = readSrc(file);
+    check(`${file}: arena modu piksel çizimini koruyor`,
+        source.includes('imageSmoothingEnabled = false'),
+        'imageSmoothingEnabled = false bulunamadı');
+}
+
+const adventureFiles = [
+    'src/world/render/TerrainRenderer.js',
+    'src/world/render/WorldRenderer.js',
+    'src/world/ActivePokemon.js',
+    'src/world/Enemy.js'
+];
+for (const file of adventureFiles) {
+    const source = readSrc(file);
+    check(`${file}: macera modunda piksel çizim kapalı`,
+        !source.includes('imageSmoothingEnabled = false'),
+        'macera modunda imageSmoothingEnabled = false kalmış');
+}
+
+// Macera görüntü ayarları
+const { VIEW } = await import('../src/config/balance.js');
+check('macera modu yüksek çözünürlükte çiziyor', VIEW.renderScale >= 2, `renderScale ${VIEW.renderScale}`);
+check('macera modu kamerası yakınlaştırılmış', VIEW.zoom > 1, `zoom ${VIEW.zoom}`);
+
+// Karakterler yeterince büyük (babanın "minnacık" şikayeti)
+const { ACTIVE_POKEMON: activeCfg, TRAINER: trainerCfg } = await import('../src/config/balance.js');
+check('sahadaki Pokemon yeterince büyük', activeCfg.size >= 90, `${activeCfg.size}px`);
+check('antrenör yeterince büyük', trainerCfg.spriteScale >= 4, `ölçek ${trainerCfg.spriteScale}`);
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

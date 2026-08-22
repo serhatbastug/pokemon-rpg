@@ -13,7 +13,8 @@ export class ActivePokemon {
         this.level = member.level;
 
         this.img = new Image();
-        this.img.src = data.battleSprite || data.sprite;
+        // Macera modu gerçekçi görünüm: yüksek çözünürlüklü resmi çizim
+        this.img.src = data.sprite || data.battleSprite;
 
         this.baseStats = data.baseStats;
         this.maxHp = maxHpFor(data.baseStats.hp, member.level);
@@ -102,7 +103,7 @@ export class ActivePokemon {
         if (!this.img.complete || this.img.naturalWidth === 0) return;
 
         ctx.save();
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
         if (this.invuln > 0 && this.invuln % 8 < 4) ctx.globalAlpha = 0.4;
 
         const bob = Math.sin(Date.now() / 260) * 2;

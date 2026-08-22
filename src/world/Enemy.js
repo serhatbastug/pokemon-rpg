@@ -4,15 +4,15 @@ import { ENEMY, REGION_SCALING } from '../config/balance.js';
 // Tür (kind) bazlı temel istatistikler. aggroTiles: labirent yolu üzerinden
 // kaç karo mesafede oyuncuyu fark eder (duvar arkasından fark etmez).
 const KIND_STATS = {
-    common: { hp: 35, speed: 2.2, size: 60, aggroTiles: 6 },
+    common: { hp: 35, speed: 2.2, size: 88, aggroTiles: 6 },
     // Gizli: mağarasını korur, peşinden gelmez (guardRadius dışına çıkmaz)
-    hidden: { hp: 70, speed: 2.6, size: 66, aggroTiles: 5, guardRadius: 190 },
+    hidden: { hp: 70, speed: 2.6, size: 96, aggroTiles: 5, guardRadius: 190 },
     // Boss: uyanana kadar hareketsiz uyur
-    boss: { hp: 140, speed: 2.0, size: 96, aggroTiles: 8, sleeps: true },
+    boss: { hp: 140, speed: 2.0, size: 140, aggroTiles: 8, sleeps: true },
     // Bölge bossu: mekan bosslarından belirgin şekilde güçlü
-    regionBoss: { hp: 240, speed: 2.4, size: 116, aggroTiles: 10, sleeps: true },
+    regionBoss: { hp: 240, speed: 2.4, size: 168, aggroTiles: 10, sleeps: true },
     // NPC antrenörün gönderdiği Pokemon: yabaniden güçlü, yakalanamaz
-    trainer: { hp: 60, speed: 2.4, size: 66, aggroTiles: 12 }
+    trainer: { hp: 60, speed: 2.4, size: 96, aggroTiles: 12 }
 };
 
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
@@ -265,7 +265,7 @@ export class Enemy {
         if (!this.img.complete || this.img.naturalWidth === 0) return;
 
         ctx.save();
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
 
         if (this.fainted) {
             ctx.globalAlpha = 0.5;

@@ -25,25 +25,25 @@ export const Scenes = {
 
         ctx.save();
         ctx.fillStyle = 'rgba(5, 10, 8, 0.55)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, this.viewW, this.viewH);
 
         // Konfeti
         for (const c of v.confetti) {
             c.y += c.vy;
             c.x += c.vx;
-            if (c.y > canvas.height) c.y = -c.size;
+            if (c.y > this.viewH) c.y = -c.size;
             ctx.fillStyle = c.color;
             ctx.fillRect(c.x, c.y, c.size, c.size);
         }
 
         // Sevinç: karakter zıplayıp dönerek kutlama yapar
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2 + 30;
+        const cx = this.viewW / 2;
+        const cy = this.viewH / 2 + 30;
         const jump = Math.abs(Math.sin(v.frame / 14)) * 46;
         const tilt = Math.sin(v.frame / 9) * 0.28;
         // Sahadaki Pokemon ve antrenör birlikte kutlar
         ctx.save();
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
         ctx.translate(cx, cy - jump);
         ctx.rotate(tilt);
         const winner = this.active?.img;
@@ -52,7 +52,7 @@ export const Scenes = {
         }
         ctx.restore();
 
-        drawTrainer(ctx, cx - 110, cy - jump * 0.6, 'right', true, 3);
+        drawTrainer(ctx, cx - 120, cy - jump * 0.6 + 40, 'right', true, 5);
 
         // Zıplarken çevreye saçılan ışık pikselleri
         for (let i = 0; i < 8; i++) {
@@ -172,7 +172,7 @@ export const Scenes = {
         oldImg.src = fromSrc;
 
         const newImg = new Image();
-        newImg.src = character.battleSprite || character.sprite;
+        newImg.src = character.sprite || character.battleSprite;
 
         Sfx.evolve();
         this.evolutionScene = {
@@ -215,11 +215,11 @@ export const Scenes = {
 
         ctx.save();
         ctx.fillStyle = '#05070a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.imageSmoothingEnabled = false;
+        ctx.fillRect(0, 0, this.viewW, this.viewH);
+        ctx.imageSmoothingEnabled = true;
 
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2 - 10;
+        const cx = this.viewW / 2;
+        const cy = this.viewH / 2 - 10;
 
         // Geçiş hızlanarak artar: önce yavaş, sonra çılgınca yanıp söner
         const speed = Math.max(4, 30 - Math.floor(f / 8));
@@ -244,7 +244,7 @@ export const Scenes = {
                 const off = document.createElement('canvas');
                 off.width = off.height = size;
                 const octx = off.getContext('2d');
-                octx.imageSmoothingEnabled = false;
+                octx.imageSmoothingEnabled = true;
                 octx.drawImage(img, 0, 0, size, size);
                 octx.globalCompositeOperation = 'source-in';
                 octx.fillStyle = '#ffffff';
@@ -266,7 +266,7 @@ export const Scenes = {
         if (f >= 195 && f < 215) {
             ctx.globalAlpha = 1 - (f - 195) / 20;
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, this.viewW, this.viewH);
             ctx.globalAlpha = 1;
         }
 
@@ -378,8 +378,8 @@ export const Scenes = {
         };
         for (let i = 0; i < 90; i++) {
             this.victory.confetti.push({
-                x: Math.random() * this.canvas.width,
-                y: -Math.random() * this.canvas.height,
+                x: Math.random() * this.viewW,
+                y: -Math.random() * this.viewH,
                 vy: 1.5 + Math.random() * 3,
                 vx: (Math.random() - 0.5) * 1.5,
                 size: 3 + Math.random() * 3,

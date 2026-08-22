@@ -91,20 +91,32 @@ boss savaşı hazır; her mekan farklı bir harita tarzında:
 Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
 uyuyan ve uyanınca arenayı parçalayan boss, bossu Pokeball'a alınca zafer sahnesi.
 
-### Seviye, evrim ve koleksiyon
+### Antrenör, ekip ve ilerleme
 
-- **Seviye:** Yenilen ve yakalanan Pokemonlardan XP kazanılır; seviye atlayınca
-  can/hasar artar ve can tamamen dolar. 1. bölgeyi bitirmek ~16. seviyeye getirir.
-- **Evrim:** Zincir PokeAPI'den alınır (elle kodlanmaz). Bulbasaur 16'da Ivysaur,
-  32'de Venusaur olur; klasik evrim sahnesi (silüet geçişi + parlama) oynar.
-  Her evrim yeni bir resmi hamle açar: **L Leech Seed** (16), **P Petal Blizzard** (32).
-- **Oynanabilir bosslar:** Yakalanan bosslar karakter olarak seçilebilir —
-  Golisopod (Pin Missile / Liquidation / First Impression),
-  Hawlucha (Aerial Ace / Flying Press / Sky Attack),
-  Zarude (Power Whip / Dark Pulse / Jungle Healing).
-- **Kayıt:** İlerleme localStorage'a yazılır; karakter seçim ekranından sıfırlanabilir.
+- **Antrenör:** Haritada gezdirdiğiniz karakter bir antrenördür (elle çizilmiş
+  piksel sprite) ve **vurulmaz**. Sahadaki Pokemonunuz peşinizden gelir,
+  saldırıları o yapar ve hasarı o alır.
+- **6 kişilik ekip:** 1-6 tuşlarıyla anında Pokemon değiştirilir. Sahadaki
+  Pokemon bayılırsa sıradaki gelir; hepsi bayılırsa mekan girişine dönülür.
+- **Yakalama:** Yalnızca yabani (yaygın/gizli) Pokemonlar yakalanır. **Bosslar
+  yakalanmaz, yenilir** — mekanı tamamlamanın yolu onları alt etmektir.
+- **Yetenek jetonu:** Yenilen her düşman haritaya altın jeton düşürür; antrenör
+  yaklaşınca toplanır. Jetonlar kütüphanede istenen Pokemona yatırılıp seviye
+  yükseltilir — XP grindi yok, gelişimi siz yönlendirirsiniz.
+- **Pokemon kütüphanesi (E):** Ekip ve koleksiyon burada yönetilir, jetonlar
+  burada harcanır.
+- **Tip etkililiği:** Her Pokemonun iyi ve kötü yönü tip tablosundan gelir
+  (PokeAPI'den indirilir). Grass hamleniz Water'a 2x vurur, Fire size 2x vurur.
+- **Yetenekler:** Elle yazılmış set yoksa, yakalanan Pokemonun yetenekleri
+  **gerçek hamle verisinden** üretilir (güç → hasar, tip → sprite). Böylece
+  "sadece resmi hamleler" kuralı veriyle garanti edilir.
+- **Evrim:** Zincir PokeAPI'den alınır. Jetonla 16. seviyeye çıkardığınızda
+  Bulbasaur → Ivysaur, 32'de Venusaur olur; klasik evrim sahnesi oynar ve yeni
+  resmi hamle açılır: **L Leech Seed** (16), **P Petal Blizzard** (32).
+- **Kayıt:** Ekip, koleksiyon, jetonlar ve rozetler localStorage'a yazılır.
 
-Sırada: 2. bölge (Ateş Dağı), Kecleon dükkanında alışveriş.
+Sırada: 2. bölge (Ateş Dağı), rozetlerle açılan saha hamleleri (Cut/Surf) ve
+bunlarla ulaşılan gizli alanlar, Kecleon dükkanında alışveriş.
 
 ## Yeni İçerik Ekleme
 

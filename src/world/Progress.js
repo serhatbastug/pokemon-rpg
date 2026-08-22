@@ -1,10 +1,10 @@
-import { xpToNext, MAX_LEVEL, XP_REWARD, CAPTURE_XP_BONUS } from '../config/progression.js';
-import { isPlayable } from '../config/playableCharacters.js';
+import { levelUpCost, MAX_LEVEL, PARTY_SIZE, STARTING_LEVEL, TOKEN_DROP } from '../config/progression.js';
 
-const SAVE_KEY = 'pokerpg-save-v1';
+const SAVE_KEY = 'pokerpg-save-v2';
+const STARTER_ID = 1; // Bulbasaur
 
-// Macera modunun kalıcı ilerlemesi: seviye, deneyim, yakalananlar, yenilen
-// bosslar ve seçili karakter. localStorage'a kaydedilir.
+// Macera modunun kalıcı ilerlemesi: ekip, koleksiyon, jetonlar ve rozetler.
+// Ekipteki her Pokemonun kendi seviyesi ve formu (evrim) vardır.
 export class Progress {
     constructor() {
         this.reset();
@@ -12,12 +12,12 @@ export class Progress {
     }
 
     reset() {
-        this.level = 1;
-        this.xp = 0;
-        this.captures = [];        // { id, name, kind }
-        this.defeatedBosses = [];  // harita id'leri
-        this.characterId = 1;      // oynanan karakter (başlangıç: Bulbasaur)
-        this.formId = 1;           // evrim sonrası güncel form
+        // party: { id, formId, level, name }  (id = yakalanan tür, formId = güncel evrim)
+        this.party = [{ id: STARTER_ID, formId: STARTER_ID, level: STARTING_LEVEL, name: 'Bulbasaur' }];
+        this.collection = [];      // yakalanan her Pokemon (ekip dışındakiler dahil)
+        this.tokens = 0;           // yetenek jetonu
+        this.badges = [];          // yenilen bossların mekan id'leri
+        this.activeIndex = 0;      // sahadaki Pokemon
     }
 
     // --- Kalıcılık ---
@@ -25,13 +25,12 @@ export class Progress {
     save() {
         try {
             localStorage.setItem(SAVE_KEY, JSON.stringify({
-                version: 1,
-                level: this.level,
-                xp: this.xp,
-                captures: this.captures,
-                defeatedBosses: this.defeatedBosses,
-                characterId: this.characterId,
-                formId: this.formId
+                version: 2,
+                party: this.party,
+                collection: this.collection,
+                tokens: this.tokens,
+                badges: this.badges,
+                activeIndex: this.activeIndex
             }));
         } catch (error) {
             console.warn('Kayıt yazılamadı:', error);
@@ -43,14 +42,13 @@ export class Progress {
             const raw = localStorage.getItem(SAVE_KEY);
             if (!raw) return false;
             const data = JSON.parse(raw);
-            if (data.version !== 1) return false;
+            if (data.version !== 2 || !Array.isArray(data.party) || !data.party.length) return false;
 
-            this.level = data.level ?? 1;
-            this.xp = data.xp ?? 0;
-            this.captures = Array.isArray(data.captures) ? data.captures : [];
-            this.defeatedBosses = Array.isArray(data.defeatedBosses) ? data.defeatedBosses : [];
-            this.characterId = data.characterId ?? 1;
-            this.formId = data.formId ?? this.characterId;
+            this.party = data.party;
+            this.collection = Array.isArray(data.collection) ? data.collection : [];
+            this.tokens = data.tokens ?? 0;
+            this.badges = Array.isArray(data.badges) ? data.badges : [];
+            this.activeIndex = Math.min(data.activeIndex ?? 0, this.party.length - 1);
             return true;
         } catch (error) {
             console.warn('Kayıt okunamadı:', error);
@@ -67,66 +65,88 @@ export class Progress {
         this.reset();
     }
 
-    // --- Deneyim ve seviye ---
+    // --- Ekip ---
 
-    get xpNeeded() {
-        return xpToNext(this.level);
+    get active() {
+        return this.party[this.activeIndex] || this.party[0];
     }
 
-    // Kazanılan XP'yi işler; kaç seviye atlandığını döndürür
-    addXp(amount) {
-        if (this.level >= MAX_LEVEL) return 0;
-
-        this.xp += Math.round(amount);
-        let levelsGained = 0;
-
-        while (this.level < MAX_LEVEL && this.xp >= this.xpNeeded) {
-            this.xp -= this.xpNeeded;
-            this.level++;
-            levelsGained++;
-        }
-        if (this.level >= MAX_LEVEL) this.xp = 0;
-
+    setActive(index) {
+        if (index < 0 || index >= this.party.length) return false;
+        this.activeIndex = index;
         this.save();
-        return levelsGained;
+        return true;
     }
 
-    xpForEnemy(kind, captured = false) {
-        const base = XP_REWARD[kind] ?? XP_REWARD.common;
-        return captured ? Math.round(base * (1 + CAPTURE_XP_BONUS)) : base;
+    get partyFull() {
+        return this.party.length >= PARTY_SIZE;
     }
 
-    // --- Koleksiyon ---
+    // Yakalanan Pokemon koleksiyona, yer varsa ekibe eklenir
+    addCapture(id, name) {
+        const entry = { id, formId: id, level: STARTING_LEVEL, name };
+        this.collection.push({ id, name });
+        if (!this.partyFull) this.party.push(entry);
+        this.save();
+        return !this.partyFull || this.party.includes(entry);
+    }
 
-    addCapture(enemy) {
-        this.captures.push({ id: enemy.id, name: enemy.name, kind: enemy.kind });
+    // Koleksiyondaki bir Pokemonu ekibe alır / ekipten çıkarır
+    swapIntoParty(collectionIndex) {
+        const entry = this.collection[collectionIndex];
+        if (!entry || this.partyFull) return false;
+        if (this.party.some(p => p.id === entry.id)) return false;
+        this.party.push({ id: entry.id, formId: entry.id, level: STARTING_LEVEL, name: entry.name });
+        this.save();
+        return true;
+    }
+
+    removeFromParty(index) {
+        if (this.party.length <= 1 || index === 0) return false; // başlangıç Pokemonu kalır
+        this.party.splice(index, 1);
+        if (this.activeIndex >= this.party.length) this.activeIndex = 0;
+        this.save();
+        return true;
+    }
+
+    // --- Jetonlar ve seviye ---
+
+    tokensForEnemy(kind) {
+        return TOKEN_DROP[kind] ?? TOKEN_DROP.common;
+    }
+
+    addTokens(amount) {
+        this.tokens += amount;
+        this.save();
+    }
+
+    costToLevel(index) {
+        const member = this.party[index];
+        if (!member || member.level >= MAX_LEVEL) return null;
+        return levelUpCost(member.level);
+    }
+
+    // Jeton harcayarak bir Pokemonu bir seviye yükseltir
+    spendOnLevel(index) {
+        const cost = this.costToLevel(index);
+        if (cost === null || this.tokens < cost) return false;
+
+        this.tokens -= cost;
+        this.party[index].level++;
+        this.save();
+        return true;
+    }
+
+    setForm(index, formId) {
+        if (!this.party[index]) return;
+        this.party[index].formId = formId;
         this.save();
     }
 
     markBossDefeated(mapId) {
-        if (!this.defeatedBosses.includes(mapId)) {
-            this.defeatedBosses.push(mapId);
+        if (!this.badges.includes(mapId)) {
+            this.badges.push(mapId);
             this.save();
         }
-    }
-
-    // Yakalanan bosslar oynanabilir karakter olur
-    get playableCharacters() {
-        const ids = [1];
-        for (const capture of this.captures) {
-            if (isPlayable(capture.id) && !ids.includes(capture.id)) ids.push(capture.id);
-        }
-        return ids;
-    }
-
-    selectCharacter(id) {
-        this.characterId = id;
-        this.formId = id;
-        this.save();
-    }
-
-    setForm(id) {
-        this.formId = id;
-        this.save();
     }
 }

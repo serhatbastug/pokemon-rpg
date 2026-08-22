@@ -2,7 +2,7 @@
 import { CHARACTER_CLASSES } from './config/characters.js';
 import { loadCharacters, fetchCharacter } from './services/pokeapi.js';
 import { Progress } from './world/Progress.js';
-import { AdventurePicker } from './ui/adventurePicker.js';
+import { Library } from './ui/library.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
@@ -36,31 +36,28 @@ const overworld = new Overworld({
     }
 });
 
-// Seçilen karakterle maceraya başlar. Doğru evrim formu, Overworld evrim
-// zincirini çekince seviyeye göre kendiliğinden uygulanır.
-async function startAdventure() {
-    try {
-        const character = await fetchCharacter({ id: progress.formId });
-        showOverworldScreen();
-        overworld.start(character);
-    } catch (error) {
-        console.error('Karakter yüklenemedi:', error);
-    }
-}
-
-const picker = new AdventurePicker({
+// Kütüphane: jetonları harcayıp Pokemon seviyesi yükseltme ve ekip düzenleme
+const library = new Library({
     progress,
-    onStart: () => startAdventure(),
-    onReset: () => overworld.stop()
+    onLevelUp: (index) => overworld.onMemberLeveled(index),
+    onPartyChange: () => overworld.loadParty()
 });
 
-document.getElementById('start-adventure-btn').addEventListener('click', () => {
-    picker.open();
+// E tuşu kütüphaneyi açar/kapatır (macera modundayken)
+input.onKeyDown(e => {
+    if (e.code === 'KeyE' && overworld.running) library.toggle();
+});
+
+document.getElementById('start-adventure-btn').addEventListener('click', async () => {
+    showOverworldScreen();
+    await overworld.start();
 });
 
 // Otomatik UI testleri (tests/ui.test.mjs) oyun durumunu buradan okur
 window.__overworld = overworld;
 window.__game = game;
+window.__library = library;
+window.__progress = progress;
 
 document.getElementById('overworld-back-btn').addEventListener('click', () => {
     overworld.stop();

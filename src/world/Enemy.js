@@ -1,4 +1,4 @@
-import { TILE_SIZE } from '../config/worldMap.js';
+﻿import { TILE_SIZE } from '../config/worldMap.js';
 
 // Tür (kind) bazlı temel istatistikler. aggroTiles: labirent yolu üzerinden
 // kaç karo mesafede oyuncuyu fark eder (duvar arkasından fark etmez).
@@ -15,23 +15,23 @@ const KIND_STATS = {
 // Tür bazlı menzilli saldırılar - hepsi o Pokemonun resmi hamleleri.
 // type, projectileSprites.js'teki sprite anahtarıdır.
 const SPECIES_ATTACKS = {
-    127: { type: 'xscissor', name: 'X-Scissor', damage: 12, speed: 6.5, cooldown: 110, range: 260 },       // Pinsir
-    217: { type: 'focusblast', name: 'Focus Blast', damage: 16, speed: 5.5, cooldown: 140, range: 280 },   // Ursaring
-    709: { type: 'shadowball', name: 'Shadow Ball', damage: 14, speed: 5, cooldown: 120, range: 300 },     // Trevenant
-    545: { type: 'poison', name: 'Sludge Bomb', damage: 16, speed: 6, cooldown: 100, range: 300 },         // Scolipede
-    768: { type: 'pinmissile', name: 'Pin Missile', damage: 12, speed: 7, cooldown: 130, range: 340, spread: 3 }, // Golisopod
+    127: { type: 'xscissor', name: 'X-Scissor', moveType: 'bug', damage: 12, speed: 6.5, cooldown: 110, range: 260 },       // Pinsir
+    217: { type: 'focusblast', name: 'Focus Blast', moveType: 'fighting', damage: 16, speed: 5.5, cooldown: 140, range: 280 },   // Ursaring
+    709: { type: 'shadowball', name: 'Shadow Ball', moveType: 'ghost', damage: 14, speed: 5, cooldown: 120, range: 300 },     // Trevenant
+    545: { type: 'poison', name: 'Sludge Bomb', moveType: 'poison', damage: 16, speed: 6, cooldown: 100, range: 300 },         // Scolipede
+    768: { type: 'pinmissile', name: 'Pin Missile', moveType: 'bug', damage: 12, speed: 7, cooldown: 130, range: 340, spread: 3 }, // Golisopod
     // Gölgeli Derinlikler
-    123: { type: 'xscissor', name: 'X-Scissor', damage: 13, speed: 7.5, cooldown: 100, range: 280 },      // Scyther
-    455: { type: 'leaf', name: 'Razor Leaf', damage: 11, speed: 6.5, cooldown: 90, range: 300, spread: 2 }, // Carnivine
-    553: { type: 'seedbomb', name: 'Stone Edge', damage: 17, speed: 6, cooldown: 140, range: 300 },        // Krookodile
-    197: { type: 'shadowball', name: 'Shadow Ball', damage: 15, speed: 6, cooldown: 95, range: 320 },      // Umbreon
-    701: { type: 'focusblast', name: 'Flying Press', damage: 15, speed: 6.5, cooldown: 120, range: 360, spread: 2 }, // Hawlucha
+    123: { type: 'xscissor', name: 'X-Scissor', moveType: 'bug', damage: 13, speed: 7.5, cooldown: 100, range: 280 },      // Scyther
+    455: { type: 'leaf', name: 'Razor Leaf', moveType: 'grass', damage: 11, speed: 6.5, cooldown: 90, range: 300, spread: 2 }, // Carnivine
+    553: { type: 'seedbomb', name: 'Stone Edge', moveType: 'rock', damage: 17, speed: 6, cooldown: 140, range: 300 },        // Krookodile
+    197: { type: 'shadowball', name: 'Shadow Ball', moveType: 'ghost', damage: 15, speed: 6, cooldown: 95, range: 320 },      // Umbreon
+    701: { type: 'focusblast', name: 'Flying Press', moveType: 'fighting', damage: 15, speed: 6.5, cooldown: 120, range: 360, spread: 2 }, // Hawlucha
     // Kadim Ağaç Meydanı
-    130: { type: 'ice', name: 'Ice Fang', damage: 14, speed: 7.5, cooldown: 105, range: 300 },              // Gyarados
-    635: { type: 'fireblast', name: 'Dragon Pulse', damage: 18, speed: 6, cooldown: 135, range: 340 },      // Hydreigon
-    289: { type: 'punch', name: 'Hammer Arm', damage: 20, speed: 5.5, cooldown: 150, range: 260 },          // Slaking
-    143: { type: 'focusblast', name: 'Body Slam', damage: 22, speed: 5, cooldown: 130, range: 280 },        // Snorlax
-    893: { type: 'leaf', name: 'Power Whip', damage: 16, speed: 8, cooldown: 85, range: 380, spread: 3 }    // Zarude (bölge bossu)
+    130: { type: 'ice', name: 'Ice Fang', moveType: 'ice', damage: 14, speed: 7.5, cooldown: 105, range: 300 },              // Gyarados
+    635: { type: 'fireblast', name: 'Dragon Pulse', moveType: 'dragon', damage: 18, speed: 6, cooldown: 135, range: 340 },      // Hydreigon
+    289: { type: 'punch', name: 'Hammer Arm', moveType: 'fighting', damage: 20, speed: 5.5, cooldown: 150, range: 260 },          // Slaking
+    143: { type: 'focusblast', name: 'Body Slam', moveType: 'normal', damage: 22, speed: 5, cooldown: 130, range: 280 },        // Snorlax
+    893: { type: 'leaf', name: 'Power Whip', moveType: 'grass', damage: 16, speed: 8, cooldown: 85, range: 380, spread: 3 }    // Zarude (bölge bossu)
 };
 
 const CONTACT_DAMAGE = 8;
@@ -46,6 +46,7 @@ export class Enemy {
         this.kind = kind;
         this.world = world;
         this.name = `#${id}`; // PokeAPI verisi gelince gerçek isimle değişir
+        this.types = [];        // tip etkililiği için (PokeAPI'den gelir)
         this.attack = SPECIES_ATTACKS[id] || SPECIES_ATTACKS[127];
 
         this.x = col * TILE_SIZE + TILE_SIZE / 2;
@@ -94,7 +95,8 @@ export class Enemy {
         if (this.contactCooldown > 0) this.contactCooldown--;
         if (this.hitFlash > 0) this.hitFlash--;
 
-        const player = this.world.player;
+        // Hedef sahadaki Pokemondur (antrenor vurulmaz)
+        const player = this.world.combatTarget;
         const dist = Math.hypot(player.x - this.x, player.y - this.y);
 
         // Uyuyan boss: yaklaşılınca uyanır, o ana kadar hareketsiz
@@ -221,6 +223,7 @@ export class Enemy {
                 vx: Math.cos(a) * atk.speed,
                 vy: Math.sin(a) * atk.speed,
                 type: atk.type,
+                moveType: atk.moveType,
                 damage: atk.damage,
                 life: 90
             });
@@ -242,6 +245,8 @@ export class Enemy {
             this.windup = 0;
             this.world.spawnMapText(this.x, this.y - this.size / 2 - 14, 'BAYILDI!', '#fbbf24');
             this.world.awardXp(this);
+            // Bosslar yakalanmaz; yenilmek mekanı tamamlar
+            if (this.isBoss) this.world.onBossDefeated(this);
         }
     }
 

@@ -27,6 +27,9 @@ export async function fetchCharacter(charClass) {
         sprite: officialArtwork,
         battleSprite: data.sprites.front_default,
         types: data.types.map(t => t.type.name),
+        // Hamle listesi: yakalanan Pokemonların yetenek setini üretmek için
+        // (services/moveAbilities.js) gereklidir
+        moves: data.moves,
         apiStats,
         // İki kişilik modun elle dengelenmiş statları varsa korunur
         baseStats: charClass.baseStats ?? apiStats

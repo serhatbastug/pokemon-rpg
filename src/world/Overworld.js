@@ -1,8 +1,12 @@
 ﻿import { MAPS, TILE_SIZE, SOLID_TILES, extractPortals } from '../config/worldMap.js';
 import { MERCHANT } from '../config/characters.js';
-import { abilitiesFor, abilitiesUnlockedAt } from '../config/playableCharacters.js';
-import { maxHpFor, speedFor, damageMultiplierFor } from '../config/progression.js';
+import { abilityOverride, withKeys } from '../config/playableCharacters.js';
+import { PARTY_SIZE } from '../config/progression.js';
 import { fetchCharacter, fetchEvolutionChain } from '../services/pokeapi.js';
+import { buildAbilities } from '../services/moveAbilities.js';
+import { effectiveness, effectivenessLabel, preloadTypes } from '../services/typeChart.js';
+import { ActivePokemon } from './ActivePokemon.js';
+import { drawTrainer } from './trainerSprite.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { PROJECTILE_SPRITES, drawPixelSprite } from '../game/projectileSprites.js';
 import { Enemy } from './Enemy.js';
@@ -18,9 +22,11 @@ export class Overworld {
         this.onExit = onExit;
         this.progress = progress;
 
-        this.abilities = [];      // seçili karaktere ve seviyeye göre
-        this.evolutionChain = []; // [{ id, name, minLevel }]
+        this.partyPokemon = [];   // ActivePokemon örnekleri (ekip sırasıyla)
+        this.active = null;       // sahadaki Pokemon
+        this.tokenDrops = [];     // haritada toplanmayı bekleyen jetonlar
         this.evolutionScene = null;
+        this.swapCooldown = 0;
 
         // Görüntü ölçeği: 1 = birebir. Düşürmek haritanın daha geniş bir
         // kısmını ekrana sığdırır (her şey orantılı küçülür).
@@ -40,24 +46,18 @@ export class Overworld {
         this.merchantRequested = false;
         this.merchantLabel = 'Tüccar';
 
-        // Oyuncu durumu
+        // Antrenör: haritada gezdirdiğimiz avatar. Vurulmaz - savaşan Pokemondur.
         this.player = {
             x: 0,
             y: 0,
-            speed: 3.5,
-            size: 72,        // çizim boyutu
-            hitbox: { w: 30, h: 20 }, // ayak hizasındaki çarpışma kutusu
-            facing: 1,       // 1 = sağa, -1 = sola
+            speed: 3.4,
+            hitbox: { w: 24, h: 16 }, // ayak hizasındaki çarpışma kutusu
+            facing: 1,                // 1 = sağa, -1 = sola
+            dir: 'down',              // sprite yönü
+            dirX: 0,
+            dirY: 1,
             moving: false,
-            img: new Image(),
-            name: '',
-            // Savaş durumu (karakter ve seviyeye göre applyCharacter'da ayarlanır)
-            maxHp: 100,
-            hp: 100,
-            damageMultiplier: 1,
-            cooldowns: [],
-            invuln: 0,               // hasar sonrası dokunulmazlık kareleri
-            aim: { x: 1, y: 0 }      // son hareket yönü; yetenekler bu yöne atılır
+            aim: { x: 1, y: 0 }       // son hareket yönü; yetenekler bu yöne atılır
         };
 
         // Harita savaşı durumu
@@ -92,34 +92,28 @@ export class Overworld {
             if (e.code === 'Escape') this.onExit();
             if (this.victory || this.evolutionScene) return; // sahnelerde oynanış durur
 
-            // Yetenek tuşları karaktere göre değişir (K, O, Ş, L, P)
-            for (let i = 0; i < this.abilities.length; i++) {
-                const ability = this.abilities[i];
+            // Yetenek tuşları sahadaki Pokemona göre değişir (K, O, Ş, L, P)
+            const abilities = this.abilities;
+            for (let i = 0; i < abilities.length; i++) {
+                const ability = abilities[i];
                 if (e.code === ability.code || (ability.altKey && e.key.toLowerCase() === ability.altKey)) {
                     this.castAbility(i);
                 }
             }
+
+            // 1-6: ekipteki Pokemonu değiştir
+            const slot = Number(e.key);
+            if (slot >= 1 && slot <= PARTY_SIZE) this.swapTo(slot - 1);
 
             // N: bayılmış Pokemona Pokeball at
             if (e.code === 'KeyN') this.tryCatch();
         });
     }
 
-    start(character) {
-        this.applyCharacter(character);
+    async start() {
         this.player.facing = 1;
-        this.player.hp = this.player.maxHp;
-        this.player.invuln = 0;
-        this.captures = this.progress.captures;
         this.loadMap('main');
-
-        // Evrim zinciri: hangi seviyede hangi forma geçileceğini API belirler
-        fetchEvolutionChain(this.progress.characterId)
-            .then(chain => {
-                this.evolutionChain = chain;
-                this.checkEvolution(true); // kayıttan gelen seviyeye uygun formu uygula
-            })
-            .catch(error => console.error('Evrim zinciri alınamadı:', error));
+        await this.loadParty();
 
         if (!this.merchantRequested) {
             this.merchantRequested = true;
@@ -159,26 +153,120 @@ export class Overworld {
         this.rafId = requestAnimationFrame(loop);
     }
 
-    // Seçili karakteri (ya da evrim sonrası formu) oyuncuya uygular:
-    // sprite, statlar ve seviyeye göre açılmış yetenekler.
-    applyCharacter(character) {
-        const { progress, player } = this;
-        const level = progress.level;
+    get abilities() {
+        return this.active ? this.active.abilities : [];
+    }
 
-        player.img.src = character.battleSprite || character.sprite;
-        player.name = character.name || '';
-        player.baseStats = character.baseStats;
+    // Düşmanların hedefi: sahadaki Pokemon (yoksa antrenörün konumu)
+    get combatTarget() {
+        return (this.active && !this.active.fainted) ? this.active : this.player;
+    }
 
-        const ratio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
-        player.maxHp = maxHpFor(character.baseStats.hp, level);
-        player.hp = Math.round(player.maxHp * ratio);
-        player.speed = speedFor(character.baseStats.speed);
-        player.damageMultiplier = damageMultiplierFor(character.baseStats.attack, level);
+    // Bir ekip üyesinin verisini ve yeteneklerini hazırlar.
+    // Elle yazılmış set varsa o kullanılır, yoksa gerçek hamle verisinden üretilir.
+    async buildMember(member) {
+        const data = await fetchCharacter({ id: member.formId });
+        const override = abilityOverride(member.id, member.level);
+        const abilities = withKeys(override && override.length ? override : await buildAbilities(data));
+        return new ActivePokemon({ member, data, abilities, world: this });
+    }
 
-        // Yetenekler karaktere ve seviyeye göre; bekleme süreleri korunur
-        const previous = this.abilities;
-        this.abilities = abilitiesFor(progress.characterId, level);
-        player.cooldowns = this.abilities.map((_, i) => previous[i] ? (player.cooldowns[i] || 0) : 0);
+    // Ekibi kurar; sahadaki Pokemonu belirler ve tip verilerini önden yükler
+    async loadParty() {
+        const { progress } = this;
+
+        this.partyPokemon = [];
+        for (const member of progress.party) {
+            try {
+                const pokemon = await this.buildMember(member);
+                this.partyPokemon.push(pokemon);
+            } catch (error) {
+                console.error(`Ekip üyesi yüklenemedi (#${member.formId}):`, error);
+            }
+        }
+
+        if (!this.partyPokemon.length) return;
+
+        this.active = this.partyPokemon[Math.min(progress.activeIndex, this.partyPokemon.length - 1)];
+        this.active.x = this.player.x - 34;
+        this.active.y = this.player.y + 6;
+
+        // Tip etkililik tablosu: ekip ve düşman tipleri
+        const types = this.partyPokemon.flatMap(p => p.types);
+        preloadTypes(types);
+
+        // Kayıttan gelen seviyeye uygun evrim formunu sessizce uygula
+        for (let i = 0; i < this.partyPokemon.length; i++) this.checkEvolution(i, true);
+    }
+
+    // Kütüphaneden seviye yükseltilen üye: statları tazelenir, evrim kontrol edilir
+    async onMemberLeveled(index) {
+        const member = this.progress.party[index];
+        const pokemon = this.partyPokemon[index];
+        if (!member || !pokemon) return;
+
+        const refreshed = await this.buildMember(member);
+        refreshed.hp = Math.min(refreshed.maxHp, Math.round(pokemon.hp + (refreshed.maxHp - pokemon.maxHp)));
+        refreshed.x = pokemon.x;
+        refreshed.y = pokemon.y;
+
+        const wasActive = this.active === pokemon;
+        this.partyPokemon[index] = refreshed;
+        if (wasActive) this.active = refreshed;
+
+        this.spawnMapText(refreshed.x, refreshed.y - 60, `${refreshed.name} Sv. ${member.level}!`, '#facc15');
+        await this.checkEvolution(index);
+    }
+
+    // Ekipteki başka bir Pokemona geç
+    swapTo(index) {
+        if (this.swapCooldown > 0) return;
+        const next = this.partyPokemon[index];
+        if (!next || next === this.active || next.fainted) {
+            if (next && next.fainted) {
+                this.spawnMapText(this.player.x, this.player.y - 50, `${next.name} bayılmış!`, '#94a3b8');
+            }
+            return;
+        }
+
+        next.x = this.active ? this.active.x : this.player.x;
+        next.y = this.active ? this.active.y : this.player.y;
+        next.invuln = 30;
+        this.active = next;
+        this.progress.setActive(index);
+        this.swapCooldown = 30;
+        this.effectsTrail(next.x, next.y);
+        this.spawnMapText(next.x, next.y - 50, `Hadi ${next.name}!`, '#38bdf8');
+    }
+
+    // Sahadaki Pokemon bayıldı: sıradaki sağlıklı Pokemon gelir
+    onPokemonFainted(pokemon) {
+        this.spawnMapText(pokemon.x, pokemon.y - 40, `${pokemon.name} bayıldı!`, '#ef4444');
+        this.effects?.triggerShake?.(10);
+
+        const next = this.partyPokemon.findIndex(p => !p.fainted);
+        if (next >= 0) {
+            setTimeout(() => this.swapTo(next), 700);
+            return;
+        }
+
+        // Tüm ekip bayıldı: mekan girişine dön, ekip iyileşsin
+        setTimeout(() => {
+            for (const member of this.partyPokemon) {
+                member.fainted = false;
+                member.hp = member.maxHp;
+            }
+            this.active = this.partyPokemon[0];
+            this.progress.setActive(0);
+            const start = this.currentMap.start;
+            this.player.x = start.col * TILE_SIZE + TILE_SIZE / 2;
+            this.player.y = start.row * TILE_SIZE + TILE_SIZE / 2;
+            this.active.x = this.player.x;
+            this.active.y = this.player.y;
+            this.portalCooldown = 45;
+            this.updateCamera(true);
+            this.spawnMapText(this.player.x, this.player.y - 60, 'Ekip bayıldı! Girişe dönüldü', '#ef4444');
+        }, 900);
     }
 
     loadMap(id) {
@@ -239,7 +327,9 @@ export class Overworld {
         for (const enemy of this.enemies) {
             this.fetchEnemyData(enemy.id).then(data => {
                 enemy.name = data.name;
+                enemy.types = data.types || [];
                 enemy.img.src = data.battleSprite || data.sprite;
+                preloadTypes(enemy.types);
             }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));
         }
 
@@ -342,8 +432,9 @@ export class Overworld {
         const W = grid[0].length;
         const H = grid.length;
 
-        const pc = Math.floor(this.player.x / TILE_SIZE);
-        const pr = Math.floor(this.player.y / TILE_SIZE);
+        const target = this.combatTarget;
+        const pc = Math.floor(target.x / TILE_SIZE);
+        const pr = Math.floor(target.y / TILE_SIZE);
 
         // Oyuncu aynı karodaysa alan değişmez; yeniden hesaplamaya gerek yok
         if (this.flow && this.flow.pc === pc && this.flow.pr === pr) return;
@@ -398,8 +489,8 @@ export class Overworld {
 
         if (here <= 1) {
             // Oyuncuyla aynı/komşu karoda: doğrudan üstüne yürü
-            const dx = this.player.x - x;
-            const dy = this.player.y - y;
+            const dx = this.combatTarget.x - x;
+            const dy = this.combatTarget.y - y;
             const len = Math.hypot(dx, dy) || 1;
             return { x: dx / len, y: dy / len };
         }
@@ -489,6 +580,12 @@ export class Overworld {
         if (dx > 0) player.facing = 1;
         if (dx < 0) player.facing = -1;
 
+        // Sprite yönü: yatay hareket dikeye baskındır
+        if (Math.abs(dx) >= Math.abs(dy)) player.dir = dx > 0 ? 'right' : 'left';
+        else player.dir = dy > 0 ? 'down' : 'up';
+        player.dirX = dx;
+        player.dirY = dy;
+
         // Yetenekler son hareket yönüne atılır
         player.aim = { x: dx, y: dy };
 
@@ -537,7 +634,9 @@ export class Overworld {
             if (this.isHiddenTile(Math.floor(enemy.x / TILE_SIZE), Math.floor(enemy.y / TILE_SIZE))) continue;
             enemy.draw(ctx);
         }
+        this.drawTokenDrops();
         this.drawProjectiles();
+        if (this.active) this.active.draw(ctx);
         this.drawPlayer();
         this.drawSpores();
         this.drawBallAnim();
@@ -583,10 +682,10 @@ export class Overworld {
         ctx.restore();
     }
 
-    // Boss yakalandı: konfeti yağmuru, zıplayan karakter ve zafer yazısı
+    // Boss yenildi: konfeti yağmuru, zıplayan Pokemon ve zafer yazısı
     drawVictory() {
         if (!this.victory) return;
-        const { ctx, canvas, player } = this;
+        const { ctx, canvas } = this;
         const v = this.victory;
         v.frame++;
 
@@ -608,12 +707,18 @@ export class Overworld {
         const cy = canvas.height / 2 + 30;
         const jump = Math.abs(Math.sin(v.frame / 14)) * 46;
         const tilt = Math.sin(v.frame / 9) * 0.28;
+        // Sahadaki Pokemon ve antrenör birlikte kutlar
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.translate(cx, cy - jump);
         ctx.rotate(tilt);
-        ctx.drawImage(player.img, -60, -60, 120, 120);
+        const winner = this.active?.img;
+        if (winner && winner.complete && winner.naturalWidth > 0) {
+            ctx.drawImage(winner, -60, -60, 120, 120);
+        }
         ctx.restore();
+
+        drawTrainer(ctx, cx - 110, cy - jump * 0.6, 'right', true, 3);
 
         // Zıplarken çevreye saçılan ışık pikselleri
         for (let i = 0; i < 8; i++) {
@@ -681,13 +786,15 @@ export class Overworld {
     // ---- Harita savaşı ----
 
     updateCombat() {
-        const { player } = this;
+        if (this.swapCooldown > 0) this.swapCooldown--;
 
-        for (let i = 0; i < player.cooldowns.length; i++) {
-            if (player.cooldowns[i] > 0) player.cooldowns[i]--;
+        // Sahadaki Pokemon antrenörü takip eder ve bekleme sürelerini işler
+        if (this.active) {
+            this.active.follow(this.player);
+            this.active.update();
         }
-        if (player.invuln > 0) player.invuln--;
 
+        this.collectTokens();
         this.computeFlowField();
         for (const enemy of this.enemies) enemy.update();
 
@@ -703,8 +810,10 @@ export class Overworld {
                 continue;
             }
 
-            if (Math.hypot(p.x - player.x, p.y - player.y) < 26) {
-                this.damagePlayer(p.damage, p);
+            // Düşman mermileri sahadaki Pokemona isabet eder (antrenör vurulmaz)
+            const target = this.active;
+            if (target && !target.fainted && Math.hypot(p.x - target.x, p.y - target.y) < 26) {
+                this.damageActive(p.damage, p, p.moveType);
                 this.enemyProjectiles.splice(i, 1);
             }
         }
@@ -725,13 +834,19 @@ export class Overworld {
             for (const enemy of this.enemies) {
                 if (enemy.fainted) continue;
                 if (Math.hypot(p.x - enemy.x, p.y - enemy.y) < enemy.size / 2 + 10) {
-                    enemy.takeDamage(p.damage);
+                    // Tip etkililiği: Pokemonların iyi ve kötü yönleri burada belirir
+                    const mult = p.moveType ? effectiveness(p.moveType, enemy.types) : 1;
+                    const damage = p.damage * mult;
+                    const label = effectivenessLabel(mult);
+                    if (label) this.spawnMapText(enemy.x, enemy.y - 66, label.text, label.color);
 
-                    // Leech Seed: verilen hasarın bir kısmı cana döner
-                    if (p.leech) {
-                        const healed = Math.round(p.damage * p.leech);
-                        this.player.hp = Math.min(this.player.maxHp, this.player.hp + healed);
-                        this.spawnMapText(this.player.x, this.player.y - 50, `+${healed}`, '#4ade80');
+                    if (mult > 0) enemy.takeDamage(damage);
+
+                    // Leech Seed: verilen hasarın bir kısmı sahadaki Pokemonun canına döner
+                    if (p.leech && this.active && mult > 0) {
+                        const healed = Math.round(damage * p.leech);
+                        this.active.heal(healed);
+                        this.spawnMapText(this.active.x, this.active.y - 50, `+${healed}`, '#4ade80');
                     }
 
                     this.projectiles.splice(i, 1);
@@ -760,24 +875,22 @@ export class Overworld {
             if (ball.frame >= 55) {
                 // Yakalandı
                 const caught = ball.enemy;
-                this.progress.addCapture(caught);
-                this.captures = this.progress.captures;
+                const joinedParty = this.progress.addCapture(caught.id, caught.name);
+                this.captures = this.progress.collection;
                 this.spawnMapText(caught.x, caught.y - 30, `${caught.name} yakalandı!`, '#4ade80');
+                if (!joinedParty) {
+                    this.spawnMapText(caught.x, caught.y - 54, 'Ekip dolu - kütüphaneye gönderildi', '#94a3b8');
+                } else {
+                    // Yeni üye ekibe katıldı: sahaya hazırlansın
+                    this.buildMember(this.progress.party[this.progress.party.length - 1])
+                        .then(pokemon => {
+                            this.partyPokemon.push(pokemon);
+                            preloadTypes(pokemon.types);
+                        })
+                        .catch(error => console.error('Yeni ekip üyesi hazırlanamadı:', error));
+                }
                 this.enemies = this.enemies.filter(e => e !== caught);
                 this.ballAnim = null;
-
-                // Yakalamak ek deneyim getirir
-                const bonus = this.progress.xpForEnemy(caught.kind, true) - this.progress.xpForEnemy(caught.kind);
-                if (bonus > 0) {
-                    this.progress.addXp(bonus);
-                    this.spawnMapText(caught.x, caught.y - 60, `+${bonus} XP (yakalama)`, '#38bdf8');
-                }
-
-                // Bossu yakalamak mekanı tamamlar: zafer sahnesi
-                if (caught.isBoss) {
-                    this.progress.markBossDefeated(this.currentMap.id);
-                    this.onBossCaptured(caught);
-                }
             }
         }
 
@@ -803,9 +916,13 @@ export class Overworld {
     }
 
     castAbility(index) {
-        const { player } = this;
-        const ability = this.abilities[index];
-        if (!ability || player.cooldowns[index] > 0) return;
+        const caster = this.active;
+        if (!caster || caster.fainted) return;
+
+        // Yetenekler sahadaki Pokemonun konumundan çıkar
+        const player = { x: caster.x, y: caster.y, aim: this.player.aim, facing: caster.facing };
+        const ability = caster.abilities[index];
+        if (!ability || caster.cooldowns[index] > 0) return;
 
         if (ability.kind === 'aoe' && ability.type === 'sleep') {
             // Sleep Powder: çevredeki düşmanları uyutur
@@ -821,7 +938,7 @@ export class Overworld {
             if (hit > 0) this.spawnMapText(player.x, player.y - 50, `${hit} Pokemon uyudu!`, '#a78bfa');
         } else if (ability.kind === 'aoe') {
             // Petal Blizzard: çevredeki herkese alan hasarı
-            const damage = ability.damage * player.damageMultiplier;
+            const damage = ability.damage * caster.damageMultiplier * caster.damageBoost;
             let hit = 0;
             for (const enemy of this.enemies) {
                 if (enemy.fainted) continue;
@@ -835,38 +952,43 @@ export class Overworld {
             if (hit === 0) this.spawnMapText(player.x, player.y - 74, 'Isabet yok', '#94a3b8');
         } else if (ability.kind === 'heal') {
             // Jungle Healing: canın bir kısmını yeniler
-            const healed = Math.round(player.maxHp * ability.heal);
-            player.hp = Math.min(player.maxHp, player.hp + healed);
+            const healed = Math.round(caster.maxHp * ability.heal);
+            caster.heal(healed);
             this.spores.push({ x: player.x, y: player.y, r: 14, life: 30, color: 'heal' });
             this.spawnMapText(player.x, player.y - 50, `+${healed} CAN`, '#4ade80');
         } else if (ability.kind === 'dash') {
             // First Impression: ileri atılıp yol üstündekileri biçer
             const aim = this.aimVector();
-            const damage = ability.damage * player.damageMultiplier;
+            const damage = ability.damage * caster.damageMultiplier * caster.damageBoost;
             const steps = 14;
             let hit = false;
 
+            // Antrenör ve Pokemon birlikte atılır
+            const trainer = this.player;
             for (let i = 1; i <= steps; i++) {
-                const nx = player.x + aim.x * (ability.distance / steps);
-                const ny = player.y + aim.y * (ability.distance / steps);
-                if (!this.canMoveTo(nx, player.y)) break;
-                player.x = nx;
-                if (this.canMoveTo(player.x, ny)) player.y = ny;
+                const nx = trainer.x + aim.x * (ability.distance / steps);
+                const ny = trainer.y + aim.y * (ability.distance / steps);
+                if (!this.canMoveTo(nx, trainer.y)) break;
+                trainer.x = nx;
+                if (this.canMoveTo(trainer.x, ny)) trainer.y = ny;
+                caster.x = trainer.x;
+                caster.y = trainer.y;
 
                 for (const enemy of this.enemies) {
                     if (enemy.fainted || enemy.dashHit) continue;
-                    if (Math.hypot(enemy.x - player.x, enemy.y - player.y) < enemy.size / 2 + 30) {
+                    if (Math.hypot(enemy.x - caster.x, enemy.y - caster.y) < enemy.size / 2 + 30) {
                         enemy.dashHit = true;
-                        enemy.takeDamage(damage);
+                        const mult = ability.moveType ? effectiveness(ability.moveType, enemy.types) : 1;
+                        if (mult > 0) enemy.takeDamage(damage * mult);
                         hit = true;
                     }
                 }
             }
             for (const enemy of this.enemies) enemy.dashHit = false;
 
-            player.invuln = Math.max(player.invuln, 20); // atılım sırasında kısa dokunulmazlık
-            this.effectsTrail(player.x, player.y);
-            this.spawnMapText(player.x, player.y - 50, hit ? `${ability.name.toUpperCase()}!` : ability.name, '#22d3ee');
+            caster.invuln = Math.max(caster.invuln, 25); // atılım sırasında kısa dokunulmazlık
+            this.effectsTrail(caster.x, caster.y);
+            this.spawnMapText(caster.x, caster.y - 50, hit ? `${ability.name.toUpperCase()}!` : ability.name, '#22d3ee');
         } else {
             // Nişan: en yakın ayakta düşmanın ATIŞ ANINDAKİ konumuna kilitlenir.
             // Duvar delen hamleler (Seed Bomb) hedefi duvar arkasında da seçer.
@@ -885,7 +1007,8 @@ export class Overworld {
                     vx: Math.cos(a) * ability.speed,
                     vy: Math.sin(a) * ability.speed,
                     type: ability.type,
-                    damage: ability.damage * player.damageMultiplier,
+                    moveType: ability.moveType,
+                    damage: ability.damage * caster.damageMultiplier * caster.damageBoost,
                     life: ability.life,
                     pierce: !!ability.pierce,
                     leech: ability.leech || 0
@@ -902,7 +1025,7 @@ export class Overworld {
             }
         }
 
-        player.cooldowns[index] = ability.cooldown;
+        caster.cooldowns[index] = ability.cooldown;
     }
 
     normalize(x, y) {
@@ -953,11 +1076,11 @@ export class Overworld {
     tryCatch() {
         if (this.ballAnim) return;
 
-        // En yakın bayılmış Pokemonu bul
+        // En yakın bayılmış Pokemonu bul (bosslar yakalanamaz, yenilir)
         let target = null;
         let best = 110; // maksimum atış mesafesi
         for (const enemy of this.enemies) {
-            if (!enemy.fainted) continue;
+            if (!enemy.fainted || enemy.isBoss) continue;
             const dist = Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y);
             if (dist < best) {
                 best = dist;
@@ -980,34 +1103,27 @@ export class Overworld {
         };
     }
 
+    // Hasar sahadaki Pokemona gider; tip etkililiği burada uygulanır
+    damageActive(amount, from, moveType) {
+        const target = this.active;
+        if (!target || target.fainted || target.invuln > 0) return;
+
+        let final = amount;
+        if (moveType) {
+            const mult = effectiveness(moveType, target.types);
+            final = amount * mult;
+            const label = effectivenessLabel(mult);
+            if (label) this.spawnMapText(target.x, target.y - 70, label.text, label.color);
+            if (mult === 0) return;
+        }
+
+        target.takeDamage(final);
+        this.spawnMapText(target.x, target.y - 46, `-${Math.ceil(final)}`, '#ff4444');
+    }
+
+    // Eski çağrılar için: düşman teması da sahadaki Pokemona işler
     damagePlayer(amount, from) {
-        const { player } = this;
-        if (player.invuln > 0) return;
-
-        player.hp -= amount;
-        player.invuln = 60;
-        this.spawnMapText(player.x, player.y - 50, `-${amount}`, '#ff4444');
-
-        // Saldırandan hafif geri itme
-        if (from) {
-            const dist = Math.hypot(player.x - from.x, player.y - from.y) || 1;
-            const kx = player.x + ((player.x - from.x) / dist) * 30;
-            const ky = player.y + ((player.y - from.y) / dist) * 30;
-            if (this.canMoveTo(kx, player.y)) player.x = kx;
-            if (this.canMoveTo(player.x, ky)) player.y = ky;
-        }
-
-        if (player.hp <= 0) {
-            // Bayıldın: mekan girişinde tam canla yeniden doğ
-            player.hp = player.maxHp;
-            player.invuln = 90;
-            const start = this.currentMap.start;
-            player.x = start.col * TILE_SIZE + TILE_SIZE / 2;
-            player.y = start.row * TILE_SIZE + TILE_SIZE / 2;
-            this.portalCooldown = 45; // doğar doğmaz portala düşmeyi engelle
-            this.updateCamera(true);
-            this.spawnMapText(player.x, player.y - 60, 'BAYILDIN!', '#ef4444');
-        }
+        this.damageActive(amount, from, from?.attack?.moveType);
     }
 
     spawnMapText(x, y, text, color) {
@@ -1016,76 +1132,66 @@ export class Overworld {
 
     // --- Seviye ve evrim ---
 
-    // Bayıltılan/yakalanan Pokemondan deneyim kazandırır
-    awardXp(enemy, captured = false) {
-        const { progress, player } = this;
-        const amount = progress.xpForEnemy(enemy.kind, captured);
-        const levelsGained = progress.addXp(amount);
+    // Yenilen Pokemon yetenek jetonu düşürür (XP yok; seviyeyi oyuncu dağıtır)
+    awardXp(enemy) {
+        const amount = this.progress.tokensForEnemy(enemy.kind);
+        this.spawnTokenDrop(enemy.x, enemy.y, amount);
+    }
 
-        this.spawnMapText(enemy.x, enemy.y - 46, `+${amount} XP`, '#38bdf8');
+    // Bir ekip üyesinin seviyesine uygun en ileri formu bulur;
+    // gerekiyorsa evrim sahnesini başlatır.
+    async checkEvolution(index, silent = false) {
+        const { progress } = this;
+        const member = progress.party[index];
+        const pokemon = this.partyPokemon[index];
+        if (!member || !pokemon) return;
 
-        if (levelsGained > 0) {
-            this.spawnMapText(player.x, player.y - 74, `SEVİYE ${progress.level}!`, '#facc15');
-
-            // Statlar yeni seviyeye göre yeniden hesaplanır, can tamamen dolar
-            this.refreshStats();
-            player.hp = player.maxHp;
-
-            // Bu seviyede açılan yetenekleri duyur
-            for (const ability of abilitiesUnlockedAt(progress.characterId, progress.level)) {
-                this.spawnMapText(player.x, player.y - 98, `YENİ HAMLE: ${ability.name}!`, '#4ade80');
+        let chain = this.evolutionChains?.get(member.id);
+        if (!chain) {
+            try {
+                chain = await fetchEvolutionChain(member.id);
+                if (!this.evolutionChains) this.evolutionChains = new Map();
+                this.evolutionChains.set(member.id, chain);
+            } catch (error) {
+                console.warn('Evrim zinciri alınamadı:', error);
+                return;
             }
-
-            this.checkEvolution();
         }
-    }
+        if (chain.length < 2) return;
 
-    // Statları güncel seviyeye göre yeniden hesaplar (form değiştirmeden)
-    refreshStats() {
-        const { player, progress } = this;
-        if (!player.baseStats) return;
-
-        const ratio = player.hp / player.maxHp;
-        player.maxHp = maxHpFor(player.baseStats.hp, progress.level);
-        player.hp = Math.round(player.maxHp * ratio);
-        player.damageMultiplier = damageMultiplierFor(player.baseStats.attack, progress.level);
-        this.abilities = abilitiesFor(progress.characterId, progress.level);
-        while (player.cooldowns.length < this.abilities.length) player.cooldowns.push(0);
-    }
-
-    // Seviyeye uygun en ileri formu bulur; gerekiyorsa evrim sahnesini başlatır
-    checkEvolution(silent = false) {
-        const { progress, evolutionChain } = this;
-        if (!evolutionChain.length) return;
-
-        let target = evolutionChain[0];
-        for (const stage of evolutionChain) {
-            if (stage.minLevel === null || progress.level >= stage.minLevel) target = stage;
+        let target = chain[0];
+        for (const stage of chain) {
+            if (stage.minLevel === null || member.level >= stage.minLevel) target = stage;
             else break;
         }
+        if (target.id === member.formId) return;
 
-        if (target.id === progress.formId) return;
+        const fromImg = pokemon.img.src;
+        progress.setForm(index, target.id);
 
-        const fromId = progress.formId;
-        progress.setForm(target.id);
+        try {
+            const data = await fetchCharacter({ id: target.id });
+            const evolved = await this.buildMember(progress.party[index]);
+            evolved.hp = Math.min(evolved.maxHp, Math.round(evolved.maxHp * (pokemon.hp / pokemon.maxHp)));
+            evolved.x = pokemon.x;
+            evolved.y = pokemon.y;
 
-        fetchCharacter({ id: target.id })
-            .then(character => {
-                if (silent) {
-                    // Kayıttan yükleme: sahne oynatmadan formu uygula
-                    this.applyCharacter(character);
-                    return;
-                }
-                this.startEvolutionScene(fromId, character);
-            })
-            .catch(error => console.error('Evrim formu yüklenemedi:', error));
+            const wasActive = this.active === pokemon;
+            this.partyPokemon[index] = evolved;
+            if (wasActive) this.active = evolved;
+
+            preloadTypes(evolved.types);
+            if (!silent) this.startEvolutionScene(fromImg, pokemon.name, data);
+        } catch (error) {
+            console.error('Evrim formu yüklenemedi:', error);
+        }
     }
 
     // Klasik Pokemon evrim sahnesi: karakter beyaz silüete döner, iki form
     // arasında gidip gelir, sonra parlamayla yeni form ortaya çıkar.
-    startEvolutionScene(fromId, character) {
+    startEvolutionScene(fromSrc, oldName, character) {
         const oldImg = new Image();
-        oldImg.src = this.player.img.src;
+        oldImg.src = fromSrc;
 
         const newImg = new Image();
         newImg.src = character.battleSprite || character.sprite;
@@ -1094,10 +1200,9 @@ export class Overworld {
             frame: 0,
             oldImg,
             newImg,
-            oldName: this.player.name,
+            oldName,
             newName: character.name,
-            character,
-            applied: false,
+            applied: true, // yeni form zaten uygulandı; sahne yalnızca gösterimdir
             sparks: []
         };
     }
@@ -1106,11 +1211,9 @@ export class Overworld {
         const scene = this.evolutionScene;
         scene.frame++;
 
-        // 200. karede yeni form gerçekten uygulanır
-        if (!scene.applied && scene.frame >= 200) {
-            scene.applied = true;
-            this.applyCharacter(scene.character);
-            this.player.hp = this.player.maxHp;
+        // 200. karede parlama ve kıvılcım patlaması
+        if (!scene.burst && scene.frame >= 200) {
+            scene.burst = true;
             for (let i = 0; i < 60; i++) {
                 scene.sparks.push({
                     x: 0, y: 0,
@@ -1254,7 +1357,9 @@ export class Overworld {
         this.bakeTerrain(); // yıkılan arena yeniden pişirilir
     }
 
-    onBossCaptured(boss) {
+    onBossDefeated(boss) {
+        this.progress.markBossDefeated(this.currentMap.id);
+
         this.victory = {
             frame: 0,
             name: boss.name,
@@ -1677,20 +1782,87 @@ export class Overworld {
         ctx.restore();
     }
 
+    // Antrenör (elle çizilmiş piksel sprite; vurulmaz)
     drawPlayer() {
         const { ctx, player } = this;
 
-        // Hasar sonrası dokunulmazlıkta yanıp sönme
-        if (player.invuln > 0 && player.invuln % 8 < 4) return;
+        // Gölge
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(player.x - 11, player.y + 22, 22, 4);
+        ctx.restore();
 
-        // Yürürken hafif zıplama
-        const bob = player.moving ? Math.sin(Date.now() / 90) * 3 : 0;
+        drawTrainer(ctx, player.x, player.y, player.dir, player.moving, 3);
+    }
+
+    // Yenilen düşmanlardan düşen yetenek jetonları
+    spawnTokenDrop(x, y, amount) {
+        for (let i = 0; i < amount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 8 + Math.random() * 26;
+            this.tokenDrops.push({
+                x: x + Math.cos(angle) * dist,
+                y: y + Math.sin(angle) * dist,
+                phase: Math.random() * Math.PI * 2,
+                life: 3600 // ~1 dakika sonra kaybolur
+            });
+        }
+    }
+
+    // Antrenör jetonun üstünden geçince toplanır
+    collectTokens() {
+        const { player, progress } = this;
+        let collected = 0;
+
+        for (let i = this.tokenDrops.length - 1; i >= 0; i--) {
+            const token = this.tokenDrops[i];
+            token.life--;
+
+            const dist = Math.hypot(token.x - player.x, token.y - player.y);
+            // Yakındaki jetonlar antrenöre doğru çekilir
+            if (dist < 70) {
+                token.x += (player.x - token.x) * 0.16;
+                token.y += (player.y - token.y) * 0.16;
+            }
+            if (dist < 22) {
+                this.tokenDrops.splice(i, 1);
+                collected++;
+                continue;
+            }
+            if (token.life <= 0) this.tokenDrops.splice(i, 1);
+        }
+
+        if (collected > 0) {
+            progress.addTokens(collected);
+            this.spawnMapText(player.x, player.y - 40, `+${collected} jeton`, '#fbbf24');
+        }
+    }
+
+    drawTokenDrops() {
+        const { ctx } = this;
+        const t = Date.now() / 200;
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        ctx.translate(player.x, player.y - player.size / 4 + bob);
-        if (player.facing === 1) ctx.scale(-1, 1);
-        ctx.drawImage(player.img, -player.size / 2, -player.size / 2, player.size, player.size);
+        for (const token of this.tokenDrops) {
+            const bob = Math.sin(t + token.phase) * 3;
+            const x = token.x, y = token.y + bob;
+
+            ctx.globalAlpha = token.life < 120 ? token.life / 120 : 1;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#fbbf24';
+            // Altın jeton: dış halka, iç dolgu ve parlama
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(x - 6, y - 6, 12, 12);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(x - 4, y - 6, 8, 12);
+            ctx.fillRect(x - 6, y - 4, 12, 8);
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(x - 2, y - 4, 3, 3);
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(x - 1, y - 2, 3, 5);
+        }
         ctx.restore();
     }
 
@@ -1828,40 +2000,63 @@ export class Overworld {
         const { ctx, canvas, player } = this;
         ctx.save();
 
-        const { progress } = this;
+        const { progress, active } = this;
 
-        // Can + seviye + deneyim paneli (sol üst)
+        // Sahadaki Pokemon paneli (sol üst)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(12, 12, 232, 46);
+        ctx.fillRect(12, 12, 232, 42);
 
         ctx.font = "bold 12px 'Space Grotesk', sans-serif";
         ctx.textAlign = 'left';
         ctx.fillStyle = '#f8fafc';
-        ctx.fillText(player.name || 'Oyuncu', 18, 26);
-        ctx.fillStyle = '#facc15';
-        ctx.fillText(`Sv. ${progress.level}`, 176, 26);
+        ctx.fillText(active ? active.name : 'Pokemon yok', 18, 26);
+        if (active) {
+            ctx.fillStyle = '#facc15';
+            ctx.fillText(`Sv. ${active.level}`, 150, 26);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(active.types.join('/'), 186, 26);
 
-        // Can barı
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(18, 31, 160, 10);
-        ctx.fillStyle = player.hp / player.maxHp > 0.3 ? '#22c55e' : '#ef4444';
-        ctx.fillRect(18, 31, 160 * Math.max(0, player.hp / player.maxHp), 10);
+            // Can barı
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(18, 32, 160, 10);
+            ctx.fillStyle = active.hp / active.maxHp > 0.3 ? '#22c55e' : '#ef4444';
+            ctx.fillRect(18, 32, 160 * Math.max(0, active.hp / active.maxHp), 10);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(`${Math.max(0, Math.ceil(active.hp))}/${active.maxHp}`, 238, 41);
+        }
+
+        // Ekip göstergesi (sol üst, panelin altında): 1-6 tuşlarıyla değişir
+        ctx.textAlign = 'center';
+        this.partyPokemon.forEach((pokemon, i) => {
+            const x = 14 + i * 38;
+            const y = 60;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(x, y, 34, 26);
+            ctx.strokeStyle = pokemon === active ? '#4ade80' : (pokemon.fainted ? '#7f1d1d' : '#475569');
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, 34, 26);
+
+            ctx.font = "bold 11px 'Space Grotesk', sans-serif";
+            ctx.fillStyle = pokemon.fainted ? '#7f1d1d' : '#f8fafc';
+            ctx.fillText(String(i + 1), x + 9, y + 17);
+
+            // Küçük can çubuğu
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(x + 16, y + 10, 14, 5);
+            ctx.fillStyle = pokemon.fainted ? '#7f1d1d' : '#22c55e';
+            ctx.fillRect(x + 16, y + 10, 14 * Math.max(0, pokemon.hp / pokemon.maxHp), 5);
+        });
+
+        // Jeton ve koleksiyon (sağ üst)
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillText(`${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}`, 238, 40);
-
-        // Deneyim barı
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(18, 45, 220, 6);
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(18, 45, 220 * Math.min(1, progress.xp / progress.xpNeeded), 6);
-
-        // Yakalananlar (sağ üst)
-        ctx.textAlign = 'right';
+        ctx.font = "bold 12px 'Space Grotesk', sans-serif";
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(canvas.width - 150, 12, 138, 26);
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillText(`Yakalanan: ${this.captures.length}`, canvas.width - 20, 30);
+        ctx.fillRect(canvas.width - 190, 12, 178, 44);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText(`${progress.tokens} jeton`, canvas.width - 20, 30);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${progress.collection.length} yakalanan · E: kütüphane`, canvas.width - 20, 47);
 
         // Yetenek kutuları (sol alt)
         const boxY = canvas.height - 58;
@@ -1871,7 +2066,7 @@ export class Overworld {
             ctx.fillRect(boxX, boxY, 44, 44);
 
             // Cooldown dolgusu (yukarıdan aşağı iner)
-            const cd = player.cooldowns[i];
+            const cd = active ? active.cooldowns[i] : 0;
             if (cd > 0) {
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
                 ctx.fillRect(boxX, boxY, 44, 44 * (cd / ability.cooldown));

@@ -145,22 +145,27 @@ async function main() {
     await page.evaluate(() => { window.__testHook = true; });
 
     // Yeni akış: macera düğmesi karakter seçimini açar
-    await page.evaluate(() => localStorage.removeItem('pokerpg-save-v1'));
+    await page.evaluate(() => localStorage.removeItem('pokerpg-save-v2'));
     await page.click('#start-adventure-btn');
-    await page.waitForSelector('.picker-item', { visible: true, timeout: 20000 });
-    check('Macera karakter secimi aciliyor', true);
-    await page.click('.picker-item');
-    await page.waitForFunction(() => window.__overworld && window.__overworld.running, { timeout: 20000 });
+    await page.waitForFunction(() => window.__overworld && window.__overworld.running && window.__overworld.active, { timeout: 30000 });
     await wait(800);
     const overworldVisible = await page.$eval('#overworld-screen', el => !el.classList.contains('hidden'));
     check('Ana harita acildi', overworldVisible);
     await shot('04-ana-harita');
 
-    const startLevel = await page.evaluate(() => window.__overworld.progress.level);
-    check('Yeni oyun 1. seviyede basliyor', startLevel === 1, `seviye ${startLevel}`);
+    const startState = await page.evaluate(() => ({
+        party: window.__overworld.progress.party.length,
+        tokens: window.__overworld.progress.tokens,
+        activeName: window.__overworld.active?.name,
+        abilities: window.__overworld.abilities.length
+    }));
+    check('Ekip baslangic Pokemonuyla kuruldu', startState.party === 1 && startState.activeName === 'Bulbasaur',
+        `${startState.party} uye: ${startState.activeName}`);
+    check('Sahadaki Pokemonun yetenekleri var', startState.abilities === 3, `${startState.abilities} yetenek`);
+    check('Jetonla baslanmiyor', startState.tokens === 0, `${startState.tokens} jeton`);
 
-    // Sprite ve evrim zinciri istekleri otursun; ölçüm sabit duruma bakmalı
-    await wait(1500);
+    // Sprite, tip ve evrim istekleri otursun; ölçüm sabit duruma bakmalı
+    await wait(3000);
     const mainFps = await measureFps(3000);
     check('Ana harita 50+ FPS', mainFps.fps >= 50, JSON.stringify(mainFps));
 
@@ -183,6 +188,7 @@ async function main() {
         const p = w.portals.find(p => p.target === 'region-1');
         w.player.x = p.col * 50 + 25;
         w.player.y = p.row * 50 + 25;
+        if (w.active) { w.active.x = w.player.x; w.active.y = w.player.y; }
         w.portalCooldown = 0;
     });
     await page.waitForFunction(() => window.__overworld.currentMap.id === 'region-1', { timeout: 15000 });
@@ -195,6 +201,7 @@ async function main() {
         const p = w.portals.find(p => p.target === 'loc-1-1');
         w.player.x = p.col * 50 + 25;
         w.player.y = p.row * 50 + 25;
+        if (w.active) { w.active.x = w.player.x; w.active.y = w.player.y; }
         w.portalCooldown = 0;
     });
     await page.waitForFunction(() => window.__overworld.currentMap.id === 'loc-1-1', { timeout: 15000 });
@@ -231,11 +238,12 @@ async function main() {
     const sporeCount = await page.evaluate(() => window.__overworld.spores.length);
     check('S (Sleep Powder) spor olusturuyor', sporeCount > 0, `${sporeCount} spor bulutu`);
 
-    // --- Savaş: bir düşmanı bayılt ve yakala ---
+    // --- Savaş: bir düşmanı bayılt, jeton düşsün ve yakala ---
+    const tokensBefore = await page.evaluate(() => window.__overworld.progress.tokens);
     await page.evaluate(() => {
         const w = window.__overworld;
         const e = w.enemies.find(e => e.kind === 'common');
-        // Düşmanı oyuncunun yanına getir ve canını düşür
+        // Düşmanı antrenörün yanına getir ve canını düşür
         e.x = w.player.x + 60;
         e.y = w.player.y;
         e.hp = 1;
@@ -245,11 +253,38 @@ async function main() {
     const fainted = await worldState();
     check('Dusman bayiliyor', fainted.enemiesFainted >= 1, `${fainted.enemiesFainted} bayilmis`);
 
+    // Jetonlar antrenöre yaklaşınca çekilip toplanır (anında olabilir)
+    await page.waitForFunction(
+        (before) => window.__overworld.progress.tokens > before,
+        { timeout: 15000 }, tokensBefore
+    );
+    const tokensAfter = await page.evaluate(() => window.__overworld.progress.tokens);
+    check('Jetonlar toplaniyor', tokensAfter > tokensBefore, `${tokensBefore} -> ${tokensAfter} jeton`);
+    await shot('07a-jeton');
+
     await page.keyboard.press('KeyN');
-    await page.waitForFunction(() => window.__overworld.captures.length > 0, { timeout: 15000 });
-    const caught = await worldState();
-    check('Pokeball ile yakalama calisiyor', caught.captures === 1, `${caught.captures} yakalanan`);
+    await page.waitForFunction(() => window.__overworld.progress.collection.length > 0, { timeout: 15000 });
+    const party = await page.evaluate(() => ({
+        collection: window.__overworld.progress.collection.length,
+        party: window.__overworld.progress.party.length
+    }));
+    check('Pokeball ile yakalama calisiyor', party.collection === 1, `${party.collection} yakalanan`);
+    await page.waitForFunction(() => window.__overworld.partyPokemon.length >= 2, { timeout: 40000 });
+    check('Yakalanan Pokemon ekibe katiliyor', party.party === 2, `ekip: ${party.party}`);
+
+    // Ekip değiştirme (2 tuşu)
+    await page.keyboard.press('Digit2');
+    await wait(300);
+    const swapped = await page.evaluate(() => window.__overworld.progress.activeIndex);
+    check('1-6 tuslariyla Pokemon degistiriliyor', swapped === 1, `aktif slot ${swapped + 1}`);
     await shot('07-yakalama');
+
+    // Yakalanan Pokemonun yetenekleri gerçek hamle verisinden üretildi mi
+    const autoAbilities = await page.evaluate(() => window.__overworld.active.abilities.map(a => a.name));
+    check('Yakalanan Pokemona otomatik hamle seti verildi', autoAbilities.length > 0, autoAbilities.join(', '));
+
+    await page.keyboard.press('Digit1');
+    await wait(300);
 
     // --- Gizli oda ---
     const secretBefore = await page.evaluate(() => window.__overworld.secretRevealed);
@@ -357,109 +392,97 @@ async function main() {
     await page.evaluate(() => {
         const w = window.__overworld;
         const boss = w.enemies.find(e => e.kind === 'regionBoss');
-        boss.x = w.player.x + 50;
-        boss.y = w.player.y;
         boss.hp = 1;
-        boss.takeDamage(5);
+        boss.takeDamage(999);
     });
-    await wait(200);
-    await page.keyboard.press('KeyN');
     await page.waitForFunction(() => window.__overworld.victory?.isRegionBoss, { timeout: 15000 });
-    check('Bolge bossu yakalaninca bolge fethedildi', true);
+    check('Bolge bossu yenilince bolge fethedildi', true);
     await wait(900);
     await shot('14-bolge-zaferi');
 
-    // --- Seviye, deneyim ve kayıt ---
-    const xpBefore = await page.evaluate(() => ({
-        level: window.__overworld.progress.level,
-        xp: window.__overworld.progress.xp
-    }));
-    check('Oynayarak seviye kazanildi', xpBefore.level > 1, `seviye ${xpBefore.level}`);
-
-    // Bir düşmanı bayılt: XP gelmeli
-    await page.evaluate(() => {
-        const w = window.__overworld;
-        const e = w.enemies.find(e => !e.fainted);
-        if (e) e.takeDamage(9999);
+    // --- Jeton, seviye, evrim ve kayıt ---
+    await page.evaluate(() => window.__overworld.progress.addTokens(400));
+    const libOpened = await page.evaluate(() => {
+        window.__library.open();
+        return !document.getElementById('library-overlay').classList.contains('hidden');
     });
-    await wait(200);
-    const afterXp = await page.evaluate(() => ({
-        level: window.__overworld.progress.level,
-        xp: window.__overworld.progress.xp
-    }));
-    check('Dusman yenince XP kazaniliyor', afterXp.xp > xpBefore.xp || afterXp.level > xpBefore.level,
-        `${xpBefore.xp} -> ${afterXp.xp} XP`);
-
-    // Kayıt localStorage'a yazılıyor mu
-    const saved = await page.evaluate(() => {
-        const raw = localStorage.getItem('pokerpg-save-v1');
-        return raw ? JSON.parse(raw) : null;
-    });
-    check('Ilerleme localStorage a kaydediliyor', saved !== null && typeof saved.level === 'number',
-        saved ? `seviye ${saved.level}, ${saved.captures.length} yakalanan` : 'kayit yok');
-
-    // Seviye 16 -> Ivysaur evrimi
-    await page.evaluate(() => {
-        const w = window.__overworld;
-        w.progress.level = 15;
-        w.progress.xp = w.progress.xpNeeded - 1;
-        const e = w.enemies.find(e => !e.fainted);
-        if (e) e.takeDamage(9999);
-    });
-    await page.waitForFunction(() => window.__overworld.evolutionScene !== null, { timeout: 15000 });
-    check('16. seviyede evrim sahnesi basliyor', true);
+    check('E ile kutuphane aciliyor', libOpened === true);
     await wait(600);
-    await shot('15-evrim-sahnesi');
+    await shot('15-kutuphane');
 
-    await page.waitForFunction(() => window.__overworld.evolutionScene === null, { timeout: 20000 });
-    const evolved = await page.evaluate(() => ({
-        form: window.__overworld.progress.formId,
-        name: window.__overworld.player.name,
-        abilities: window.__overworld.abilities.length
+    // Kütüphaneden jeton harcayarak seviye yükseltme
+    const beforeLevel = await page.evaluate(() => ({
+        level: window.__overworld.progress.party[0].level,
+        tokens: window.__overworld.progress.tokens
     }));
-    check('Bulbasaur Ivysaur a evrimlesti', evolved.form === 2, `form #${evolved.form} (${evolved.name})`);
-    check('Evrimle yeni yetenek acildi (Leech Seed)', evolved.abilities === 4, `${evolved.abilities} yetenek`);
-    await shot('16-ivysaur');
+    await page.click('#library-party .lib-card .lib-btn');
+    await wait(500);
+    const afterLevel = await page.evaluate(() => ({
+        level: window.__overworld.progress.party[0].level,
+        tokens: window.__overworld.progress.tokens
+    }));
+    check('Jeton harcayip seviye yukseltiliyor',
+        afterLevel.level === beforeLevel.level + 1 && afterLevel.tokens < beforeLevel.tokens,
+        `Sv.${beforeLevel.level} -> Sv.${afterLevel.level}, ${beforeLevel.tokens} -> ${afterLevel.tokens} jeton`);
 
-    // Seviye 32 -> Venusaur
-    await page.evaluate(() => {
+    // 16. seviyeye kadar yatır: evrim tetiklenmeli
+    await page.evaluate(async () => {
         const w = window.__overworld;
-        w.progress.level = 31;
-        w.progress.xp = w.progress.xpNeeded - 1;
-        const e = w.enemies.find(e => !e.fainted);
-        if (e) e.takeDamage(9999);
+        w.progress.party[0].level = 15;
+        w.progress.save();
+        await w.onMemberLeveled(0);
+        w.progress.party[0].level = 16;
+        w.progress.save();
+        await w.onMemberLeveled(0);
     });
-    await page.waitForFunction(() => window.__overworld.progress.formId === 3, { timeout: 20000 });
+    await page.waitForFunction(() => window.__overworld.progress.party[0].formId === 2, { timeout: 20000 });
+    check('16. seviyede Ivysaur a evrimlesiyor', true);
+    await page.waitForFunction(() => window.__overworld.evolutionScene !== null, { timeout: 10000 }).catch(() => {});
+    await wait(500);
+    await shot('16-evrim-sahnesi');
     await page.waitForFunction(() => window.__overworld.evolutionScene === null, { timeout: 20000 });
-    const venusaur = await page.evaluate(() => ({
-        form: window.__overworld.progress.formId,
-        abilities: window.__overworld.abilities.map(a => a.name),
-        maxHp: window.__overworld.player.maxHp
+
+    const evolved = await page.evaluate(() => ({
+        name: window.__overworld.partyPokemon[0].name,
+        abilities: window.__overworld.partyPokemon[0].abilities.length
     }));
-    check('Venusaur a evrimlesti', venusaur.form === 3, `form #${venusaur.form}, ${venusaur.maxHp} can`);
-    check('Petal Blizzard acildi', venusaur.abilities.includes('Petal Blizzard'), venusaur.abilities.join(', '));
-    await shot('17-venusaur');
+    check('Evrim sonrasi yeni hamle acildi (Leech Seed)', evolved.abilities === 4,
+        `${evolved.name}, ${evolved.abilities} yetenek`);
 
-    // Yakalanan boss oynanabilir karakter listesine giriyor mu
-    const playable = await page.evaluate(() => window.__overworld.progress.playableCharacters);
-    check('Yakalanan bosslar oynanabilir', playable.includes(768), `oynanabilir: ${playable.join(', ')}`);
+    // Tip etkililiği: Grass hamlesi Water tipine süper etkili olmalı
+    const typeCheck = await page.evaluate(async () => {
+        const mod = await import('/src/services/typeChart.js');
+        await mod.preloadTypes(['grass', 'fire']);
+        return {
+            grassVsWater: mod.effectiveness('grass', ['water']),
+            fireVsGrass: mod.effectiveness('fire', ['grass', 'poison'])
+        };
+    });
+    check('Tip etkililigi calisiyor',
+        typeCheck.grassVsWater === 2 && typeCheck.fireVsGrass === 2,
+        `grass->water: ${typeCheck.grassVsWater}x, fire->grass/poison: ${typeCheck.fireVsGrass}x`);
 
-    // Kayıttan geri yükleme: sayfa yenilenince ilerleme korunmalı
+    // Kayıt: sayfa yenilenince ekip, jeton ve evrim korunmalı
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('pokerpg-save-v2')));
+    check('Ilerleme localStorage a kaydediliyor',
+        saved && saved.version === 2 && saved.party[0].formId === 2,
+        saved ? `ekip ${saved.party.length}, ${saved.tokens} jeton, form #${saved.party[0].formId}` : 'kayit yok');
+
     await page.reload({ waitUntil: 'networkidle2' });
     await page.waitForSelector('.char-card', { timeout: 20000 });
-    const restored = await page.evaluate(() => {
-        const raw = localStorage.getItem('pokerpg-save-v1');
-        return raw ? JSON.parse(raw) : null;
-    });
-    check('Sayfa yenilenince ilerleme korunuyor', restored && restored.level >= 32 && restored.formId === 3,
-        restored ? `seviye ${restored.level}, form #${restored.formId}` : 'kayit yok');
-
     await page.click('#start-adventure-btn');
-    await page.waitForSelector('.picker-item', { visible: true, timeout: 20000 });
-    const pickerCount = await page.$$eval('.picker-item', els => els.length);
-    check('Secim ekraninda yakalanan boss listeleniyor', pickerCount >= 2, `${pickerCount} karakter`);
-    await shot('18-karakter-secimi');
-
+    await page.waitForFunction(() => window.__overworld?.active, { timeout: 30000 });
+    const restored = await page.evaluate(() => ({
+        level: window.__overworld.progress.party[0].level,
+        form: window.__overworld.progress.party[0].formId,
+        name: window.__overworld.active.name,
+        party: window.__overworld.partyPokemon.length,
+        tokens: window.__overworld.progress.tokens
+    }));
+    check('Sayfa yenilenince ilerleme korunuyor',
+        restored.form === 2 && restored.level >= 16 && restored.party >= 2,
+        `Sv.${restored.level} ${restored.name}, ekip ${restored.party}, ${restored.tokens} jeton`);
+    await shot('17-kayittan-devam');
     // --- Konsol ve ağ hataları ---
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));

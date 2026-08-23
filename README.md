@@ -20,7 +20,7 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (335 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
+| `npm run check` | Veri ve saf mantık testleri (324 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
 | `npm run test:ui` | Puppeteer ile uçtan uca oynanış (71 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
@@ -116,33 +116,6 @@ boss savaşı hazır; her mekan farklı bir harita tarzında:
 
 Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
 uyuyan ve uyanınca arenayı parçalayan boss, bossu yenince rozet ve zafer sahnesi.
-
-### Görsel: iki mod, iki tarz
-
-Oyunun iki modu bilinçli olarak **farklı görsel dile** sahip:
-
-| | 2 Kişilik Arena | Tek Kişilik Macera |
-|---|---|---|
-| Tarz | Pixel art (korundu) | **Anime / cel-shading** |
-| Çözünürlük | 1000x500 | 1000x560 mantıksal, **2x** arka plan (2000x1120) |
-| Pokemon görseli | Piksel sprite | Yüksek çözünürlüklü resmi çizim |
-| Zemin | Piksel bloklar | Düz renk alanları, sert gölge bantları, koyu konturlar |
-| Mermiler | Piksel desenler | Anime enerji efektleri (düz renk + kontur + beyaz çekirdek) |
-| Antrenör | — | Elle çizilmiş cel-shading karakter (önbelleğe alınmış sprite) |
-| Kamera | Sabit | 1.55x yakınlaştırma (karakterler büyük görünür) |
-
-Anime tarzının teknik özü **degrade kullanmamaktır**: bir şekil düz renkle
-doldurulur, içine sert kenarlı bir gölge bandı konur ve çevresine koyu bir
-kontur çizilir (`render/celShading.js`). Yumuşak degradeler görüntüyü plastik
-gösterirken bu yöntem çizgi film hissi verir.
-
-Karakterler belirgin şekilde büyük: sahadaki Pokemon 96px, bosslar 140-168px.
-Performans için zemin harita başına bir kez, antrenör de yön/kare başına bir kez
-offscreen canvas'a çizilip önbelleğe alınır - bu yüzden 4 kat piksele ve
-cel-shading maliyetine rağmen tüm ekranlar 60 FPS.
-
-Bu ayrım `npm run check` ile korunuyor: arena dosyaları piksel çizimi
-kapatmamalı, macera dosyaları da piksel moduna dönmemeli.
 
 ### Antrenör, ekip ve ilerleme
 

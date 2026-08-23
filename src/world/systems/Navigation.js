@@ -8,7 +8,7 @@ import { hasSurf } from '../../config/fieldMoves.js';
 export const Navigation = {
     // Ölçek uygulandıktan sonra ekranda görünen dünya alanı
     get viewSize() {
-        return { w: this.viewW / this.zoom, h: this.viewH / this.zoom };
+        return { w: this.canvas.width / this.zoom, h: this.canvas.height / this.zoom };
     },
 
     // Kamera oyuncuyu ortalayarak takip eder, harita kenarlarında durur.

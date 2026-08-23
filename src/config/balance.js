@@ -2,23 +2,14 @@
 // ki bir davranışı değiştirmek için dosya aramak gerekmesin.
 // Süreler kare (frame) cinsindendir: 60 kare = 1 saniye.
 
-// Macera modu görüntü ayarları. Piksel sanatı yok: yüksek çözünürlükte,
-// yumuşatılmış çizim ve yakınlaştırılmış kamera (karakterler büyük görünsün).
-export const VIEW = {
-    width: 1000,        // mantıksal genişlik (oyun mantığı bu birimde çalışır)
-    height: 560,        // mantıksal yükseklik
-    renderScale: 2,     // canvas arka planı bu kadar büyük tutulur -> keskinlik
-    zoom: 1.55          // kamera yakınlaştırması -> her şey ekranda daha büyük
-};
-
 export const TRAINER = {
     speed: 3.4,
     hitbox: { w: 24, h: 16 }, // ayak hizasındaki çarpışma kutusu
-    spriteScale: 5,
+    spriteScale: 3,
 
     // Antrenör de hasar alır: kaçınma (zıplama/dash) oynanışın merkezinde
     maxHp: 60,
-    hitRadius: 22,        // mermilerin antrenöre isabet yarıçapı
+    hitRadius: 18,        // mermilerin antrenöre isabet yarıçapı
     hitInvuln: 70,        // hasar sonrası dokunulmazlık kareleri
     contactDamage: 6      // düşman teması antrenöre bu kadar vurur
 };
@@ -65,7 +56,7 @@ export const DEPLOY = {
 };
 
 export const ACTIVE_POKEMON = {
-    size: 96,
+    size: 62,
     hitInvuln: 45,       // hasar sonrası dokunulmazlık
     hitFlash: 20,
     retreatRange: 90,    // düşman bu kadar yaklaşırsa geri çekilir

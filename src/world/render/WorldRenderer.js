@@ -1,7 +1,7 @@
 import { TILE_SIZE } from '../../config/worldMap.js';
 import { unlockedMoves } from '../../config/fieldMoves.js';
-import { DODGE, STATUS, TRAINER } from '../../config/balance.js';
-import { drawProjectileFx, drawAreaFx } from './projectileFx.js';
+import { DODGE, STATUS } from '../../config/balance.js';
+import { PROJECTILE_SPRITES, drawPixelSprite } from '../../game/projectileSprites.js';
 import { drawTrainer } from '../trainerSprite.js';
 
 // Dünya ve arayüz çizimi: portallar, tüccar, oyuncu, mermiler, efektler ve HUD.
@@ -114,7 +114,7 @@ export const WorldRenderer = {
             const cx = x0 + TILE_SIZE / 2;
 
             ctx.save();
-            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingEnabled = false;
 
             // Tüccar (tezgahın arkasında, hafifçe sallanır)
             if (this.merchantReady) {
@@ -184,10 +184,8 @@ export const WorldRenderer = {
         ctx.save();
         ctx.globalAlpha = 0.3 - lift * 0.006;
         ctx.fillStyle = '#000000';
-        const shadowW = TRAINER.spriteScale * 7 - lift * 0.25;
-        ctx.beginPath();
-        ctx.ellipse(player.x, player.y - 2, shadowW / 2, shadowW / 6, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const shadowW = 22 - lift * 0.25;
+        ctx.fillRect(player.x - shadowW / 2, player.y + 22, shadowW, 4);
         ctx.restore();
 
         // Atılım hayaleti
@@ -195,7 +193,7 @@ export const WorldRenderer = {
             ctx.save();
             ctx.globalAlpha = 0.3;
             drawTrainer(ctx, player.x - player.dashDir.x * 14, player.y - player.dashDir.y * 14,
-                player.dir, true, TRAINER.spriteScale);
+                player.dir, true, 3);
             ctx.restore();
         }
 
@@ -204,7 +202,7 @@ export const WorldRenderer = {
 
         ctx.save();
         if (this.trainerInvulnerable && player.invuln === 0) ctx.globalAlpha = 0.75; // kaçınma anı
-        drawTrainer(ctx, player.x, player.y - lift, player.dir, player.moving, TRAINER.spriteScale);
+        drawTrainer(ctx, player.x, player.y - lift, player.dir, player.moving, 3);
         ctx.restore();
 
         // Durum etkisi göstergesi
@@ -239,7 +237,7 @@ export const WorldRenderer = {
         const y = ball.fromY + (ball.toY - ball.fromY) * t - Math.sin(t * Math.PI) * 46;
 
         ctx.save();
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false;
         ctx.translate(x, y);
         ctx.rotate(ball.frame * 0.45);
         ctx.fillStyle = '#dc2626';
@@ -296,7 +294,7 @@ export const WorldRenderer = {
         const t = Date.now() / 200;
 
         ctx.save();
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false;
         for (const token of this.tokenDrops) {
             const bob = Math.sin(t + token.phase) * 3;
             const x = token.x, y = token.y + bob;
@@ -321,7 +319,13 @@ export const WorldRenderer = {
     drawProjectiles() {
         const { ctx } = this;
         for (const p of [...this.projectiles, ...this.enemyProjectiles]) {
-            drawProjectileFx(ctx, p, p.spread ? 13 : 16);
+            const def = PROJECTILE_SPRITES[p.type];
+            if (def) {
+                const opts = {};
+                if (def.spin) opts.angle = (Date.now() / 1000) * def.spin;
+                else if (def.directional && p.vx < 0) opts.flip = true;
+                drawPixelSprite(ctx, def, p.x, p.y, opts);
+            }
         }
     },
 
@@ -336,7 +340,15 @@ export const WorldRenderer = {
 
         for (const s of this.spores) {
             const colors = palettes[s.color] || palettes.sleep;
-            drawAreaFx(ctx, s.x, s.y, s.r, colors[1], Math.max(0, s.life / 30));
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, s.life / 30) * 0.8;
+            const n = 34;
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2 + s.r * 0.02;
+                ctx.fillStyle = colors[i % 3];
+                ctx.fillRect(s.x + Math.cos(a) * s.r - 1.5, s.y + Math.sin(a) * s.r - 1.5, 3, 3);
+            }
+            ctx.restore();
         }
     },
 
@@ -358,7 +370,7 @@ export const WorldRenderer = {
         }
 
         ctx.save();
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false;
         ctx.translate(bx, by);
         ctx.rotate(tilt);
         // Pokeball: 16x16'lık ince piksel deseni (P kırmızı, w beyaz, k siyah)
@@ -435,7 +447,7 @@ export const WorldRenderer = {
 
     // Ekran sabiti arayüz: can barı, yetenek kutuları, yakalanan sayısı
     drawHud() {
-        const { ctx, player } = this;
+        const { ctx, canvas, player } = this;
         ctx.save();
 
         const { progress, active } = this;
@@ -534,18 +546,18 @@ export const WorldRenderer = {
         ctx.textAlign = 'right';
         ctx.font = "bold 12px 'Space Grotesk', sans-serif";
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(this.viewW - 190, 12, 178, 44);
+        ctx.fillRect(canvas.width - 190, 12, 178, 44);
         ctx.fillStyle = '#fbbf24';
-        ctx.fillText(`${progress.tokens} jeton`, this.viewW - 20, 30);
+        ctx.fillText(`${progress.tokens} jeton`, canvas.width - 20, 30);
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText(`${progress.collection.length} yakalanan · E: kütüphane`, this.viewW - 20, 47);
+        ctx.fillText(`${progress.collection.length} yakalanan · E: kütüphane`, canvas.width - 20, 47);
 
         // Poke Ball sayacı (tükenince Kecleon'dan alınır)
         const balls = progress.itemCount('poke-ball');
         ctx.fillStyle = balls > 0 ? '#f8fafc' : '#f87171';
-        ctx.fillText(`${balls}x`, this.viewW - 158, 30);
+        ctx.fillText(`${balls}x`, canvas.width - 158, 30);
         ctx.save();
-        ctx.translate(this.viewW - 176, 26);
+        ctx.translate(canvas.width - 176, 26);
         ctx.fillStyle = balls > 0 ? '#dc2626' : '#7f1d1d';
         ctx.fillRect(-6, -6, 12, 6);
         ctx.fillStyle = balls > 0 ? '#f8fafc' : '#475569';
@@ -560,7 +572,7 @@ export const WorldRenderer = {
             ctx.textAlign = 'right';
             ctx.font = "bold 11px 'Space Grotesk', sans-serif";
             moves.forEach((move, i) => {
-                const x = this.viewW - 20 - i * 92;
+                const x = canvas.width - 20 - i * 92;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
                 ctx.fillRect(x - 82, 62, 84, 22);
                 ctx.fillStyle = move.color;
@@ -571,7 +583,7 @@ export const WorldRenderer = {
         }
 
         // Yetenek kutuları (sol alt)
-        const boxY = this.viewH - 58;
+        const boxY = canvas.height - 58;
         this.abilities.forEach((ability, i) => {
             const boxX = 12 + i * 52;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';

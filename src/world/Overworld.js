@@ -5,7 +5,7 @@ import { fetchCharacter } from '../services/pokeapi.js';
 import { preloadTypes } from '../services/typeChart.js';
 import { FIELD_MOVES, fieldMoveForTile } from '../config/fieldMoves.js';
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
-import { TRAINER, HIT_STOP, VIEW } from '../config/balance.js';
+import { TRAINER, HIT_STOP } from '../config/balance.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { Enemy } from './Enemy.js';
 
@@ -29,20 +29,6 @@ export class Overworld {
     constructor({ canvas, input, onExit, progress, onOpenShop, onMerchantLoaded }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-
-        // Macera modu piksel sanatı DEĞİL: yüksek çözünürlükte, yumuşatılmış çizim.
-        // Mantık her zaman "mantıksal" birimlerde çalışır (viewW/viewH); canvas
-        // arka planı RENDER_SCALE katı büyük tutulup CSS ile küçültülür - böylece
-        // her şey keskin görünür. (Arena modu piksel tarzını korur.)
-        this.viewW = VIEW.width;
-        this.viewH = VIEW.height;
-        this.res = VIEW.renderScale;
-
-        canvas.width = this.viewW * this.res;
-        canvas.height = this.viewH * this.res;
-        canvas.style.width = '100%';
-        canvas.style.maxWidth = `${this.viewW}px`;
-        canvas.style.height = 'auto';
         this.input = input;
         this.onExit = onExit;
         this.progress = progress;
@@ -56,9 +42,9 @@ export class Overworld {
         this.evolutionScene = null;
         this.swapCooldown = 0;
 
-        // Görüntü ölçeği: 1'in üstü her şeyi büyütür (düşmanlar "minnacık"
-        // görünmesin diye). Yüksek çözünürlük sayesinde bulanıklaşmaz.
-        this.zoom = VIEW.zoom;
+        // Görüntü ölçeği: 1 = birebir. Düşürmek haritanın daha geniş bir
+        // kısmını ekrana sığdırır (her şey orantılı küçülür).
+        this.zoom = 1;
 
         this.currentMap = null;
         this.portals = [];
@@ -119,8 +105,8 @@ export class Overworld {
 
         // Atmosfer: kenarları karartan vinyet (bir kez oluşturulur)
         const vg = this.ctx.createRadialGradient(
-            this.viewW / 2, this.viewH / 2, this.viewH * 0.45,
-            this.viewW / 2, this.viewH / 2, this.viewH * 0.95
+            canvas.width / 2, canvas.height / 2, canvas.height * 0.45,
+            canvas.width / 2, canvas.height / 2, canvas.height * 0.95
         );
         vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
         vg.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
@@ -176,12 +162,12 @@ export class Overworld {
                     this.merchantLabel = `Tüccar ${merchant.name}`;
                     this.onMerchantLoaded?.(merchant.name);
                     this.merchantImg.onload = () => { this.merchantReady = true; };
-                    this.merchantImg.src = merchant.sprite || merchant.battleSprite;
+                    this.merchantImg.src = merchant.battleSprite || merchant.sprite;
                 })
                 .catch(error => console.error('Tüccar yüklenemedi:', error));
         }
 
-        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingEnabled = false;
         this.running = true;
 
         // Ekran yenilemesiyle senkron döngü (setInterval'dan daha akıcı);
@@ -276,7 +262,7 @@ export class Overworld {
                 enemy.name = data.name;
                 enemy.types = data.types || [];
                 this.progress.markSeen(enemy.id, data.name, false, enemy.kind); // Pokedex: görüldü
-                enemy.img.src = data.sprite || data.battleSprite;
+                enemy.img.src = data.battleSprite || data.sprite;
                 preloadTypes(enemy.types);
             }).catch(error => console.error(`Düşman #${enemy.id} yüklenemedi:`, error));
         }
@@ -411,21 +397,15 @@ export class Overworld {
     }
 
     draw() {
-        const { ctx } = this;
-
-        // Tüm çizim mantıksal birimlerde yapılır; buradaki ölçek onu
-        // yüksek çözünürlüklü arka plana taşır.
-        ctx.setTransform(this.res, 0, 0, this.res, 0, 0);
-        ctx.clearRect(0, 0, this.viewW, this.viewH);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        const { ctx, canvas } = this;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
 
         // Dünya, kamera kadar kaydırılarak çizilir (boss uyanışında sarsılır)
         ctx.save();
         const sx = this.shake ? (Math.random() - 0.5) * this.shake : 0;
         const sy = this.shake ? (Math.random() - 0.5) * this.shake : 0;
-        ctx.scale(this.zoom, this.zoom);
-        ctx.translate(-this.camera.x + sx, -this.camera.y + sy);
+        ctx.translate(-Math.round(this.camera.x) + sx, -Math.round(this.camera.y) + sy);
 
         this.drawTiles();
         this.drawPortals();
@@ -457,19 +437,17 @@ export class Overworld {
 
         // Atmosfer: loş tonlama + kenar karartması (ekran sabiti)
         const shadowy = this.currentMap.ambience === 'shadow';
-        // Tonlama ölçülü: üstüne bir de vinyet biniyor, fazlası haritayı
-        // okunmaz hale getiriyor.
         if (this.currentMap.theme === 'dark') {
-            ctx.fillStyle = shadowy ? 'rgba(8, 6, 20, 0.26)' : 'rgba(6, 18, 10, 0.09)';
-            ctx.fillRect(0, 0, this.viewW, this.viewH);
+            ctx.fillStyle = shadowy ? 'rgba(8, 6, 20, 0.34)' : 'rgba(6, 18, 10, 0.18)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         if (this.currentMap.ambience) {
             ctx.fillStyle = this.vignette;
-            ctx.fillRect(0, 0, this.viewW, this.viewH);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (shadowy) {
                 // Derinlikler: ikinci kat karartma, koridorlar iyice daralır
                 ctx.fillStyle = this.vignette;
-                ctx.fillRect(0, 0, this.viewW, this.viewH);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
 

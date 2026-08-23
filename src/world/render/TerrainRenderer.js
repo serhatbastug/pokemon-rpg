@@ -1,649 +1,20 @@
 import { TILE_SIZE } from '../../config/worldMap.js';
-import { cel, celCircle, groundShadow, paint, brush, paintedShadow, foliagePath } from './celShading.js';
-import { style } from '../../config/renderStyle.js';
 
-// Macera modu zemini.
-//
-// İki çizim dili desteklenir (bkz. config/renderStyle.js):
-//   painted -> anime ARKA PLAN sanatı: konturu yok, boyanmış ton bantları
-//   bold    -> kalın konturlu cel-shading
-// Anime'de arka planlar guaj boyayla boyanır ve çizgi taşımaz; çizgi yalnızca
-// karakterlerde bulunur. Bu yüzden varsayılan "painted".
-//
-// Harita bir kez offscreen canvas'a pişirilir, her karede tek drawImage ile
-// kopyalanır. (Arena modu kendi piksel tarzını korur.)
-
-const painted = () => style().terrain.painted;
-
-// Şekli seçili dile göre gölgelendirir
-function shade(ctx, pathFn, opts) {
-    if (painted()) paint(ctx, pathFn, opts);
-    else cel(ctx, pathFn, opts);
-}
-
-function dropShadow(ctx, x, y, rx, ry, alpha) {
-    if (painted()) paintedShadow(ctx, x, y, rx, ry, alpha);
-    else groundShadow(ctx, x, y, rx, ry, alpha);
-}
-
+// Zemin çizimi: karo desenleri ve haritanın offscreen canvas'a pişirilmesi.
+// Overworld prototipine karıştırılır (applyMixins) - bu yüzden 'this' Overworld örneğidir.
 export const TerrainRenderer = {
-    // Karo paleti: [taban, gölge, ışık, kontur]
-    tilePalette(tile, dark) {
-        const day = {
-            '.': ['#5cb856', '#3f9c46', '#7fd472', '#2a6b31'],   // çim
-            'p': ['#d9b27a', '#b98f5c', '#eccb9a', '#8a6438'],   // patika
-            's': ['#f0d99a', '#d6ba76', '#fcecc0', '#a98d54'],   // kum
-            'R': ['#a8b2bd', '#7d8794', '#c9d2db', '#4f5763'],   // kaya
-            'W': ['#4aa8e0', '#2f7fbe', '#8fd4f5', '#1c5988'],   // su
-            'b': ['#a37a4a', '#7d5a34', '#c39a67', '#553a1f']    // boss arenası
-        };
-        // Loş haritalarda boyama dili için daha aydınlık gece paleti: üstüne
-        // ayrıca atmosfer tonlaması bindiği için koyu palet okunmuyordu.
-        const night = painted() ? {
-            '.': ['#438a45', '#2f6a35', '#5cae59', '#173d1c'],
-            'p': ['#ab8a5e', '#886a45', '#c4a87c', '#5c4326'],
-            's': ['#cdb680', '#a89262', '#e0cf9e', '#75613a'],
-            'R': ['#8b95a2', '#68717c', '#a8b2be', '#363c45'],
-            'W': ['#3389bb', '#22648f', '#66b4dd', '#12405f'],
-            'b': ['#87663d', '#654a2c', '#a28155', '#3b2814']
-        } : {
-            '.': ['#357a3c', '#25592c', '#4b9c4c', '#173d1c'],
-            'p': ['#9c7c53', '#7a5e3c', '#b89a6e', '#5c4326'],
-            's': ['#c0aa76', '#9c8757', '#d6c493', '#75613a'],
-            'R': ['#7c8794', '#5a636e', '#9aa5b1', '#363c45'],
-            'W': ['#2b7cae', '#1c5a85', '#5aa8d4', '#12405f'],
-            'b': ['#7a5a36', '#5a4026', '#96754b', '#3b2814']
-        };
-        return (dark ? night : day)[tile] || (dark ? night['.'] : day['.']);
-    },
-
-    drawTile(ctx, tile, col, row, phase = 0) {
-        const x0 = col * TILE_SIZE;
-        const y0 = row * TILE_SIZE;
-        const size = TILE_SIZE;
-        const dark = this.currentMap.theme === 'dark';
-
-        // Konuma bağlı ama rastgele görünen değer (0-1)
-        const noise = (a, b) => {
-            const v = Math.sin(col * 12.9898 + row * 78.233 + a * 3.17 + b * 7.31) * 43758.5453;
-            return v - Math.floor(v);
-        };
-
-        // Nesne karolarının (ağaç, çalı, çiçek) zemini çimdir
-        const groundTile = ['h', 'H', 'T', 'f', 'g', 'A'].includes(tile) ? '.' : tile;
-        const [base, shadow, light] = this.tilePalette(groundTile, dark);
-
-        ctx.fillStyle = base;
-        ctx.fillRect(x0, y0, size, size);
-
-        this.drawGroundDetail(ctx, x0, y0, groundTile, noise, shadow, light);
-
-        if (tile === 'W') this.drawWater(ctx, x0, y0, phase, dark, noise);
-        if (tile === 'R') this.drawRock(ctx, x0, y0, noise, dark);
-        if (tile === 'T') this.drawTree(ctx, x0, y0, noise, dark);
-        if (tile === 'A') this.drawAncientTree(ctx, x0, y0, noise, phase);
-        if (tile === 'f') this.drawFlowers(ctx, x0, y0, noise);
-        if (tile === 'g') this.drawTallGrass(ctx, x0, y0, noise, phase, dark);
-        if (tile === 'h' || tile === 'H') this.drawBush(ctx, x0, y0, noise, dark);
-        if (tile === 'b') this.drawScorched(ctx, x0, y0, noise);
-    },
-
-    // Zemin dokusu. Karo sınırında dikiş oluşmaması için lekeler karo
-    // ortasında tutulur ve düşük kontrastla çizilir.
-    drawGroundDetail(ctx, x0, y0, tile, noise, shadow, light) {
-        const size = TILE_SIZE;
-        const soft = painted();
-        ctx.save();
-
-        if (tile === '.') {
-            // Boyanmış çim: düşük kontrastlı geniş ton yamaları.
-            // Kontrast yükselirse karo sınırında leke gibi görünür.
-            ctx.globalAlpha = soft ? 0.14 : 0.35;
-            for (let i = 0; i < 3; i++) {
-                ctx.fillStyle = i === 1 ? shadow : light;
-                const px = x0 + size * (0.32 + noise(i, 1) * 0.36);
-                const py = y0 + size * (0.32 + noise(i, 2) * 0.36);
-                ctx.beginPath();
-                ctx.ellipse(px, py, size * 0.19, size * 0.12, noise(i, 3) * Math.PI, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Çim tutamları
-            ctx.globalAlpha = soft ? 0.4 : 0.55;
-            ctx.strokeStyle = shadow;
-            ctx.lineWidth = soft ? 1.3 : 1.6;
-            ctx.lineCap = 'round';
-            for (let i = 0; i < 3; i++) {
-                const gx = x0 + size * (0.22 + noise(i, 4) * 0.56);
-                const gy = y0 + size * (0.38 + noise(i, 5) * 0.44);
-                ctx.beginPath();
-                if (soft) {
-                    // Boyama: iki ince yaprak, çizgi film "v"si değil
-                    ctx.moveTo(gx - 3, gy);
-                    ctx.quadraticCurveTo(gx - 2, gy - 4, gx - 1, gy - 5);
-                    ctx.moveTo(gx + 2, gy);
-                    ctx.quadraticCurveTo(gx + 3, gy - 3, gx + 4, gy - 4);
-                } else {
-                    ctx.moveTo(gx - 3, gy);
-                    ctx.lineTo(gx, gy - 4);
-                    ctx.lineTo(gx + 3, gy);
-                }
-                ctx.stroke();
-            }
-        } else if (tile === 'p' || tile === 's' || tile === 'b') {
-            ctx.globalAlpha = soft ? 0.3 : 0.4;
-            for (let i = 0; i < 3; i++) {
-                ctx.fillStyle = i % 2 ? shadow : light;
-                const px = x0 + size * (0.24 + noise(i, 6) * 0.52);
-                const py = y0 + size * (0.24 + noise(i, 7) * 0.52);
-                ctx.beginPath();
-                ctx.ellipse(px, py, 3 + noise(i, 8) * 3, 2 + noise(i, 9) * 2, noise(i, 10) * 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-        ctx.restore();
-    },
-
-    drawWater(ctx, x0, y0, phase, dark, noise) {
-        const size = TILE_SIZE;
-        const [, shadow, light] = this.tilePalette('W', dark);
-        const soft = painted();
-
-        ctx.save();
-        const offset = phase ? size * 0.12 : 0;
-
-        // Derinlik: koyu bant
-        ctx.globalAlpha = soft ? 0.3 : 0.35;
-        ctx.fillStyle = shadow;
-        ctx.beginPath();
-        ctx.ellipse(x0 + size * 0.66, y0 + size * 0.7, size * 0.28, size * 0.18, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dalga çizgileri
-        ctx.globalAlpha = soft ? 0.7 : 1;
-        ctx.strokeStyle = light;
-        ctx.lineWidth = soft ? 2.4 : 3;
-        ctx.lineCap = 'round';
-        for (let i = 0; i < 3; i++) {
-            const y = y0 + size * (0.22 + i * 0.27) + offset;
-            const w = size * (0.2 + noise(i, 11) * 0.18);
-            const x = x0 + size * (0.16 + noise(i, 12) * 0.42);
-            ctx.beginPath();
-            if (soft) {
-                ctx.moveTo(x, y);
-                ctx.quadraticCurveTo(x + w * 0.5, y - 2, x + w, y);
-            } else {
-                ctx.moveTo(x, y);
-                ctx.lineTo(x + w, y);
-            }
-            ctx.stroke();
-        }
-
-        // Köpük vurgusu
-        ctx.globalAlpha = soft ? 0.6 : 0.8;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x0 + size * 0.2, y0 + size * (phase ? 0.44 : 0.36));
-        ctx.lineTo(x0 + size * 0.36, y0 + size * (phase ? 0.44 : 0.36));
-        ctx.stroke();
-        ctx.restore();
-    },
-
-    drawRock(ctx, x0, y0, noise, dark) {
-        const size = TILE_SIZE;
-        const [base, shadow, light, outline] = this.tilePalette('R', dark);
-        const cx = x0 + size * (0.46 + noise(0, 21) * 0.08);
-        const cy = y0 + size * 0.56;
-        const w = size * (0.34 + noise(0, 22) * 0.06);
-
-        dropShadow(ctx, cx, y0 + size * 0.82, w * 1.05, size * 0.1, 0.24);
-
-        const path = () => {
-            ctx.beginPath();
-            ctx.moveTo(cx - w, cy + size * 0.2);
-            ctx.lineTo(cx - w * 0.75, cy - size * 0.12);
-            ctx.lineTo(cx - w * 0.2, cy - size * 0.3);
-            ctx.lineTo(cx + w * 0.55, cy - size * 0.18);
-            ctx.lineTo(cx + w, cy + size * 0.14);
-            ctx.lineTo(cx + w * 0.5, cy + size * 0.24);
-            ctx.closePath();
-        };
-        shade(ctx, path, {
-            base, shadow, light,
-            outline, lineWidth: 2.2,
-            softness: 0.14,
-            bounds: { x: cx - w, y: cy - size * 0.3, w: w * 2, h: size * 0.55 }
-        });
-
-        // Kayadaki çatlak
-        ctx.save();
-        path();
-        ctx.clip();
-        if (painted()) {
-            ctx.filter = 'blur(0.6px)';
-            ctx.globalAlpha = 0.5;
-            ctx.strokeStyle = shadow;
-            ctx.lineWidth = 2;
-        } else {
-            ctx.globalAlpha = 0.65;
-            ctx.strokeStyle = outline;
-            ctx.lineWidth = 1.6;
-        }
-        ctx.beginPath();
-        ctx.moveTo(cx - w * 0.15, cy - size * 0.18);
-        ctx.lineTo(cx + w * 0.05, cy + size * 0.05);
-        ctx.stroke();
-        ctx.filter = 'none';
-        ctx.restore();
-    },
-
-    drawTree(ctx, x0, y0, noise, dark) {
-        const size = TILE_SIZE;
-        // Konuma göre boyut/konum çeşitliliği: ağaçlar aynı görünmesin
-        const grow = 0.88 + noise(0, 31) * 0.26;
-        const cx = x0 + size * (0.44 + noise(0, 32) * 0.12);
-        const baseY = y0 + size * 0.86;
-        const soft = painted();
-
-        // Boyama dilinde daha aydınlık bir palet: yumuşak gölge kütlesi
-        // rengi zaten koyultuyor, koyu tabanla birlikte görüntü kararıyor.
-        const leaf = dark
-            ? (soft
-                ? { base: '#3f9349', shadow: '#2a6634', light: '#6ec06a', outline: '#12321a' }
-                : { base: '#2f7a3a', shadow: '#1c4f27', light: '#59b45c', outline: '#12321a' })
-            : (soft
-                ? { base: '#54ac4f', shadow: '#347f3e', light: '#8ad673', outline: '#1e5427' }
-                : { base: '#4fa94f', shadow: '#2f7a3c', light: '#8ede7c', outline: '#1e5427' });
-        const wood = dark
-            ? { base: '#5e4227', shadow: '#3e2b18', light: '#7a5734', outline: '#2d1d0f' }
-            : { base: '#8a6440', shadow: '#66492d', light: '#a8804f', outline: '#4a3018' };
-
-        dropShadow(ctx, cx, baseY, size * 0.32 * grow, size * 0.1, 0.26);
-
-        // Gövde: tacın altından yalnızca ince bir parça görünür. Geniş
-        // bırakılırsa yaprakların altında kare bir blok gibi durur.
-        const trunkW = size * 0.07;
-        const trunkTop = y0 + size * 0.5;
-        shade(ctx, () => {
-            ctx.beginPath();
-            ctx.moveTo(cx - trunkW, baseY);
-            ctx.lineTo(cx - trunkW * 0.75, trunkTop);
-            ctx.lineTo(cx + trunkW * 0.75, trunkTop);
-            ctx.lineTo(cx + trunkW, baseY);
-            ctx.closePath();
-        }, {
-            base: wood.base, shadow: wood.shadow, light: soft ? wood.light : null,
-            outline: wood.outline, lineWidth: 2,
-            softness: 0.3,
-            bounds: { x: cx - trunkW, y: trunkTop, w: trunkW * 2, h: baseY - trunkTop }
-        });
-
-        // Taç: kenarı yaprak kümeleriyle tırtıklı tek siluet. Küme sayısı ve
-        // boyları konuma göre değişir ki ağaçlar aynı görünmesin.
-        const r = size * 0.34 * grow;
-        const canopyY = y0 + size * 0.3;
-        const bumps = 7 + Math.floor(noise(0, 36) * 3);
-        const bump = (i) => noise(i, 37);
-        const canopyPath = () => foliagePath(ctx, cx, canopyY, r, bumps, bump);
-
-        if (soft) {
-            // Taban rengi + KESKİN kenarlı ton bantları. Bulanık leke değil:
-            // anime arka planında da tonlar birbirinden net ayrılır.
-            canopyPath();
-            ctx.fillStyle = leaf.base;
-            ctx.fill();
-        } else {
-            shade(ctx, canopyPath, {
-                base: leaf.base, shadow: leaf.shadow, light: null,
-                outline: leaf.outline, lineWidth: 2.4,
-                bounds: { x: cx - r * 1.6, y: canopyY - r * 1.3, w: r * 3.2, h: r * 2.6 }
-            });
-        }
-
-        ctx.save();
-        canopyPath();
-        ctx.clip();
-
-        if (soft) {
-            // Alt-sağ gölge kütlesi: kendisi de tırtıklı, böylece gölgenin
-            // kenarı da yaprak gibi kırılır. Hacim asıl buradan gelir.
-            foliagePath(ctx, cx + r * 0.38, canopyY + r * 0.46, r * 0.95, bumps, (i) => noise(i, 38));
-            ctx.fillStyle = leaf.shadow;
-            ctx.fill();
-
-            // Üst-sol ışık kümesi: küçük tutulur, büyüğü tacı soldurur
-            ctx.globalAlpha = 0.8;
-            foliagePath(ctx, cx - r * 0.4, canopyY - r * 0.42, r * 0.44, 5, (i) => noise(i, 39));
-            ctx.fillStyle = leaf.light;
-            ctx.fill();
-            ctx.globalAlpha = 1;
-
-            // Küme ayrım çizgileri: yaprak kümelerini birbirinden ayırır
-            ctx.strokeStyle = leaf.shadow;
-            ctx.globalAlpha = 0.5;
-            ctx.lineWidth = Math.max(1, r * 0.07);
-            ctx.lineCap = 'round';
-            for (let i = 0; i < 3; i++) {
-                const a = (noise(i, 41) * 2 - 0.4) * Math.PI;
-                const lx = cx + Math.cos(a) * r * 0.45;
-                const ly = canopyY + Math.sin(a) * r * 0.4;
-                ctx.beginPath();
-                ctx.arc(lx, ly, r * (0.28 + noise(i, 42) * 0.18), a - 1.1, a + 1.1);
-                ctx.stroke();
-            }
-            ctx.globalAlpha = 1;
-        } else {
-            ctx.fillStyle = leaf.light;
-            ctx.beginPath();
-            ctx.ellipse(cx - r * 0.45, canopyY - r * 0.5, r * 0.42, r * 0.26, -0.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = leaf.shadow;
-            ctx.lineWidth = 1.8;
-            ctx.globalAlpha = 0.7;
-            for (let i = 0; i < 2; i++) {
-                ctx.beginPath();
-                ctx.arc(cx + r * (0.1 + i * 0.5), canopyY + r * (0.15 + i * 0.2), r * 0.4, 2.6, 4.4);
-                ctx.stroke();
-            }
-        }
-        ctx.restore();
-    },
-
-    drawBush(ctx, x0, y0, noise, dark) {
-        const size = TILE_SIZE;
-        const cx = x0 + size * 0.5;
-        const cy = y0 + size * 0.58;
-        const r = size * (0.28 + noise(0, 41) * 0.05);
-        const soft = painted();
-
-        const leaf = dark
-            ? { base: '#2a6f35', shadow: '#194a24', light: '#4a9c4e', outline: '#102d17' }
-            : { base: '#47a049', shadow: '#2f7d3a', light: '#7fd472', outline: '#1c4f26' };
-
-        dropShadow(ctx, cx, y0 + size * 0.82, r * 1.15, size * 0.09, 0.24);
-
-        const lobes = [
-            [cx, cy - r * 0.15, r * 0.85],
-            [cx - r * 0.65, cy + r * 0.2, r * 0.68],
-            [cx + r * 0.65, cy + r * 0.18, r * 0.66]
-        ];
-        const path = () => {
-            ctx.beginPath();
-            for (const [lx, ly, lr] of lobes) {
-                ctx.moveTo(lx + lr, ly);
-                ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-            }
-        };
-        shade(ctx, path, {
-            base: leaf.base, shadow: leaf.shadow, light: null,
-            outline: leaf.outline, lineWidth: 2.2,
-            softness: 0.2,
-            bounds: { x: cx - r * 1.5, y: cy - r, w: r * 3, h: r * 2.2 }
-        });
-
-        ctx.save();
-        path();
-        ctx.clip();
-        if (soft) {
-            brush(ctx, () => {
-                ctx.beginPath();
-                ctx.ellipse(cx - r * 0.35, cy - r * 0.45, r * 0.5, r * 0.3, -0.5, 0, Math.PI * 2);
-            }, leaf.light, r * 0.2, 0.65);
-            for (let i = 0; i < 2; i++) {
-                const bx = cx + (noise(i, 42) - 0.4) * r * 1.3;
-                const by = cy + r * (0.3 + noise(i, 43) * 0.4);
-                brush(ctx, () => {
-                    ctx.beginPath();
-                    ctx.ellipse(bx, by, r * 0.32, r * 0.2, 0, 0, Math.PI * 2);
-                }, leaf.shadow, r * 0.18, 0.4);
-            }
-        } else {
-            ctx.fillStyle = leaf.light;
-            for (let i = 0; i < 3; i++) {
-                const lx = cx + (noise(i, 42) - 0.5) * r * 1.4;
-                const ly = cy + (noise(i, 43) - 0.5) * r * 1.1;
-                ctx.beginPath();
-                ctx.moveTo(lx, ly - 5);
-                ctx.lineTo(lx + 4, ly + 3);
-                ctx.lineTo(lx - 4, ly + 3);
-                ctx.closePath();
-                ctx.fill();
-            }
-        }
-        ctx.restore();
-    },
-
-    drawTallGrass(ctx, x0, y0, noise, phase, dark) {
-        const size = TILE_SIZE;
-        const sway = phase === 0 ? 0 : 3;
-        const soft = painted();
-        const blade = dark
-            ? { base: '#3f9245', deep: '#245c2c', light: '#63b866', outline: '#173d1c' }
-            : { base: '#66c25b', deep: '#3d8f42', light: '#9be089', outline: '#2a6b31' };
-
-        ctx.save();
-        ctx.lineCap = 'round';
-        for (let i = 0; i < 7; i++) {
-            const gx = x0 + size * (0.14 + noise(i, 51) * 0.72);
-            const gy = y0 + size * (0.68 + noise(i, 52) * 0.24);
-            const h = size * (0.26 + noise(i, 53) * 0.24);
-            const lean = (noise(i, 54) - 0.5) * 10 + sway;
-            const stroke = () => {
-                ctx.beginPath();
-                ctx.moveTo(gx, gy);
-                ctx.quadraticCurveTo(gx + lean * 0.4, gy - h * 0.6, gx + lean, gy - h);
-                ctx.stroke();
-            };
-
-            if (soft) {
-                // Boyanmış çim: konturu yok, koyu taban -> açık uç
-                ctx.strokeStyle = blade.deep;
-                ctx.lineWidth = 3.4;
-                stroke();
-                ctx.strokeStyle = blade.base;
-                ctx.lineWidth = 2.2;
-                stroke();
-                ctx.globalAlpha = 0.75;
-                ctx.strokeStyle = blade.light;
-                ctx.lineWidth = 1.1;
-                stroke();
-                ctx.globalAlpha = 1;
-            } else {
-                ctx.strokeStyle = blade.outline;
-                ctx.lineWidth = 4.5;
-                stroke();
-                ctx.strokeStyle = blade.base;
-                ctx.lineWidth = 2.2;
-                stroke();
-            }
-        }
-        ctx.restore();
-    },
-
-    drawFlowers(ctx, x0, y0, noise) {
-        const size = TILE_SIZE;
-        const soft = painted();
-        const palettes = [
-            { base: '#ff7fb0', light: '#ffc2da', shadow: '#d9548c', outline: '#b03a68' },
-            { base: '#ffd24a', light: '#ffe89a', shadow: '#d9a92c', outline: '#b8862a' },
-            { base: '#ff8a6b', light: '#ffc0ae', shadow: '#d96145', outline: '#b04a34' },
-            { base: '#c79bff', light: '#e6d0ff', shadow: '#9c6fd9', outline: '#7a4fb0' },
-            { base: '#fdfdfd', light: '#ffffff', shadow: '#d5dbe2', outline: '#9aa5b1' }
-        ];
-
-        for (let i = 0; i < 3; i++) {
-            const fx = x0 + size * (0.22 + noise(i, 61) * 0.56);
-            const fy = y0 + size * (0.32 + noise(i, 62) * 0.46);
-            const r = 4 + noise(i, 63) * 1.5;
-            const c = palettes[Math.floor(noise(i, 64) * palettes.length) % palettes.length];
-
-            // Sap
-            ctx.save();
-            ctx.strokeStyle = soft ? '#3d8f42' : '#2a6b31';
-            ctx.lineWidth = 1.8;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(fx, fy + r * 2.6);
-            ctx.quadraticCurveTo(fx + 2, fy + r, fx, fy);
-            ctx.stroke();
-            ctx.restore();
-
-            // Taç yapraklar
-            for (let p = 0; p < 5; p++) {
-                const a = (p / 5) * Math.PI * 2 - Math.PI / 2;
-                const px = fx + Math.cos(a) * r;
-                const py = fy + Math.sin(a) * r;
-                if (soft) {
-                    paint(ctx, () => {
-                        ctx.beginPath();
-                        ctx.arc(px, py, r * 0.7, 0, Math.PI * 2);
-                    }, {
-                        base: c.base, shadow: c.shadow, light: c.light,
-                        softness: 0.3,
-                        bounds: { x: px - r * 0.7, y: py - r * 0.7, w: r * 1.4, h: r * 1.4 }
-                    });
-                } else {
-                    celCircle(ctx, px, py, r * 0.66, {
-                        base: c.base, shadow: null, light: null,
-                        outline: c.outline, lineWidth: 1.2
-                    });
-                }
-            }
-            // Göbek
-            if (soft) {
-                ctx.fillStyle = '#ffd95e';
-                ctx.beginPath();
-                ctx.arc(fx, fy, r * 0.42, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                celCircle(ctx, fx, fy, r * 0.42, {
-                    base: '#ffe066', shadow: null, light: null,
-                    outline: '#b8862a', lineWidth: 1.1
-                });
-            }
-        }
-    },
-
-    drawAncientTree(ctx, x0, y0, noise, phase) {
-        const size = TILE_SIZE;
-        const soft = painted();
-
-        ctx.save();
-        ctx.fillStyle = '#8a5f38';
-        ctx.fillRect(x0, y0, size, size);
-
-        // Sağ yanda gölge kütlesi
-        if (soft) {
-            ctx.filter = 'blur(6px)';
-            ctx.fillStyle = '#5f3f22';
-            ctx.fillRect(x0 + size * 0.55, y0 - 4, size * 0.55, size + 8);
-            ctx.filter = 'none';
-        } else {
-            ctx.fillStyle = '#5f3f22';
-            ctx.fillRect(x0 + size * 0.55, y0, size * 0.45, size);
-        }
-
-        // Kabuk damarları
-        ctx.strokeStyle = '#3d2712';
-        ctx.globalAlpha = soft ? 0.55 : 1;
-        ctx.lineWidth = soft ? 2 : 2.4;
-        ctx.lineCap = 'round';
-        if (soft) ctx.filter = 'blur(0.8px)';
-        for (let i = 0; i < 3; i++) {
-            const x = x0 + size * (0.18 + i * 0.28 + noise(i, 71) * 0.06);
-            ctx.beginPath();
-            ctx.moveTo(x, y0);
-            ctx.quadraticCurveTo(x + 5, y0 + size / 2, x, y0 + size);
-            ctx.stroke();
-        }
-        ctx.filter = 'none';
-
-        // Yosun
-        ctx.fillStyle = '#4aa64c';
-        ctx.globalAlpha = soft ? 0.5 : 0.75;
-        if (soft) ctx.filter = 'blur(4px)';
-        for (let i = 0; i < 2; i++) {
-            const mx = x0 + size * (0.24 + noise(i, 72) * 0.52);
-            const my = y0 + size * (0.24 + noise(i, 73) * 0.52);
-            ctx.beginPath();
-            ctx.ellipse(mx, my, size * 0.16, size * 0.1, noise(i, 74) * 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.filter = 'none';
-        ctx.globalAlpha = 1;
-
-        // Kadim rune
-        const rx = x0 + size * (0.3 + noise(0, 75) * 0.35);
-        const ry = y0 + size * (0.28 + noise(0, 76) * 0.35);
-        if (soft) {
-            // Boyama dilinde parıltı: yumuşak hale
-            ctx.filter = 'blur(3px)';
-            ctx.globalAlpha = 0.7;
-            ctx.strokeStyle = phase === 0 ? '#7dffa0' : '#c9ffd8';
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.arc(rx, ry, size * 0.13, 0.4, 4.4);
-            ctx.stroke();
-            ctx.filter = 'none';
-            ctx.globalAlpha = 1;
-        }
-        ctx.strokeStyle = phase === 0 ? '#7dffa0' : '#c9ffd8';
-        ctx.lineWidth = soft ? 2.4 : 3;
-        ctx.beginPath();
-        ctx.arc(rx, ry, size * 0.13, 0.4, 4.4);
-        ctx.stroke();
-        ctx.restore();
-    },
-
-    drawScorched(ctx, x0, y0, noise) {
-        const size = TILE_SIZE;
-        const soft = painted();
-        ctx.save();
-
-        ctx.fillStyle = '#5a3a1e';
-        ctx.globalAlpha = soft ? 0.45 : 0.55;
-        if (soft) ctx.filter = 'blur(5px)';
-        for (let i = 0; i < 2; i++) {
-            const sx = x0 + size * (0.28 + noise(i, 81) * 0.44);
-            const sy = y0 + size * (0.28 + noise(i, 82) * 0.44);
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, size * 0.19, size * 0.12, noise(i, 83) * 3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.filter = 'none';
-
-        ctx.globalAlpha = soft ? 0.55 : 0.8;
-        ctx.strokeStyle = '#2b1a0c';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        if (soft) ctx.filter = 'blur(0.7px)';
-        for (let i = 0; i < 2; i++) {
-            const sx = x0 + size * (0.24 + noise(i, 84) * 0.52);
-            const sy = y0 + size * (0.24 + noise(i, 85) * 0.52);
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(sx + (noise(i, 86) - 0.5) * size * 0.5, sy + (noise(i, 87) - 0.5) * size * 0.5);
-            ctx.stroke();
-        }
-        ctx.filter = 'none';
-        ctx.restore();
-    },
-
-    // Zemin, harita yüklenirken iki animasyon karesi halinde pişirilir
+    // Zemin, harita yüklenirken iki animasyon karesi halinde offscreen canvas'a
+    // bir kez çizilir. Her karede binlerce fillRect yerine tek drawImage yapılır;
+    // harita değişince (gizli oda açılması, boss yıkımı) yeniden pişirilir.
     bakeTerrain() {
         const grid = this.currentMap.grid;
         const w = grid[0].length * TILE_SIZE;
         const h = grid.length * TILE_SIZE;
 
-        // Ağaç/çalı tacı karonun ÜSTÜNE taşar; bu karolar için tuvale bir
-        // karo boyu üst pay verilir, aksi halde taç tepesinden kesilir.
-        const OVERHANG = new Set(['T', 'A', 'h', 'H']);
-
-        // Karo desenleri önbelleğe alınır; desen konuma bağlı olduğundan
-        // VARIANTS karoda bir tekrar eder.
-        const VARIANTS = 9;
+        // Karo desenleri konuma göre değişir ama VARIANTS karoda bir tekrar eder;
+        // her benzersiz desen bir kez çizilip önbelleğe alınır, sonra kopyalanır.
+        // (Doğrudan çizim harita başına ~230.000 fillRect demek olurdu.)
+        const VARIANTS = 6;
         const patches = new Map();
         const patchFor = (tile, col, row, phase) => {
             const vc = col % VARIANTS;
@@ -651,14 +22,12 @@ export const TerrainRenderer = {
             const key = `${tile}|${vc}|${vr}|${phase}`;
             let patch = patches.get(key);
             if (!patch) {
-                const pad = OVERHANG.has(tile) ? TILE_SIZE : 0;
                 patch = document.createElement('canvas');
                 patch.width = TILE_SIZE;
-                patch.height = TILE_SIZE + pad;
-                patch.pad = pad;
+                patch.height = TILE_SIZE;
                 const pctx = patch.getContext('2d');
-                pctx.imageSmoothingEnabled = true;
-                pctx.translate(-vc * TILE_SIZE, -vr * TILE_SIZE + pad);
+                pctx.imageSmoothingEnabled = false;
+                pctx.translate(-vc * TILE_SIZE, -vr * TILE_SIZE);
                 this.drawTile(pctx, tile, vc, vr, phase);
                 patches.set(key, patch);
             }
@@ -670,16 +39,13 @@ export const TerrainRenderer = {
             layer.width = w;
             layer.height = h;
             const lctx = layer.getContext('2d');
-            lctx.imageSmoothingEnabled = true;
+            lctx.imageSmoothingEnabled = false;
 
-            // Nesneler bir üst sıraya taşabildiği için sıra sıra çizilir:
-            // aşağıdaki nesne yukarıdakinin üstüne biner (doğru derinlik).
             for (let row = 0; row < grid.length; row++) {
                 for (let col = 0; col < grid[row].length; col++) {
                     // Keşfedilmemiş gizli oda dışarıdan ağaçlık görünür
                     const tile = this.isHiddenTile(col, row) ? 'T' : grid[row][col];
-                    const patch = patchFor(tile, col, row, phase);
-                    lctx.drawImage(patch, col * TILE_SIZE, row * TILE_SIZE - (patch.pad || 0));
+                    lctx.drawImage(patchFor(tile, col, row, phase), col * TILE_SIZE, row * TILE_SIZE);
                 }
             }
             return layer;
@@ -687,12 +53,13 @@ export const TerrainRenderer = {
     },
 
     drawTiles() {
-        const { ctx, camera } = this;
+        const { ctx, canvas, camera } = this;
         if (!this.terrain) return;
 
         // Su/çim animasyonu: iki pişmiş kare arasında geçiş
         const layer = this.terrain[Math.floor(Date.now() / 450) % 2];
 
+        // Yalnızca görünür bölgeyi kopyala
         const view = this.viewSize;
         const sx = Math.max(0, Math.floor(camera.x));
         const sy = Math.max(0, Math.floor(camera.y));
@@ -701,5 +68,211 @@ export const TerrainRenderer = {
         if (sw <= 0 || sh <= 0) return;
 
         ctx.drawImage(layer, sx, sy, sw, sh, sx, sy, sw, sh);
+    },
+
+    // Karo içi PX'lik bloklarla, karoya özgü deterministik desen çizer.
+    // PX küçüldükçe piksel sanatı incelir (5 = karo başına 10x10 blok).
+    // phase (0|1): su parıltısı ve çim salınımının animasyon karesi.
+    drawTile(ctx, tile, col, row, phase = 0) {
+        const PX = 5;
+        const N = TILE_SIZE / PX; // kenardaki blok sayısı
+        const x0 = col * TILE_SIZE;
+        const y0 = row * TILE_SIZE;
+
+        // Koyu temalı haritalar (derin orman) daha loş bir palet kullanır
+        const dark = this.currentMap.theme === 'dark';
+        const palettes = dark ? {
+            '.': ['#0c3a1e', '#0f4a26', '#0d4022', '#0f4a26'],
+            'p': ['#4a2c0a', '#5b370d', '#66400f', '#5b370d'],
+            's': ['#6b4a08', '#7c5306', '#6b4a08', '#5b420a'],
+            'R': ['#26303f', '#333e4f', '#455267', '#333e4f'],
+            'W': ['#082f49', '#0a3a5c', '#0c4a6e', '#0a3a5c'],
+            'b': ['#4a2f14', '#5a3a19', '#3d2610', '#523318']
+        } : {
+            '.': ['#14532d', '#15803d', '#166534', '#15803d'],
+            'p': ['#713f12', '#854d0e', '#92400e', '#854d0e'],
+            's': ['#a16207', '#ca8a04', '#a16207', '#92400e'],
+            'R': ['#334155', '#475569', '#64748b', '#475569'],
+            'W': ['#0c4a6e', '#075985', '#0369a1', '#075985'],
+            'b': ['#5a3a19', '#6b4520', '#4a2f14', '#63401c']
+        };
+
+        // Çiçek, uzun çim, çalı ve portal karoları çim zemin üzerine çizilir
+        const base = palettes[tile] || palettes['.'];
+
+        // İnce dokulu zemin: her blok karoya özgü sahte-rastgele bir tonda
+        for (let by = 0; by < N; by++) {
+            for (let bx = 0; bx < N; bx++) {
+                const idx = (col * 7 + row * 13 + bx * 3 + by * 5 + ((bx * by) % 3)) % base.length;
+                ctx.fillStyle = base[idx];
+                ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+            }
+        }
+
+        if (tile === 'W') {
+            // Su: ince dalga çizgileri ve kayan parıltılar
+            const t = phase * 3;
+            ctx.fillStyle = dark ? '#0e5a86' : '#0ea5e9';
+            for (let i = 0; i < 3; i++) {
+                const wy = ((col * 3 + row * 7 + i * 3 + t) % N) * PX;
+                ctx.fillRect(x0 + ((i * 3) % N) * PX, y0 + wy, PX * 3, PX);
+            }
+            ctx.fillStyle = '#7dd3fc';
+            const sx = ((col * 3 + row * 5 + t) % N) * PX;
+            const sy = ((col * 5 + row * 3 + t) % N) * PX;
+            ctx.fillRect(x0 + sx, y0 + sy, PX * 2, PX);
+        }
+
+        if (tile === 'R') {
+            // Kaya: ışık alan üst yüz, gölgeli alt yüz ve çatlaklar
+            ctx.fillStyle = dark ? '#5b6a80' : '#94a3b8';
+            for (let bx = 1; bx < N - 2; bx++) ctx.fillRect(x0 + bx * PX, y0 + PX, PX, PX);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(x0 + PX * 2, y0 + PX * 2, PX, PX);
+            ctx.fillStyle = '#1e293b';
+            for (let i = 0; i < 4; i++) {
+                const cx = ((col * 5 + row * 3 + i * 7) % (N - 2) + 1) * PX;
+                const cy = ((col * 7 + row * 5 + i * 11) % (N - 3) + 3) * PX;
+                ctx.fillRect(x0 + cx, y0 + cy, PX, PX);
+            }
+        }
+
+        if (tile === 'T') {
+            // Ağaç: dokulu gövde + katmanlı yaprak kütlesi
+            const trunk = dark ? '#2e1503' : '#451a03';
+            const trunkLight = dark ? '#3f2109' : '#5c2708';
+            for (let by = 6; by < N; by++) {
+                ctx.fillStyle = by % 2 === 0 ? trunk : trunkLight;
+                ctx.fillRect(x0 + PX * 4, y0 + by * PX, PX * 2, PX);
+            }
+            const leafColors = dark
+                ? ['#02180b', '#052e16', '#0a3a1c', '#0d4a24']
+                : ['#052e16', '#14532d', '#166534', '#16a34a'];
+            // Elips biçimli taç (10x10 ızgarada)
+            for (let by = 0; by < 7; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const ddx = (bx - 4.5) / 4.6;
+                    const ddy = (by - 3) / 3.4;
+                    if (ddx * ddx + ddy * ddy > 1) continue;
+                    const idx = (col * 11 + row * 17 + bx * 2 + by * 5) % leafColors.length;
+                    ctx.fillStyle = leafColors[idx];
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Üstten gelen ışık vurgusu
+            ctx.fillStyle = dark ? '#12602e' : '#22c55e';
+            ctx.fillRect(x0 + PX * 3, y0 + PX, PX, PX);
+            ctx.fillRect(x0 + PX * 4, y0, PX, PX);
+        }
+
+        if (tile === 'A') {
+            // Kadim ağaç: kalın dikey kabuk damarları, yosun ve parlayan runeler
+            const bark = ['#3b1f08', '#4a2a0c', '#2c1606', '#553012'];
+            for (let by = 0; by < N; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const idx = (bx * 2 + ((by + bx) % 3) + col * 3 + row * 5) % bark.length;
+                    ctx.fillStyle = bark[idx];
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Dikey kabuk çatlakları
+            ctx.fillStyle = '#1a0d03';
+            for (let bx = 1; bx < N; bx += 3) {
+                for (let by = 0; by < N; by++) {
+                    if ((by + bx + col + row) % 4 === 0) continue;
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Yosun tutamları
+            ctx.fillStyle = '#166534';
+            for (let i = 0; i < 5; i++) {
+                const mx = ((col * 7 + row * 11 + i * 5) % N) * PX;
+                const my = ((col * 5 + row * 3 + i * 13) % N) * PX;
+                ctx.fillRect(x0 + mx, y0 + my, PX, PX);
+            }
+            // Nefes alan kadim runeler (iki pişmiş kare arasında yanıp söner)
+            ctx.globalAlpha = phase === 0 ? 0.55 : 1;
+            ctx.fillStyle = '#4ade80';
+            for (let i = 0; i < 3; i++) {
+                const rx = ((col * 13 + row * 7 + i * 11) % (N - 2) + 1) * PX;
+                const ry = ((col * 3 + row * 17 + i * 5) % (N - 3) + 1) * PX;
+                ctx.fillRect(x0 + rx, y0 + ry, PX, PX);
+                ctx.fillRect(x0 + rx, y0 + ry + PX, PX, PX);
+                ctx.fillRect(x0 + rx + PX, y0 + ry + PX, PX, PX);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        if (tile === 'f') {
+            // Çiçekler: 5 taçlı ince desen (artı biçimi + sarı göbek)
+            const flowerColors = ['#f472b6', '#fbbf24', '#f87171', '#e0f2fe'];
+            for (let i = 0; i < 4; i++) {
+                const fx = ((col * 13 + row * 7 + i * 11) % (N - 3) + 1) * PX;
+                const fy = ((col * 5 + row * 11 + i * 17) % (N - 3) + 1) * PX;
+                ctx.fillStyle = flowerColors[(col + row + i) % flowerColors.length];
+                ctx.fillRect(x0 + fx, y0 + fy - PX, PX, PX);
+                ctx.fillRect(x0 + fx, y0 + fy + PX, PX, PX);
+                ctx.fillRect(x0 + fx - PX, y0 + fy, PX, PX);
+                ctx.fillRect(x0 + fx + PX, y0 + fy, PX, PX);
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(x0 + fx, y0 + fy, PX, PX);
+            }
+        }
+
+        if (tile === 'g') {
+            // Uzun çim: tek piksel kalınlığında, salınan ince yapraklar
+            const sway = phase === 0 ? 0 : PX;
+            const bladeColors = dark ? ['#0d4a24', '#12602e', '#16a34a'] : ['#166534', '#16a34a', '#22c55e'];
+            for (let i = 0; i < 7; i++) {
+                const gx = ((col * 7 + row * 3 + i * 9) % (N - 1)) * PX;
+                const gh = 3 + ((col + row + i) % 4); // blok cinsinden boy
+                ctx.fillStyle = bladeColors[i % bladeColors.length];
+                for (let b = 0; b < gh; b++) {
+                    // Uca doğru bükülme
+                    const bend = b >= gh - 2 ? sway : 0;
+                    ctx.fillRect(x0 + gx + bend, y0 + (N - 1 - b) * PX, PX, PX);
+                }
+            }
+        }
+
+        if (tile === 'b') {
+            // Boss arenası: çatlaklar, kavlamış toprak ve kırık dal parçaları
+            const scarColors = ['#3f2a12', '#4a3218', '#2e1d0c'];
+            for (let i = 0; i < 8; i++) {
+                const sx = ((col * 5 + row * 11 + i * 13) % N) * PX;
+                const sy = ((col * 7 + row * 3 + i * 17) % N) * PX;
+                ctx.fillStyle = scarColors[(col + row + i) % scarColors.length];
+                ctx.fillRect(x0 + sx, y0 + sy, PX, PX);
+            }
+            // Çapraz çatlak
+            if ((col * 3 + row * 5) % 3 === 0) {
+                ctx.fillStyle = '#1f1408';
+                for (let b = 0; b < N; b++) {
+                    const cy = ((b + col + row) % 3 === 0) ? b + 1 : b;
+                    if (cy < N) ctx.fillRect(x0 + b * PX, y0 + cy * PX, PX, PX);
+                }
+            }
+        }
+
+        // Gizli çalı normal çalıyla birebir aynı çizilir (içinden geçilebilir)
+        if (tile === 'h' || tile === 'H') {
+            // Çalı: yuvarlak, yoğun yaprak kümesi + üstte ışık vurgusu
+            const bushColors = dark ? ['#052e16', '#0d4a24', '#12602e'] : ['#14532d', '#166534', '#16a34a'];
+            for (let by = 0; by < N; by++) {
+                for (let bx = 0; bx < N; bx++) {
+                    const ddx = (bx - 4.5) / 4.6;
+                    const ddy = (by - 4.5) / 4.6;
+                    if (ddx * ddx + ddy * ddy > 1) continue;
+                    const idx = (col * 9 + row * 5 + bx * 3 + by * 2) % bushColors.length;
+                    ctx.fillStyle = bushColors[idx];
+                    ctx.fillRect(x0 + bx * PX, y0 + by * PX, PX, PX);
+                }
+            }
+            // Üst yaprakların ışık alan noktaları
+            ctx.fillStyle = dark ? '#16a34a' : '#4ade80';
+            ctx.fillRect(x0 + PX * 3, y0 + PX * 2, PX, PX);
+            ctx.fillRect(x0 + PX * 5, y0 + PX, PX, PX);
+            ctx.fillRect(x0 + PX * 6, y0 + PX * 3, PX, PX);
+        }
     }
 };

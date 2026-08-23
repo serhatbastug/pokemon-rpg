@@ -3,7 +3,6 @@ import { trainersFor } from '../../config/trainers.js';
 import { Enemy } from '../Enemy.js';
 import { Sfx } from '../../services/audio.js';
 import { drawTrainer } from '../trainerSprite.js';
-import { TRAINER } from '../../config/balance.js';
 import { preloadTypes } from '../../services/typeChart.js';
 
 // NPC antrenör savaşları: haritada duran rakipler görüş alanına girince
@@ -83,7 +82,7 @@ export const TrainerBattles = {
             enemy.name = data.name;
             enemy.types = data.types || [];
             this.progress.markSeen(id, data.name);
-            enemy.img.src = data.sprite || data.battleSprite;
+            enemy.img.src = data.battleSprite || data.sprite;
             preloadTypes(enemy.types);
             this.spawnMapText(npc.x, npc.y - 34, `Hadi ${data.name}!`, '#f87171');
         }).catch(error => console.error(`Antrenör Pokemonu yüklenemedi (#${id}):`, error));
@@ -109,16 +108,14 @@ export const TrainerBattles = {
             // Gölge
             ctx.globalAlpha *= 0.9;
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.ellipse(npc.x, npc.y - 2, TRAINER.spriteScale * 3.5, TRAINER.spriteScale * 1.2, 0, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(npc.x - 11, npc.y + 22, 22, 4);
             ctx.restore();
 
             ctx.save();
             if (npc.beaten) ctx.globalAlpha = 0.45;
             // Rakip antrenör oyuncuya bakar
             const dir = this.player.x > npc.x ? 'right' : 'left';
-            drawTrainer(ctx, npc.x, npc.y, dir, false, TRAINER.spriteScale);
+            drawTrainer(ctx, npc.x, npc.y, dir, false, 3);
             ctx.restore();
 
             // İsim ve durum
@@ -128,16 +125,16 @@ export const TrainerBattles = {
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 3;
             const label = npc.beaten ? `${npc.name} (yenildi)` : npc.name;
-            ctx.strokeText(label, npc.x, npc.y - TRAINER.spriteScale * 11);
+            ctx.strokeText(label, npc.x, npc.y - 30);
             ctx.fillStyle = npc.beaten ? '#94a3b8' : '#fbbf24';
-            ctx.fillText(label, npc.x, npc.y - TRAINER.spriteScale * 11);
+            ctx.fillText(label, npc.x, npc.y - 30);
 
             // Kalan Pokemon sayısı
             if (npc.engaged && !npc.beaten) {
                 const remaining = npc.party.length - npc.sentIndex;
                 for (let i = 0; i < npc.party.length; i++) {
                     ctx.fillStyle = i < remaining ? '#f87171' : '#334155';
-                    ctx.fillRect(npc.x - npc.party.length * 5 + i * 10, npc.y - TRAINER.spriteScale * 9, 7, 7);
+                    ctx.fillRect(npc.x - npc.party.length * 5 + i * 10, npc.y - 24, 7, 7);
                 }
             }
             ctx.restore();

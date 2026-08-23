@@ -20,8 +20,8 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (341 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (79 test): ana menü sahnesi (yürüyüş, macera kapısı, portal), ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run check` | Veri ve saf mantık testleri (354 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (85 test): ana menü sahnesi (yürüyüş, macera kapısı, portal, oyun kolu), ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -36,13 +36,35 @@ açılır (`src/menu/`). Sahne tek ekrandır, kamera kaymaz:
 | Nerede | Ne var | Nasıl |
 |---|---|---|
 | Sol | Antrenörün evi | Şimdilik yalnızca dekor, etkileşim yok |
-| Orta | "MACERA KAPISI" tabelalı taş kemer | Önüne gelip **F**: "Oyuna başlamak istiyor musunuz?" penceresi açılır, EVET macera modunu başlatır |
+| Orta | "MACERA KAPISI" tabelalı taş kemer | Önüne gelip **F** / **ÜÇGEN**: "Oyuna başlamak istiyor musunuz?" penceresi açılır |
 | Sağ | "2 KİŞİLİK OYNA" tabelalı portal | Kemerin **altına yürüyün**: ekran yavaşça kararır, karakter seçimi açılır |
 
+> **Macera kapısı şimdilik bir yere götürmüyor.** Ana haritanın kaldırılmasına
+> karar verildi; kapının nereye açılacağı belirlenene kadar EVET de pencereyi
+> kapatmakla yetiniyor. Macera motoru duruyor ve UI testlerinde çalışıyor
+> (`window.__enterAdventure`).
+
 Sahne ekranı tamamen kaplar (canvas 1000x560, object-fit: contain).
-Hareket WASD veya yön tuşlarıyla. Ev, ağaç gövdeleri ve kapı çerçeveleri engeldir;
-yerleşimin tutarlılığı (her iki kapıya da yürüyerek ulaşılabilmesi dahil)
-`npm run check` içinde BFS ile test edilir.
+Ev, ağaç gövdeleri ve kemer ayakları engeldir; yerleşimin tutarlılığı (her iki
+kapıya da yürüyerek ulaşılabilmesi dahil) `npm run check` içinde BFS ile test
+edilir.
+
+### Oyun kolu (PS5 DualSense)
+
+Kol Bluetooth ile bağlandıktan sonra **bir tuşuna basılınca** tarayıcı onu
+görür (Gamepad API kuralı). Ana menüde:
+
+| | Klavye | Kol |
+|---|---|---|
+| Yürüme | W A S D / yön tuşları | Sol analog (veya D-pad) |
+| Macera kapısını aç | F | **ÜÇGEN** |
+| Onay penceresi: evet | Enter | **ÇARPI** |
+| Onay penceresi: hayır | Esc | **DAİRE** |
+
+Analog ne kadar itilirse antrenör o kadar hızlı yürür. Kol bağlıyken kapı
+ipucundaki **F** simgesi yerine **üçgen** görünür. Eşleme `src/core/gamepad.js`
+içinde; ham kol verisini yöne çeviren `readPad` saf fonksiyon olduğu için
+`npm run check` içinde test edilir.
 
 ## Kontroller
 

@@ -5,6 +5,7 @@ import { Progress } from './world/Progress.js';
 import { Library } from './ui/library.js';
 import { Shop } from './ui/shop.js';
 import { InputManager } from './core/input.js';
+import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
 import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen } from './ui/screens.js';
@@ -58,7 +59,11 @@ input.onKeyDown(e => {
 
 // --- Ana menü sahnesi ---
 // Menü artık bir düğme listesi değil, antrenörün gezdiği bir sahne:
-// sağdaki orman kapısı macera moduna, yukarıdaki geçit iki kişilik moda çıkar.
+// ortadaki macera kapısı F ile açılır, sağdaki portal iki kişilik moda çıkar.
+
+// Oyun kolu (PS5 DualSense): sol analog yürütür, ÜÇGEN = F.
+// Kolun durumu MenuScene döngüsünde her karede taranır.
+const gamepad = new GamepadManager();
 
 async function enterAdventure() {
     menu.stop();
@@ -73,14 +78,25 @@ function returnToMenu() {
 }
 
 const startPrompt = new StartPrompt({
-    onConfirm: () => enterAdventure(),
+    // Macera kapısı şimdilik bir yere götürmüyor: ana haritanın kaldırılması
+    // kararlaştırıldı, kapının açılacağı yer sonra belirlenecek. EVET de
+    // HAYIR gibi yalnızca pencereyi kapatır.
+    onConfirm: () => menu.setPaused(false),
     onCancel: () => menu.setPaused(false)
+});
+
+// Kol: pencere açıkken Çarpı onaylar, Daire kapatır
+gamepad.onButtonDown(button => {
+    if (!startPrompt.open) return;
+    if (button === 'cross') startPrompt.confirm();
+    else if (button === 'circle') startPrompt.cancel();
 });
 
 const menu = new MenuScene({
     canvas: document.getElementById('menuCanvas'),
     input,
-    // Macera kapısının önünde F: sahne donar, onay penceresi açılır
+    gamepad,
+    // Macera kapısının önünde F / ÜÇGEN: sahne donar, onay penceresi açılır
     onAdventureGate: () => {
         menu.setPaused(true);
         startPrompt.show();
@@ -105,6 +121,10 @@ window.__library = library;
 window.__shop = shop;
 window.__progress = progress;
 window.__menu = menu;
+window.__gamepad = gamepad;
+// Macera modu menüden şimdilik açılmıyor (kapı bir yere götürmüyor) ama motor
+// duruyor; UI testleri maceraya buradan giriyor.
+window.__enterAdventure = enterAdventure;
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();

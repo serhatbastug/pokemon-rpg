@@ -21,11 +21,25 @@ import {
 const FADE_FRAMES = 84;   // portaldan geçince kararma süresi (~1.4 sn)
 const INTRO_FRAMES = 26;  // sahneye girerken açılma süresi
 
+// Tuş ipucundaki üçgen simgesi (kol bağlıyken F yerine bu görünür).
+// 7 piksellik bir kareye içi boş üçgen sığmıyor - kenarlar "M" gibi
+// okunuyordu; bu yüzden içi dolu çiziliyor.
+const TRIANGLE_GLYPH = [
+    '...#...',
+    '..###..',
+    '..###..',
+    '.#####.',
+    '.#####.',
+    '#######',
+    '.......'
+];
+
 export class MenuScene {
-    constructor({ canvas, input, onAdventureGate, onVersusPortal }) {
+    constructor({ canvas, input, gamepad, onAdventureGate, onVersusPortal }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.input = input;
+        this.gamepad = gamepad || null;
         this.onAdventureGate = onAdventureGate || (() => {});
         this.onVersusPortal = onVersusPortal || (() => {});
 
@@ -65,6 +79,17 @@ export class MenuScene {
             }
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'KeyF') this.tryAdventureGate();
+        });
+
+        // Oyun kolu: sol analog yürütür, ÜÇGEN klavyedeki F'nin karşılığıdır
+        this.gamepad?.onButtonDown(button => {
+            if (!this.running || this.paused || this.leaving) return;
+            unlockAudio();
+            if (!this.musicStarted) {
+                this.musicStarted = true;
+                playMusic('town');
+            }
+            if (button === 'triangle') this.tryAdventureGate();
         });
     }
 
@@ -142,6 +167,10 @@ export class MenuScene {
         this.frame++;
         if (this.intro > 0) this.intro--;
 
+        // Kolun durumu her karede taranır (Gamepad API'sinde tuş olayı yok).
+        // Onay penceresi açıkken de taranır: pencere kolla kapatılabilsin.
+        this.gamepad?.poll();
+
         // Portaldan geçiş: ekran kararır, sonunda karakter seçimine devredilir
         if (this.leaving) {
             this.fade = Math.min(FADE_FRAMES, this.fade + 1);
@@ -168,13 +197,25 @@ export class MenuScene {
         if (input.isDown('KeyW') || input.isDown('ArrowUp')) dy -= 1;
         if (input.isDown('KeyS') || input.isDown('ArrowDown')) dy += 1;
 
+        // Klavye basılı değilse sol analog (ya da D-pad) devreye girer.
+        // Analogda hız çubuğun ne kadar itildiğine göre değişir.
+        let speed = PLAYER_SPEED;
+        if (dx === 0 && dy === 0 && this.gamepad) {
+            const stick = this.gamepad.stick();
+            if (stick.magnitude > 0) {
+                dx = stick.x;
+                dy = stick.y;
+                speed = PLAYER_SPEED * stick.magnitude;
+            }
+        }
+
         player.moving = dx !== 0 || dy !== 0;
         if (!player.moving) return;
 
         // Çapraz giderken hız artmasın
         const len = Math.hypot(dx, dy) || 1;
-        const vx = (dx / len) * PLAYER_SPEED;
-        const vy = (dy / len) * PLAYER_SPEED;
+        const vx = (dx / len) * speed;
+        const vy = (dy / len) * speed;
 
         // Eksenler ayrı denenir: duvara sürtünerek yürünebilsin
         if (!blocked(player.x + vx, player.y)) player.x += vx;
@@ -183,10 +224,10 @@ export class MenuScene {
         player.x = Math.max(0, Math.min(SCENE.w, player.x));
         player.y = Math.max(0, Math.min(SCENE.h, player.y));
 
-        if (dy < 0) player.dir = 'up';
-        else if (dy > 0) player.dir = 'down';
-        else if (dx < 0) player.dir = 'left';
-        else if (dx > 0) player.dir = 'right';
+        // Bakış yönü baskın eksene göre seçilir: analogda iki eksen de nadiren
+        // tam sıfır olur, sabit sıra kullanılırsa karakter hep yukarı bakar.
+        if (Math.abs(dy) >= Math.abs(dx)) player.dir = dy < 0 ? 'up' : 'down';
+        else player.dir = dx < 0 ? 'left' : 'right';
     }
 
     moveFireflies() {
@@ -294,7 +335,19 @@ export class MenuScene {
         ctx.fillRect(x, y, cap, cap);
         ctx.fillStyle = '#94a3b8';
         ctx.fillRect(x, y + cap - PX, cap, PX);
-        drawPixelText(ctx, 'F', x + PX, y, { scale: 4, color: '#0f172a' });
+
+        // Kol bağlıysa F yerine ÜÇGEN simgesi gösterilir
+        if (this.gamepad?.connected) {
+            ctx.fillStyle = '#0f172a';
+            for (let r = 0; r < TRIANGLE_GLYPH.length; r++) {
+                for (let c = 0; c < TRIANGLE_GLYPH[r].length; c++) {
+                    if (TRIANGLE_GLYPH[r][c] !== '#') continue;
+                    ctx.fillRect(x + c * PX, y + r * PX, PX, PX);
+                }
+            }
+        } else {
+            drawPixelText(ctx, 'F', x + PX, y, { scale: 4, color: '#0f172a' });
+        }
 
         drawPixelText(ctx, label, x + cap + gap, y + PX * 2, {
             scale: 2, color: '#fef3c7', shadow: '#0f172a'

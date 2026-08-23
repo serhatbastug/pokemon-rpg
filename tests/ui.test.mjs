@@ -31,18 +31,12 @@ async function hold(key, ms) {
     await page.keyboard.up(key);
 }
 
-// Ana menüden macera moduna geçiş: kemere yaklaş, F'ye bas, EVET'e tıkla.
-// (Kemere kadar yürümek yerine konum atanır; yürüyüşün kendisi ayrıca test
-// ediliyor, buradaki amaç macera moduna hızlı ve kararlı biçimde girmek.)
+// Macera moduna geçiş. Macera kapısı şimdilik menüden bir yere götürmüyor
+// (nereye açılacağı henüz belirlenmedi) ama motor duruyor ve test ediliyor;
+// testler maceraya main.js'in açtığı giriş noktasından giriyor.
 async function enterAdventureFromMenu() {
-    await page.waitForFunction(() => window.__menu && window.__menu.running, { timeout: 15000 });
-    await page.evaluate(() => {
-        window.__menu.player.x = 500;
-        window.__menu.player.y = 250;
-    });
-    await page.keyboard.press('KeyF');
-    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
-    await page.click('#start-prompt-yes');
+    await page.waitForFunction(() => !!window.__enterAdventure, { timeout: 15000 });
+    await page.evaluate(() => window.__enterAdventure());
 }
 
 // Sayfadaki oyun durumunu okumak için Overworld örneğini global'e bağlarız
@@ -168,6 +162,92 @@ async function main() {
     const promptClosed = await page.$eval('#start-prompt', el => el.classList.contains('hidden'));
     const menuStillRunning = await page.evaluate(() => window.__menu.running && !window.__menu.paused);
     check('HAYIR pencereyi kapatip menuye donuyor', promptClosed && menuStillRunning);
+
+    // EVET de şimdilik bir yere götürmüyor: kapının nereye açılacağı belli
+    // değil, pencere kapanıp menüde kalınmalı
+    await page.keyboard.press('KeyF');
+    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
+    await page.click('#start-prompt-yes');
+    await wait(400);
+    const afterYes = await page.evaluate(() => ({
+        promptOpen: !document.getElementById('start-prompt').classList.contains('hidden'),
+        menuRunning: window.__menu.running && !window.__menu.paused,
+        overworldRunning: window.__overworld.running
+    }));
+    check('EVET simdilik maceraya goturmuyor',
+        !afterYes.promptOpen && afterYes.menuRunning && !afterYes.overworldRunning,
+        JSON.stringify(afterYes));
+
+    // Oyun kolu: kol yokken de sahne kolun durumunu sorunsuz tarıyor olmalı
+    const padState = await page.evaluate(() => ({
+        connected: window.__gamepad.connected,
+        stick: window.__gamepad.stick()
+    }));
+    check('Kol yokken analog nötr okunuyor',
+        padState.stick.x === 0 && padState.stick.y === 0 && padState.stick.magnitude === 0,
+        JSON.stringify(padState));
+
+    // Sahte kol: gerçek DualSense olmadan da tarama ve tuş eşlemesi
+    // uçtan uca doğrulanır (standart eşlemede eksen 0/1 sol analog, tuş 3 ÜÇGEN)
+    await page.evaluate(() => {
+        window.__fakePad = {
+            axes: [0, 0, 0, 0],
+            buttons: Array.from({ length: 16 }, () => ({ pressed: false })),
+            connected: true
+        };
+        navigator.getGamepads = () => [window.__fakePad];
+        // Tarayıcı kolu ancak bu olayla haber veriyor; oyun da taramaya
+        // ondan sonra başlıyor (kol yokken her kare getGamepads çağrılmasın)
+        window.dispatchEvent(new Event('gamepadconnected'));
+    });
+
+    await page.evaluate(() => {
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 400;
+        window.__fakePad.axes[0] = 1;
+    });
+    await wait(400);
+    const padWalk = await page.evaluate(() => ({ ...window.__menu.player, connected: window.__gamepad.connected }));
+    await page.evaluate(() => { window.__fakePad.axes[0] = 0; });
+    check('Sol analog karakteri yurutuyor',
+        padWalk.x > 520 && padWalk.dir === 'right' && padWalk.connected,
+        `x 500 -> ${Math.round(padWalk.x)}, yon ${padWalk.dir}`);
+
+    // Analog yarım itildiğinde daha yavaş yürünür
+    await page.evaluate(() => {
+        window.__menu.player.x = 500;
+        window.__fakePad.axes[0] = 0.45;
+    });
+    await wait(400);
+    const padSlow = await page.evaluate(() => window.__menu.player.x);
+    await page.evaluate(() => { window.__fakePad.axes[0] = 0; });
+    check('Analog yarim itilince daha yavas yuruyor',
+        padSlow > 500 && (padSlow - 500) < (padWalk.x - 500) * 0.8,
+        `yarim ${Math.round(padSlow - 500)}px, tam ${Math.round(padWalk.x - 500)}px`);
+
+    // ÜÇGEN = F: macera kapısının önünde onay penceresini açar
+    await page.evaluate(() => {
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 250;
+        window.__fakePad.buttons[3].pressed = true;
+    });
+    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
+    check('UCGEN onay penceresini aciyor', true);
+    await shot('00d-kol-ipucu');
+
+    // Daire = HAYIR: pencereyi kapatır
+    await page.evaluate(() => {
+        window.__fakePad.buttons[3].pressed = false;
+        window.__fakePad.buttons[1].pressed = true;
+    });
+    await wait(300);
+    const padClosed = await page.evaluate(() => ({
+        promptOpen: !document.getElementById('start-prompt').classList.contains('hidden'),
+        menuRunning: window.__menu.running && !window.__menu.paused
+    }));
+    await page.evaluate(() => { window.__fakePad.buttons[1].pressed = false; });
+    check('Daire onay penceresini kapatiyor', !padClosed.promptOpen && padClosed.menuRunning,
+        JSON.stringify(padClosed));
 
     // İki kişilik portal: sağdaki kemerin altına yürüyünce ekran kararır ve
     // karakter seçimi açılır

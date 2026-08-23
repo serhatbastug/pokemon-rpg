@@ -317,6 +317,44 @@ check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedGat
 check('menü: iki kişilik portala yürüyerek girilebiliyor', reachedDoor);
 check('menü: gezilebilir alan makul büyüklükte', seenCells.size > 900, `${seenCells.size} kare`);
 
+// ---- Oyun kolu (PS5 DualSense) ----
+// readPad saf bir fonksiyon: ham kol anlık görüntüsünü yöne çevirir.
+const { readPad, BUTTONS, DEADZONE } = await import('../src/core/gamepad.js');
+
+const pad = (axes = [0, 0], down = []) => ({
+    axes,
+    buttons: Array.from({ length: 16 }, (_, i) => ({ pressed: down.includes(i) }))
+});
+
+const idle = readPad(pad());
+check('kol: boştayken yön sıfır', idle.x === 0 && idle.y === 0 && idle.magnitude === 0);
+check('kol: boştayken basılı tuş yok', idle.pressed.length === 0);
+
+const drift = readPad(pad([DEADZONE - 0.05, 0]));
+check('kol: ölü bölge içindeki oynama yok sayılıyor', drift.magnitude === 0);
+
+const pushed = readPad(pad([1, 0]));
+check('kol: sağa itilince x pozitif', pushed.x > 0.99 && pushed.y === 0);
+check('kol: tam itişte büyüklük 1', Math.abs(pushed.magnitude - 1) < 0.001);
+
+const half = readPad(pad([0, -0.6]));
+check('kol: yukarı itilince y negatif', half.y < 0 && half.x === 0);
+check('kol: yarım itişte büyüklük 0-1 arası', half.magnitude > 0 && half.magnitude < 1);
+
+const triangle = readPad(pad([0, 0], [BUTTONS.triangle]));
+check('kol: ÜÇGEN basılı okunuyor', triangle.pressed.includes('triangle'));
+check('kol: ÜÇGEN tek başına yön üretmiyor', triangle.magnitude === 0);
+
+const dpad = readPad(pad([0, 0], [BUTTONS.dpadLeft]));
+check('kol: D-pad sol yön üretiyor', dpad.x === -1 && dpad.y === 0 && dpad.magnitude === 1);
+
+const diagonal = readPad(pad([0, 0], [BUTTONS.dpadUp, BUTTONS.dpadRight]));
+check('kol: D-pad çaprazı normalize ediliyor',
+    Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 0.001);
+
+check('kol: ÜÇGEN standart eşlemede 3. tuş', BUTTONS.triangle === 3);
+check('kol: Çarpı standart eşlemede 0. tuş', BUTTONS.cross === 0);
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

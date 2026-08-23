@@ -1,33 +1,33 @@
 // Ana menü: statik bir ekran değil, antrenörün içinde yürüdüğü piksel sahne.
 //
-//   sol   -> antrenörün evi (şimdilik etkileşimsiz)
-//   sağ   -> orman ve dibinde macera kapısı (yaklaş + F -> onay penceresi)
-//   yukarı-> "İKİ KİŞİLİK OYNA" tabelası ve altındaki geçit (içinden geçilince
-//            ekran yavaşça kararır, karakter seçimine gidilir)
+//   sol    -> antrenörün evi (şimdilik etkileşimsiz)
+//   yukarı -> MACERA KAPISI: kemerin önünde F, onay penceresi açılır
+//   sağ    -> 2 KİŞİLİK OYNA portalı: açıklığından yürüyünce ekran kararır ve
+//             karakter seçimine gidilir
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
-import { drawPixelText } from './pixelFont.js';
+import { drawPixelText, measurePixelText } from './pixelFont.js';
 import {
     SCENE, PX, START, PLAYER_SPEED, PLAYER_SCALE,
-    TREES, DOOR, GATE, blocked, nearDoor, inGate
+    TREES, ADVENTURE, VERSUS, blocked, nearAdventureGate, inVersusPortal
 } from './menuLayout.js';
 import {
-    bakeGround, bakeHouse, bakeGate, bakeDoor, treeSpriteFor,
-    drawSmoke, drawGatePortal, drawDoorGlow, drawFireflies
+    bakeGround, bakeHouse, bakeArch, treeSpriteFor,
+    drawSmoke, drawArchSparks, drawFireflies
 } from './menuArt.js';
 
-const FADE_FRAMES = 84;   // geçitten geçince kararma süresi (~1.4 sn)
+const FADE_FRAMES = 84;   // portaldan geçince kararma süresi (~1.4 sn)
 const INTRO_FRAMES = 26;  // sahneye girerken açılma süresi
 
 export class MenuScene {
-    constructor({ canvas, input, onAdventureDoor, onTwoPlayerGate }) {
+    constructor({ canvas, input, onAdventureGate, onVersusPortal }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.input = input;
-        this.onAdventureDoor = onAdventureDoor || (() => {});
-        this.onTwoPlayerGate = onTwoPlayerGate || (() => {});
+        this.onAdventureGate = onAdventureGate || (() => {});
+        this.onVersusPortal = onVersusPortal || (() => {});
 
         this.running = false;
         this.paused = false;      // onay penceresi açıkken sahne donar
@@ -39,7 +39,7 @@ export class MenuScene {
         this.player = {
             x: START.x,
             y: START.y,
-            dir: 'down',
+            dir: 'up',
             moving: false
         };
 
@@ -64,7 +64,7 @@ export class MenuScene {
                 playMusic('town');
             }
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
-            if (e.code === 'KeyF') this.tryDoor();
+            if (e.code === 'KeyF') this.tryAdventureGate();
         });
     }
 
@@ -73,7 +73,7 @@ export class MenuScene {
         if (this.ground) return;
         this.ground = bakeGround();
 
-        const props = [bakeHouse(), bakeGate(), bakeDoor()];
+        const props = [bakeHouse(), bakeArch(ADVENTURE), bakeArch(VERSUS)];
         for (const tree of TREES) {
             const sprite = treeSpriteFor(tree);
             props.push({
@@ -142,19 +142,19 @@ export class MenuScene {
         this.frame++;
         if (this.intro > 0) this.intro--;
 
-        // Geçitten geçiş: ekran kararır, sonunda karakter seçimine devredilir
+        // Portaldan geçiş: ekran kararır, sonunda karakter seçimine devredilir
         if (this.leaving) {
             this.fade = Math.min(FADE_FRAMES, this.fade + 1);
             if (this.fade >= FADE_FRAMES) {
                 this.running = false;
-                this.onTwoPlayerGate();
+                this.onVersusPortal();
             }
             return;
         }
 
         if (!this.paused) {
             this.movePlayer();
-            this.checkGate();
+            this.checkVersusPortal();
         }
         this.moveFireflies();
     }
@@ -201,23 +201,23 @@ export class MenuScene {
         }
     }
 
-    // Antrenör geçidin altına girdi mi?
-    checkGate() {
-        if (!inGate(this.player.x, this.player.y)) return;
+    // Antrenör iki kişilik portalın kemeri altına girdi mi?
+    checkVersusPortal() {
+        if (!inVersusPortal(this.player.x, this.player.y)) return;
         this.leaving = true;
         this.player.moving = false;
         Sfx.badge();
     }
 
     // F: macera kapısının önündeyse onay penceresini açar
-    tryDoor() {
-        if (!nearDoor(this.player.x, this.player.y)) return;
+    tryAdventureGate() {
+        if (!nearAdventureGate(this.player.x, this.player.y)) return;
         Sfx.buy();
-        this.onAdventureDoor();
+        this.onAdventureGate();
     }
 
-    get doorHintVisible() {
-        return !this.paused && !this.leaving && nearDoor(this.player.x, this.player.y);
+    get hintVisible() {
+        return !this.paused && !this.leaving && nearAdventureGate(this.player.x, this.player.y);
     }
 
     draw() {
@@ -227,7 +227,7 @@ export class MenuScene {
 
         ctx.drawImage(this.ground, 0, 0);
 
-        // Ev, geçit, kapı ve ağaçlar antrenörle birlikte dip hizasına göre
+        // Ev, kemerler ve ağaçlar antrenörle birlikte dip hizasına göre
         // sıralanır: arkasındaki ağaç antrenörü örter, önündeki örtmez.
         const feet = player.y;
         let i = 0;
@@ -243,11 +243,11 @@ export class MenuScene {
 
         // Canlanan ayrıntılar
         drawSmoke(ctx, this.frame);
-        drawGatePortal(ctx, this.frame);
-        drawDoorGlow(ctx, this.frame);
+        drawArchSparks(ctx, ADVENTURE, this.frame);
+        drawArchSparks(ctx, VERSUS, this.frame);
         drawFireflies(ctx, this.fireflies, this.frame);
 
-        if (this.doorHintVisible) this.drawDoorHint();
+        if (this.hintVisible) this.drawHint();
 
         // Kararma / açılma perdesi
         const veil = this.leaving
@@ -270,27 +270,34 @@ export class MenuScene {
         drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26), player.dir, player.moving, PLAYER_SCALE);
     }
 
-    // Kapının üstünde zıplayan "F" tuş ipucu. Kapının çerçevesine binmesin
-    // diye lentonun epey üstünde, açıklığın tam ortasında durur.
-    drawDoorHint() {
-        const { ctx } = this;
+    // "F AÇ" ipucu antrenörün başının üstünde durur: kemerin çerçevesine ya da
+    // tabelaya binmesin diye sabit bir noktaya değil, oyuncuya bağlı.
+    drawHint() {
+        const { ctx, player } = this;
         const bob = Math.round(Math.sin(this.frame * 0.12) * 4 / PX) * PX;
-        const cx = Math.round((DOOR.frame.x + DOOR.frame.w / 2) / PX) * PX;
-        const y = DOOR.frame.y - 64 + bob;
         const cap = PX * 7;
+        const label = 'AÇ';
+        const gap = PX * 2;
+        const width = cap + gap + measurePixelText(label, 2);
+        const x = Math.round((player.x - width / 2) / PX) * PX;
+        const y = Math.round((player.y - 94) / PX) * PX + bob;
+
+        // Koyu zemin: ipucu kemerin içindeki ateşin üstüne denk gelebiliyor,
+        // bu olmadan yazı okunmuyor
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.fillRect(x - PX * 2, y - PX * 2, width + PX * 4, cap + PX * 4);
 
         // Tuş kapağı: koyu çerçeve + açık yüzey + alt gölge
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(cx - cap / 2 - PX, y - PX, cap + PX * 2, cap + PX * 2);
+        ctx.fillRect(x - PX, y - PX, cap + PX * 2, cap + PX * 2);
         ctx.fillStyle = '#e2e8f0';
-        ctx.fillRect(cx - cap / 2, y, cap, cap);
+        ctx.fillRect(x, y, cap, cap);
         ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(cx - cap / 2, y + cap - PX, cap, PX);
-        drawPixelText(ctx, 'F', cx - cap / 2 + PX, y, { scale: 4, color: '#0f172a' });
+        ctx.fillRect(x, y + cap - PX, cap, PX);
+        drawPixelText(ctx, 'F', x + PX, y, { scale: 4, color: '#0f172a' });
 
-        // Altında küçük "AÇ" yazısı
-        drawPixelText(ctx, 'AÇ', cx, y + cap + PX * 3, {
-            scale: 2, color: '#fef3c7', shadow: '#0f172a', align: 'center'
+        drawPixelText(ctx, label, x + cap + gap, y + PX * 2, {
+            scale: 2, color: '#fef3c7', shadow: '#0f172a'
         });
     }
 }

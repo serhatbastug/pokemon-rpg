@@ -80,13 +80,13 @@ const startPrompt = new StartPrompt({
 const menu = new MenuScene({
     canvas: document.getElementById('menuCanvas'),
     input,
-    // Kapının önünde F: sahne donar, onay penceresi açılır
-    onAdventureDoor: () => {
+    // Macera kapısının önünde F: sahne donar, onay penceresi açılır
+    onAdventureGate: () => {
         menu.setPaused(true);
         startPrompt.show();
     },
-    // Geçitten geçildi: ekran karardı, sıra karakter seçiminde
-    onTwoPlayerGate: () => {
+    // İki kişilik portaldan geçildi: ekran karardı, sıra karakter seçiminde
+    onVersusPortal: () => {
         menu.stop();
         showSelectionScreen();
     }

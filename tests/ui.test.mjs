@@ -31,14 +31,14 @@ async function hold(key, ms) {
     await page.keyboard.up(key);
 }
 
-// Ana menüden macera moduna geçiş: kapıya yaklaş, F'ye bas, EVET'e tıkla.
-// (Kapıya kadar yürümek yerine konum atanır; yürüyüşün kendisi ayrıca test
+// Ana menüden macera moduna geçiş: kemere yaklaş, F'ye bas, EVET'e tıkla.
+// (Kemere kadar yürümek yerine konum atanır; yürüyüşün kendisi ayrıca test
 // ediliyor, buradaki amaç macera moduna hızlı ve kararlı biçimde girmek.)
 async function enterAdventureFromMenu() {
     await page.waitForFunction(() => window.__menu && window.__menu.running, { timeout: 15000 });
     await page.evaluate(() => {
-        window.__menu.player.x = 800;
-        window.__menu.player.y = 300;
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 250;
     });
     await page.keyboard.press('KeyF');
     await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
@@ -146,15 +146,15 @@ async function main() {
     check('Evin duvarindan gecilemiyor', atHouse.y > 264,
         `y ${Math.round(atHouse.y)} (ev dibi 260)`);
 
-    // Macera kapısı: yaklaş, F, onay penceresi
+    // Macera kapısı (ortadaki kemer): yaklaş, F, onay penceresi
     await page.evaluate(() => {
-        window.__menu.player.x = 800;
-        window.__menu.player.y = 300;
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 250;
     });
     await wait(120);
-    // İpucu görünüyorsa antrenör gerçekten kapının önünde ve dışarıda duruyor
-    const hintVisible = await page.evaluate(() => window.__menu.doorHintVisible);
-    check('Kapinin onunde F ipucu goruluyor', hintVisible);
+    // İpucu görünüyorsa antrenör gerçekten kemerin önünde ve dışarıda duruyor
+    const hintVisible = await page.evaluate(() => window.__menu.hintVisible);
+    check('Macera kapisinin onunde F ipucu goruluyor', hintVisible);
     await shot('00b-kapi-onunde');
     await page.keyboard.press('KeyF');
     await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
@@ -169,16 +169,16 @@ async function main() {
     const menuStillRunning = await page.evaluate(() => window.__menu.running && !window.__menu.paused);
     check('HAYIR pencereyi kapatip menuye donuyor', promptClosed && menuStillRunning);
 
-    // Geçit: tabelanın altından yürüyerek geçilince ekran kararır ve
+    // İki kişilik portal: sağdaki kemerin altına yürüyünce ekran kararır ve
     // karakter seçimi açılır
     await page.evaluate(() => {
-        window.__menu.player.x = 500;
-        window.__menu.player.y = 260;
+        window.__menu.player.x = 878;
+        window.__menu.player.y = 320;
     });
-    await hold('KeyW', 1400);
+    await hold('KeyW', 900);
     await page.waitForFunction(() => !document.getElementById('selection-screen').classList.contains('hidden'), { timeout: 8000 });
     const menuClosed = await page.evaluate(() => !window.__menu.running);
-    check('Gecitten gecince karakter secimi aciliyor', menuClosed);
+    check('Portaldan gecince karakter secimi aciliyor', menuClosed);
     await shot('01-secim-ekrani');
 
     // --- İki kişilik mod: seçim akışı ---
@@ -346,8 +346,11 @@ async function main() {
         // ikinci kez bayılmaz, dolayısıyla jeton da düşürmez
         const e = w.enemies.find(en => en.kind === 'common' && !en.fainted)
             || w.enemies.find(en => en.kind === 'common');
-        // Düşmanı antrenörün yanına getir ve canını düşür
-        e.x = w.player.x + 60;
+        // Düşmanı antrenörün dibine getir ve canını düşür. Mesafe bilerek
+        // kısa: jetonlar düşman çevresine 34 piksele kadar saçılıyor ve
+        // mıknatıs menzili 70 - uzağa konursa jetonlar menzil dışına düşüp
+        // duran antrenör tarafından hiç toplanmıyor (test aralıklı kalıyordu).
+        e.x = w.player.x + 24;
         e.y = w.player.y;
         e.hp = 1;
         e.takeDamage(5);

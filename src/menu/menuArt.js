@@ -4,7 +4,7 @@
 // Ağaç, ev, geçit ve kapı birer offscreen canvas'a BİR KEZ çizilir; sahne
 // her karede yalnızca hazır sprite'ları derinlik sırasına göre kopyalar.
 
-import { PX, SCENE, PATHS, HOUSE, GATE, DOOR, TREE_SIZES } from './menuLayout.js';
+import { PX, SCENE, PATHS, HOUSE, TREE_SIZES } from './menuLayout.js';
 import { drawPixelText } from './pixelFont.js';
 
 // --- Küçük yardımcılar ---
@@ -419,39 +419,55 @@ export function bakeHouse() {
     return { canvas, x: HOUSE.x - pad, y: HOUSE.y - pad, baseY: HOUSE.y + HOUSE.h };
 }
 
-// --- Geçit (iki kişilik oyna) + tabela ---
+// --- Taş kemerler (macera kapısı ve iki kişilik portal) ---
+//
+// İkisi de aynı yapı: iki taş ayak, üstünde lento, altında basamaklı bir
+// açıklık ve kemerin tepesine oturan ahşap tabela. Ayrışan tek şey konum,
+// tabela yazısı ve açıklığın içindeki ışığın rengi.
 
-export function bakeGate() {
+const GLOWS = {
+    amber:  { deep: '#1a0f04', mid: '#7c2d12', bright: '#d97706', spark: '#fde68a', rune: '#fbbf24' },
+    violet: { deep: '#0b1020', mid: '#2e1065', bright: '#6d28d9', spark: '#c4b5fd', rune: '#a78bfa' }
+};
+
+export function archGlow(arch) {
+    return GLOWS[arch.glow] || GLOWS.violet;
+}
+
+export function bakeArch(arch) {
     const pad = 24;
-    const left = GATE.sign.x - pad;
-    const top = GATE.sign.y - pad;
-    const w = GATE.sign.w + pad * 2;
-    const h = (GATE.frame.y + GATE.frame.h) - GATE.sign.y + pad * 2;
-    const { canvas, ctx } = newCanvas(w, h);
+    const f = arch.frame;
+    const s = arch.sign;
+    const o = arch.opening;
+    const glow = archGlow(arch);
+
+    const left = Math.min(s.x, f.x) - pad;
+    const top = s.y - pad;
+    const right = Math.max(s.x + s.w, f.x + f.w) + pad;
+    const bottom = f.y + f.h + pad;
+    const { canvas, ctx } = newCanvas(right - left, bottom - top);
     const toX = (x) => x - left;
     const toY = (y) => y - top;
 
-    const f = GATE.frame;
-    const o = GATE.opening;
-
-    // Kemerin gölgesi
+    // Kemerin yere düşen gölgesi
     ctx.globalAlpha = 0.30;
-    blk(ctx, toX(f.x + 6), toY(f.y + f.h - 4), f.w - 12, 12, '#052e16');
+    blk(ctx, toX(f.x + 4), toY(f.y + f.h - 4), f.w - 8, 14, '#052e16');
     ctx.globalAlpha = 1;
 
-    // Açıklık: karanlık boşluk + mor geçit parıltısı (taban katman)
+    // Açıklığın içi: karanlık geçit, dibe doğru koyulaşan ışık zerreleri
     for (let y = o.y; y < o.y + o.h; y += PX) {
         for (let x = o.x; x < o.x + o.w; x += PX) {
             const dy = (y - o.y) / o.h;
             const n = hash(x, y, 101);
-            let tone = '#0b1020';
-            if (n < 0.10 + dy * 0.16) tone = '#2e1065';
-            if (n < 0.035 + dy * 0.06) tone = '#6d28d9';
+            let tone = glow.deep;
+            if (n < 0.10 + dy * 0.16) tone = glow.mid;
+            if (n < 0.035 + dy * 0.06) tone = glow.bright;
             ctx.fillStyle = tone;
             ctx.fillRect(toX(x), toY(y), PX, PX);
         }
     }
-    // Açıklığın içindeki basamaklar (perspektif: aşağı indikçe genişler)
+
+    // Açıklığın dibindeki basamaklar: aşağı indikçe genişler (perspektif)
     for (let i = 0; i < 3; i++) {
         const sy = o.y + o.h - PX * (3 - i) * 2;
         const inset = (2 - i) * PX * 2;
@@ -459,7 +475,7 @@ export function bakeGate() {
         blk(ctx, toX(o.x + inset), toY(sy + PX * 2), o.w - inset * 2, PX, '#334155');
     }
 
-    // Taş ayaklar ve lento: derz çizgili blok örgü, sol yüz ışıklı
+    // Taş örgü: derz çizgili bloklar, sol yüz ışıklı sağ yüz gölgeli
     const drawStone = (rx, ry, rw, rh) => {
         for (let y = ry; y < ry + rh; y += PX) {
             for (let x = rx; x < rx + rw; x += PX) {
@@ -475,10 +491,11 @@ export function bakeGate() {
             }
         }
     };
+
     // Ayaklar çarpışma kutularıyla birebir aynı genişlikte çizilir; ikisi
     // ayrışırsa aradaki boşluktan orman sızıyor.
-    for (const pillar of GATE.pillars) drawStone(pillar.x, pillar.y, pillar.w, pillar.h);
-    drawStone(f.x, f.y, f.w, o.y - f.y);
+    for (const pillar of arch.pillars) drawStone(pillar.x, pillar.y, pillar.w, pillar.h);
+    drawStone(f.x, f.y, f.w, o.y - f.y);                    // lento
 
     // Lentonun üst yüzü: kalınlık hissi veren açık şerit
     blk(ctx, toX(f.x) - PX, toY(f.y) - PX * 2, f.w + PX * 2, PX * 2, '#cbd5e1');
@@ -490,19 +507,18 @@ export function bakeGate() {
     // Kemer içi üst gölge: açıklığın tepesi koyulaşır, derinlik hissi
     blk(ctx, toX(o.x), toY(o.y), o.w, PX * 2, '#020617');
 
-    // Parlayan runeler (ayakların ortasında)
-    for (const rx of [f.x + 8, f.x + f.w - 18]) {
+    // Ayakların ortasındaki parlayan runeler
+    for (const rx of [f.x + 10, f.x + f.w - 22]) {
         for (let i = 0; i < 3; i++) {
-            dot(ctx, toX(rx), toY(f.y + 46 + i * PX * 3), '#a78bfa');
-            dot(ctx, toX(rx + PX), toY(f.y + 46 + i * PX * 3 + PX), '#7c3aed');
+            dot(ctx, toX(rx), toY(f.y + 46 + i * PX * 3), glow.spark);
+            dot(ctx, toX(rx + PX), toY(f.y + 46 + i * PX * 3 + PX), glow.rune);
         }
     }
 
     // --- Tabela ---
-    const s = GATE.sign;
-    // Direkler: kemerin iki yanında toprağa saplanır
-    for (const postX of [s.x + 28, s.x + s.w - 40]) {
-        for (let y = s.y + s.h - PX * 2; y < f.y + 40; y += PX) {
+    // Direkler: panonun iki ucundan kemerin yanına iner
+    for (const postX of [s.x + 20, s.x + s.w - 32]) {
+        for (let y = s.y + s.h - PX * 2; y < f.y + 30; y += PX) {
             for (let x = postX; x < postX + 12; x += PX) {
                 const rel = (x - postX) / 12;
                 ctx.fillStyle = rel < 0.34 ? '#a97142' : rel > 0.66 ? '#5f3a1c' : '#8b5a30';
@@ -527,8 +543,8 @@ export function bakeGate() {
         for (const cy of [s.y + PX * 2, s.y + s.h - PX * 3]) dot(ctx, toX(cx), toY(cy), '#d6d3d1');
     }
 
-    // Yazı: iki satır, ortalanmış
-    const scale = 4;
+    // Yazı: satırlar dikeyde ortalanır
+    const scale = s.scale || 4;
     const lineH = 7 * scale + 8;
     const startY = s.y + (s.h - (s.lines.length * lineH - 8)) / 2;
     s.lines.forEach((line, i) => {
@@ -540,154 +556,7 @@ export function bakeGate() {
         });
     });
 
-    return { canvas, x: left, y: top, baseY: GATE.frame.y + GATE.frame.h };
-}
-
-// --- Macera kapısı (sağ orman) ---
-
-// Kapı, düz bir dikdörtgen değil: derinliği dört ayrı ipucundan okunuyor.
-//   1) Lentonun ve sövelerin üstünde kalınlık gösteren açık şeritler
-//   2) Açıklığın içinde sağa doğru kaçan yan duvar
-//   3) Zemine düşen, arkaya doğru daralan sıcak ışık yamuğu
-//   4) Öne doğru aralanmış, dikey kalaslı kapı kanadı
-export function bakeDoor() {
-    const pad = 48;
-    const left = DOOR.frame.x - pad;
-    const top = DOOR.frame.y - pad;
-    const { canvas, ctx } = newCanvas(DOOR.frame.w + pad * 2, DOOR.frame.h + pad * 2);
-    const toX = (x) => x - left;
-    const toY = (y) => y - top;
-
-    const f = DOOR.frame;
-    const o = DOOR.opening;
-    const DEPTH = 20;                 // açıklığın içeri kaçtığı derinlik
-
-    // Yere düşen gölge
-    ctx.globalAlpha = 0.30;
-    blk(ctx, toX(f.x - 6), toY(f.y + f.h - 8), f.w + 12, 16, '#052e16');
-    ctx.globalAlpha = 1;
-
-    // 1) Açıklığın içi: karanlık oda
-    blk(ctx, toX(o.x), toY(o.y), o.w, o.h, '#0d0906');
-
-    // 2) İçeri kaçan sağ yan duvar (perspektif): açıklığın sağ kenarından
-    // içeri doğru daralan bir şerit. Işık kapıdan girdiği için soluk aydınlık.
-    for (let y = o.y; y < o.y + o.h; y += PX) {
-        const t = Math.min(1, Math.abs(y - (o.y + o.h / 2)) / (o.h / 2));
-        const depth = Math.round((DEPTH * (1 - t * 0.35)) / PX) * PX;
-        for (let d = 0; d < depth; d += PX) {
-            const shade = d / depth;
-            ctx.fillStyle = shade < 0.35 ? '#3f3a35' : shade < 0.7 ? '#2b2723' : '#1a1714';
-            ctx.fillRect(toX(o.x + o.w - depth + d), toY(y), PX, PX);
-        }
-    }
-
-    // 3) İçerideki zemin: arkaya doğru daralan sıcak ışık yamuğu. Kapı
-    // aralığından giren ışık burayı aydınlatıyor - ton bilerek soluk, parlak
-    // turuncu bir leke lav gibi duruyordu.
-    const floorTop = o.y + o.h - 34;
-    for (let y = floorTop; y < o.y + o.h; y += PX) {
-        const t = (y - floorTop) / (o.y + o.h - floorTop);   // 0 arka, 1 ön
-        const halfW = (o.w / 2) * (0.26 + t * 0.52);
-        const cx = o.x + o.w / 2 - 4;
-        for (let x = cx - halfW; x < cx + halfW; x += PX) {
-            const warm = hash(x, y, 109);
-            ctx.fillStyle = t > 0.6
-                ? (warm < 0.28 ? '#8a5a24' : '#6b451c')
-                : (warm < 0.28 ? '#4e3113' : '#33200c');
-            ctx.fillRect(Math.round(toX(x) / PX) * PX, toY(y), PX, PX);
-        }
-    }
-
-    // 4) Taş çerçeve: söveler, lento ve eşik. rel, ışığın geldiği yöne göre
-    // ton seçer (sol üstten aydınlık).
-    const drawStone = (rx, ry, rw, rh, lightAxis) => {
-        for (let y = ry; y < ry + rh; y += PX) {
-            for (let x = rx; x < rx + rw; x += PX) {
-                const row = Math.floor((y - ry) / (PX * 4));
-                const brick = Math.floor((x - rx + (row % 2) * PX * 3) / (PX * 7));
-                const rel = lightAxis === 'x' ? (x - rx) / rw : (y - ry) / rh;
-                let tone = ['#a8a29e', '#8b857f'][Math.floor(hash(brick, row, 137) * 2)];
-                if (rel < 0.32) tone = '#d6d3d1';
-                else if (rel > 0.70) tone = '#57534e';
-                if ((y - ry) % (PX * 4) === 0 || (x - rx + (row % 2) * PX * 3) % (PX * 7) === 0) tone = '#3f3a35';
-                ctx.fillStyle = tone;
-                ctx.fillRect(toX(x), toY(y), PX, PX);
-            }
-        }
-    };
-    drawStone(f.x, f.y, o.x - f.x, f.h, 'x');                                  // sol söve
-    drawStone(o.x + o.w, f.y, f.x + f.w - (o.x + o.w), f.h, 'x');              // sağ söve
-    drawStone(f.x, f.y, f.w, o.y - f.y, 'y');                                  // lento
-    drawStone(f.x, o.y + o.h, f.w, f.y + f.h - (o.y + o.h), 'y');              // eşik
-
-    // Lentonun ve sövelerin kalınlığı: taşın üstünde ve iç kenarında açık şerit
-    blk(ctx, toX(f.x - PX), toY(f.y - PX * 2), f.w + PX * 2, PX * 2, '#e7e5e4');
-    blk(ctx, toX(f.x - PX), toY(f.y), f.w + PX * 2, PX, '#a8a29e');
-    blk(ctx, toX(o.x - PX), toY(o.y), PX, o.h, '#57534e');                     // sol sövenin iç yüzü
-    blk(ctx, toX(o.x), toY(o.y - PX), o.w, PX, '#292524');                     // lentonun iç yüzü (gölge)
-
-    // Eşiğin önündeki basamak: öne doğru genişleyen iki sıra taş
-    for (let i = 0; i < 2; i++) {
-        const sy = f.y + f.h + i * PX * 2;
-        const grow = (i + 1) * PX * 3;
-        blk(ctx, toX(f.x - grow), toY(sy), f.w + grow * 2, PX * 2, i === 0 ? '#b8b2ab' : '#8b857f');
-        blk(ctx, toX(f.x - grow), toY(sy + PX * 2), f.w + grow * 2, PX, '#44403c');
-    }
-
-    // 5) Aralanmış kapı kanadı. Menteşe sol sövede; kanat öne (sola) açılmış.
-    // Dış kenar izleyiciye daha yakın olduğu için biraz daha uzun çizilir -
-    // perspektif hissi buradan geliyor.
-    const hingeX = o.x;
-    const outerX = o.x - 40;
-    const hingeTop = o.y;
-    const hingeBottom = o.y + o.h;
-    const outerTop = o.y - 8;
-    const outerBottom = o.y + o.h + 12;
-
-    // Sütun sınırları piksel ızgarasına oturtulur; oturmazsa kanadın üst ve
-    // alt kenarı tırtıklı, yırtık gibi çıkıyor.
-    const columns = [];
-    for (let x = outerX; x <= hingeX; x += PX) {
-        const t = (x - outerX) / (hingeX - outerX);          // 0 dış kenar, 1 menteşe
-        columns.push({
-            x,
-            t,
-            top: Math.round((outerTop + (hingeTop - outerTop) * t) / PX) * PX,
-            bottom: Math.round((outerBottom + (hingeBottom - outerBottom) * t) / PX) * PX
-        });
-    }
-
-    for (const col of columns) {
-        const plank = Math.round((col.x - outerX) / PX);
-        // Dış kenar ışık alır, menteşeye doğru gölgeye girer
-        const base = col.t < 0.16 ? '#b07a45' : col.t < 0.48 ? '#8b5a30' : col.t < 0.78 ? '#6b4520' : '#54371a';
-        for (let y = col.top; y < col.bottom; y += PX) {
-            let tone = base;
-            if (plank % 4 === 0) tone = '#33200c';           // kalas aralığı
-            else if (hash(col.x, y, 139) < 0.14) tone = '#4a2c12';
-            ctx.fillStyle = tone;
-            ctx.fillRect(toX(col.x), toY(y), PX, PX);
-        }
-        // Kanadın üst ve alt kenarındaki koyu kontur
-        dot(ctx, toX(col.x), toY(col.top), '#2a1808');
-        dot(ctx, toX(col.x), toY(col.bottom - PX), '#2a1808');
-    }
-
-    // Kanadın demir bantları ve halka tokmağı
-    for (const rel of [0.22, 0.78]) {
-        for (const col of columns) {
-            const by = Math.round((col.top + (col.bottom - col.top) * rel) / PX) * PX;
-            dot(ctx, toX(col.x), toY(by), '#3f3f46');
-            dot(ctx, toX(col.x), toY(by + PX), '#27272a');
-        }
-    }
-    const knobY = Math.round((o.y + o.h / 2) / PX) * PX;
-    dot(ctx, toX(outerX + PX * 2), toY(knobY), '#fbbf24');
-    dot(ctx, toX(outerX + PX * 2), toY(knobY + PX), '#b45309');
-    dot(ctx, toX(outerX + PX * 3), toY(knobY), '#fde68a');
-
-    return { canvas, x: left, y: top, baseY: DOOR.frame.y + DOOR.frame.h + 12 };
+    return { canvas, x: left, y: top, baseY: f.y + f.h };
 }
 
 // --- Karede canlanan küçük efektler ---
@@ -708,36 +577,21 @@ export function drawSmoke(ctx, frame) {
     ctx.globalAlpha = 1;
 }
 
-// Geçidin içindeki mor parıltı
-export function drawGatePortal(ctx, frame) {
-    const o = GATE.opening;
+// Kemerin içinde yükselen ışık zerreleri
+export function drawArchSparks(ctx, arch, frame) {
+    const o = arch.opening;
+    const glow = archGlow(arch);
     for (let i = 0; i < 14; i++) {
         const t = ((frame * 0.8 + i * 30) % 120) / 120;
-        const x = o.x + PX * 2 + hash(i, 0, 149) * (o.w - PX * 4);
+        const x = o.x + PX * 2 + hash(i, arch.frame.x, 149) * (o.w - PX * 4);
         const y = o.y + o.h - t * (o.h - PX * 2);
         ctx.globalAlpha = 0.65 * Math.sin(t * Math.PI);
-        ctx.fillStyle = i % 3 === 0 ? '#c4b5fd' : '#8b5cf6';
+        ctx.fillStyle = i % 3 === 0 ? glow.spark : glow.bright;
         ctx.fillRect(Math.round(x / PX) * PX, Math.round(y / PX) * PX, PX, PX);
     }
     ctx.globalAlpha = 1;
 }
 
-// Kapının içindeki ateş ışığının titremesi: zemindeki sıcak yamuk nefes alır
-export function drawDoorGlow(ctx, frame) {
-    const o = DOOR.opening;
-    const flicker = 0.5 + Math.sin(frame * 0.11) * 0.28 + Math.sin(frame * 0.37) * 0.14;
-    ctx.globalAlpha = 0.16 * flicker;
-    ctx.fillStyle = '#fbbf24';
-    const floorTop = o.y + o.h - 44;
-    for (let y = floorTop; y < o.y + o.h; y += PX) {
-        const t = (y - floorTop) / (o.y + o.h - floorTop);
-        const halfW = Math.round(((o.w / 2) * (0.30 + t * 0.62)) / PX) * PX;
-        ctx.fillRect(Math.round((o.x + o.w / 2 - 4 - halfW) / PX) * PX, y, halfW * 2, PX);
-    }
-    ctx.globalAlpha = 1;
-}
-
-// Ormanda süzülen ateşböcekleri
 export function drawFireflies(ctx, flies, frame) {
     for (const fly of flies) {
         const glow = 0.35 + Math.sin(frame * 0.06 + fly.phase) * 0.35;

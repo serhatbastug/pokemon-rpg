@@ -1,9 +1,10 @@
 // Ana menü sahnesinin yerleşimi. Burada DOM/canvas yok - sadece sayılar,
 // böylece çizimden bağımsız test edilebilir (tests/data.test.mjs).
 //
-// Sahne tek ekrandır, kamera kaymaz: solda antrenörün evi, sağda orman ve
-// ormanın en dibinde macera kapısı, yukarıda "İKİ KİŞİLİK OYNA" tabelası ve
-// altındaki geçit.
+// Sahne tek ekrandır, kamera kaymaz:
+//   sol    -> antrenörün evi (şimdilik yalnızca dekor)
+//   yukarı -> MACERA KAPISI: tabelalı taş kemer, yaklaşıp F ile açılır
+//   sağ    -> 2 KİŞİLİK OYNA portalı: açıklığından yürüyerek geçilir
 //
 // Piksel birimi PX = 4: antrenör sprite'ı da 4 ölçeğiyle çizilir, böylece
 // sahnedeki her şey aynı piksel ızgarasına oturur.
@@ -21,40 +22,46 @@ export const START = { x: 500, y: 400 };
 // evle şimdilik etkileşim yok.
 export const HOUSE = { x: 95, y: 120, w: 240, h: 140 };
 
-// Üstteki geçit: tabela + altından geçilen kapı. Antrenör açıklığa girince
-// ekran yavaşça kararır ve karakter seçimine gidilir.
-export const GATE = {
-    sign: { x: 340, y: 4, w: 320, h: 84, lines: ['İKİ KİŞİLİK', 'OYNA'] },
+// Üstteki macera kapısı. Kemerin tamamı engeldir: içinden geçilmez, önünde
+// durup F'ye basılır ve onay penceresi açılır.
+export const ADVENTURE = {
+    sign: { x: 408, y: 4, w: 184, h: 84, lines: ['MACERA', 'KAPISI'], scale: 4 },
     frame: { x: 426, y: 88, w: 148, h: 120 },
-    // Çerçevenin yalnızca yan ayakları engeldir; açıklıktan geçilir
     pillars: [
         { x: 426, y: 88, w: 30, h: 120 },
         { x: 544, y: 88, w: 30, h: 120 }
     ],
     opening: { x: 456, y: 126, w: 88, h: 82 },
-    trigger: { x: 460, y: 130, w: 80, h: 50 }
+    hotspot: { x: 500, y: 236, r: 94 },
+    glow: 'amber'
 };
 
-// Sağdaki macera kapısı: yaklaşıp F'ye basınca onay penceresi açılır.
-// Ekran kenarına yapışmasın diye sağında bir tutam orman bırakıldı.
-export const DOOR = {
-    frame: { x: 848, y: 196, w: 116, h: 174 },
-    opening: { x: 872, y: 228, w: 68, h: 128 },
-    hotspot: { x: 866, y: 300, r: 104 }
+// Sağdaki iki kişilik oyun portalı. Ayakları engel, açıklığı yürünebilir:
+// antrenör patikadan gelip kemerin altına girince ekran kararır.
+export const VERSUS = {
+    sign: { x: 786, y: 62, w: 184, h: 72, lines: ['2 KİŞİLİK', 'OYNA'], scale: 3 },
+    frame: { x: 812, y: 150, w: 132, h: 150 },
+    pillars: [
+        { x: 812, y: 150, w: 32, h: 150 },
+        { x: 912, y: 150, w: 32, h: 150 }
+    ],
+    opening: { x: 844, y: 190, w: 68, h: 110 },
+    back: { x: 844, y: 150, w: 68, h: 40 },   // kemerin arkası: dışarı çıkılamaz
+    trigger: { x: 848, y: 194, w: 60, h: 60 },
+    glow: 'violet'
 };
 
 // Toprak patikalar (yalnızca görsel; üzerinde yürümek zorunlu değil)
 export const PATHS = [
-    { x: 55, y: 255, w: 890, h: 70 },   // evden ormana uzanan ana patika
-    { x: 460, y: 190, w: 80, h: 110 }   // geçide çıkan kol
+    { x: 55, y: 255, w: 835, h: 70 },   // evden portala uzanan ana patika
+    { x: 460, y: 208, w: 80, h: 92 }    // macera kapısına çıkan kol
 ];
 
 // Sahneyi çevreleyen orman duvarları: ağaçlar buraya çizilir, içinden
-// geçilemez. Geçidin açıklığı üstteki duvarda bilerek boş bırakılmıştır.
+// geçilemez.
 const WALLS = [
     { x: 0, y: 0, w: 426, h: 178 },
     { x: 574, y: 0, w: 426, h: 178 },
-    { x: 426, y: 0, w: 148, h: 126 },   // geçidin arkası: dışarı çıkılamaz
     { x: 0, y: 0, w: 55, h: 560 },
     { x: 985, y: 0, w: 15, h: 560 },
     { x: 0, y: 472, w: 1000, h: 88 }
@@ -84,23 +91,22 @@ const BANDS = [
     { x: 0, y: -10, w: 1000, h: 156, count: 26, sizes: ['big', 'big', 'mid'] },      // üst orman
     { x: 0, y: 452, w: 1000, h: 110, count: 18, sizes: ['big', 'mid', 'mid'] },      // alt orman
     { x: 0, y: 110, w: 80, h: 370, count: 7, sizes: ['big', 'mid'] },                // sol kenar
-    { x: 600, y: 120, w: 260, h: 130, count: 8, sizes: ['big', 'big', 'mid'] },      // sağ orman (üst)
-    { x: 600, y: 330, w: 240, h: 140, count: 7, sizes: ['big', 'mid', 'mid'] },      // sağ orman (alt)
+    { x: 596, y: 120, w: 156, h: 130, count: 6, sizes: ['big', 'big', 'mid'] },      // sağ orman (üst)
+    { x: 596, y: 330, w: 156, h: 140, count: 5, sizes: ['big', 'mid', 'mid'] },      // sağ orman (alt)
     { x: 60, y: 330, w: 345, h: 140, count: 8, sizes: ['mid', 'small', 'mid'] },     // evin altı
-    { x: 340, y: 120, w: 90, h: 140, count: 3, sizes: ['mid', 'small'] },            // ev ile geçit arası
-    { x: 578, y: 120, w: 40, h: 140, count: 2, sizes: ['mid', 'small'] }             // geçidin sağı
+    { x: 340, y: 120, w: 72, h: 140, count: 2, sizes: ['mid', 'small'] }             // ev ile kemer arası
 ];
 
-// Ağaç girmemesi gereken alanlar: patikalar, ev, kapı önü, tabela ve
-// antrenörün doğduğu açıklık. Kapının çevresi geniş tutuldu - orada duran bir
-// ağaç kapıyı tamamen örtüyordu.
+// Ağaç girmemesi gereken alanlar: patikalar, ev, iki kemerin çevresi, tabelalar
+// ve antrenörün doğduğu açıklık. Kemerlerin çevresi geniş tutuldu - önünde
+// duran bir ağaç kapıyı tamamen örtüyordu.
 const KEEP_OUT = [
     { x: 0, y: 238, w: 1000, h: 104 },
-    { x: 414, y: 86, w: 172, h: 230 },
+    { x: 414, y: 86, w: 172, h: 240 },
     { x: 80, y: 105, w: 270, h: 170 },
-    { x: 806, y: 130, w: 194, h: 430 },
+    { x: 760, y: 40, w: 240, h: 440 },
     { x: 370, y: 320, w: 280, h: 170 },
-    { x: 330, y: 0, w: 340, h: 100 }
+    { x: 396, y: 0, w: 208, h: 100 }
 ];
 
 export function rectsOverlap(a, b) {
@@ -147,12 +153,14 @@ function buildTrees() {
 
 export const TREES = buildTrees();
 
-// Çarpışma alan listesi: duvarlar + ev + kapı çerçeveleri + ağaç dipleri
+// Çarpışma alan listesi. Macera kemerinin tamamı engel (F ile açılır),
+// portalda ise yalnızca ayaklar ve arka duvar engel - açıklıktan geçilir.
 export const SOLIDS = [
     ...WALLS,
     HOUSE,
-    ...GATE.pillars,
-    DOOR.frame,
+    ADVENTURE.frame,
+    ...VERSUS.pillars,
+    VERSUS.back,
     ...TREES.map(treeBase)
 ];
 
@@ -172,11 +180,11 @@ export function inRect(x, y, rect) {
 }
 
 // Antrenör macera kapısının önünde mi? (F ipucu ve onay penceresi için)
-export function nearDoor(x, y) {
-    return Math.hypot(x - DOOR.hotspot.x, y - DOOR.hotspot.y) <= DOOR.hotspot.r;
+export function nearAdventureGate(x, y) {
+    return Math.hypot(x - ADVENTURE.hotspot.x, y - ADVENTURE.hotspot.y) <= ADVENTURE.hotspot.r;
 }
 
-// Antrenör üstteki geçide girdi mi?
-export function inGate(x, y) {
-    return inRect(x, y, GATE.trigger);
+// Antrenör iki kişilik oyun portalının altına girdi mi?
+export function inVersusPortal(x, y) {
+    return inRect(x, y, VERSUS.trigger);
 }

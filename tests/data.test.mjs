@@ -262,22 +262,27 @@ const menu = await import('../src/menu/menuLayout.js');
 const { missingGlyphs } = await import('../src/menu/pixelFont.js');
 
 check('menü: başlangıç noktası boş', !menu.blocked(menu.START.x, menu.START.y));
-check('menü: geçidin arkasından dışarı çıkılamıyor', menu.blocked(500, 110));
-check('menü: macera kapısının içinden geçilemiyor', menu.blocked(930, 300));
+check('menü: macera kemerinin içinden geçilemiyor', menu.blocked(500, 150));
+check('menü: macera kemerinin önünde durulabiliyor', !menu.blocked(500, 250));
+check('menü: portalın açıklığından geçilebiliyor', !menu.blocked(878, 250));
+check('menü: portalın arkasından dışarı çıkılamıyor', menu.blocked(878, 175));
+check('menü: portalın ayağından geçilemiyor', menu.blocked(828, 250));
 check('menü: evin içine girilemiyor', menu.blocked(200, 180));
 
-// Tabeladaki yazının her harfi piksel yazı tipinde var mı?
-for (const line of menu.GATE.sign.lines) {
-    const missing = missingGlyphs(line);
-    check(`menü: "${line}" yazısı çizilebiliyor`, missing.length === 0, missing.join(','));
+// Tabelalardaki yazının her harfi piksel yazı tipinde var mı?
+for (const arch of [menu.ADVENTURE, menu.VERSUS]) {
+    for (const line of arch.sign.lines) {
+        const missing = missingGlyphs(line);
+        check(`menü: "${line}" yazısı çizilebiliyor`, missing.length === 0, missing.join(','));
+    }
 }
 
 // Ağaçların dibi patikaya, eve veya kapı önüne taşmamalı
 const treeBases = menu.TREES.map(menu.treeBase);
 const corridors = [
-    { name: 'ana patika', rect: { x: 60, y: 258, w: 930, h: 64 } },
-    { name: 'geçit kolu', rect: { x: 468, y: 180, w: 64, h: 110 } },
-    { name: 'kapı önü', rect: { x: 850, y: 240, w: 120, h: 100 } }
+    { name: 'ana patika', rect: { x: 60, y: 258, w: 825, h: 64 } },
+    { name: 'kemer kolu', rect: { x: 462, y: 210, w: 76, h: 90 } },
+    { name: 'portal önü', rect: { x: 808, y: 190, w: 140, h: 180 } }
 ];
 for (const corridor of corridors) {
     const clash = treeBases.filter(base => menu.rectsOverlap(base, corridor.rect));
@@ -295,8 +300,8 @@ let reachedDoor = false;
 
 while (queue.length) {
     const [x, y] = queue.shift();
-    if (menu.inGate(x, y)) reachedGate = true;
-    if (menu.nearDoor(x, y)) reachedDoor = true;
+    if (menu.nearAdventureGate(x, y)) reachedGate = true;
+    if (menu.inVersusPortal(x, y)) reachedDoor = true;
     for (const [dx, dy] of [[STEP, 0], [-STEP, 0], [0, STEP], [0, -STEP]]) {
         const nx = x + dx;
         const ny = y + dy;
@@ -308,8 +313,8 @@ while (queue.length) {
     }
 }
 
-check('menü: geçide yürüyerek ulaşılıyor', reachedGate);
-check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedDoor);
+check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedGate);
+check('menü: iki kişilik portala yürüyerek girilebiliyor', reachedDoor);
 check('menü: gezilebilir alan makul büyüklükte', seenCells.size > 900, `${seenCells.size} kare`);
 
 // ---- Özet ----

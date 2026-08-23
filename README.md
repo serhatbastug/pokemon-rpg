@@ -20,13 +20,28 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (324 kontrol): harita geçerliliği, portal ulaşılabilirliği, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (71 test): ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run check` | Veri ve saf mantık testleri (336 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (78 test): ana menü sahnesi (yürüyüş, kapı, geçit), ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
 Ekran görüntüleri `tests/screenshots/` altına yazılır (git'e dahil değil).
 GitHub Actions yapılandırması `.github/workflows/ci.yml` içindedir.
+
+## Ana Menü
+
+Oyun bir düğme listesiyle değil, **antrenörün içinde yürüdüğü piksel bir sahneyle**
+açılır (`src/menu/`). Sahne tek ekrandır, kamera kaymaz:
+
+| Nerede | Ne var | Nasıl |
+|---|---|---|
+| Sol | Antrenörün evi | Şimdilik yalnızca dekor, etkileşim yok |
+| Yukarı | "İKİ KİŞİLİK OYNA" tabelası ve altındaki taş geçit | Açıklığın **içinden yürüyün**: ekran yavaşça kararır, karakter seçimi açılır |
+| Sağ | Orman ve dibindeki macera kapısı | Kapıya yaklaşıp **F**: "Oyuna başlamak istiyor musunuz?" penceresi açılır, EVET macera modunu başlatır |
+
+Hareket WASD veya yön tuşlarıyla. Ev, ağaç gövdeleri ve kapı çerçeveleri engeldir;
+yerleşimin tutarlılığı (her iki kapıya da yürüyerek ulaşılabilmesi dahil)
+`npm run check` içinde BFS ile test edilir.
 
 ## Kontroller
 
@@ -91,8 +106,14 @@ src/
     render/
       TerrainRenderer.js  Karo desenleri ve zemin pişirme
       WorldRenderer.js    Portallar, tüccar, oyuncu, efektler ve HUD
+  menu/
+    MenuScene.js        Ana menü sahnesi: yürüyüş, çarpışma, kapı ve geçit
+    menuLayout.js       Sahne yerleşimi (ev, kapılar, patikalar, ağaçlar) - DOM'suz
+    menuArt.js          Sahnenin piksel çizimleri (zemin, ağaç, ev, geçit, kapı)
+    pixelFont.js        5x7 piksel bitmap yazı tipi (tabela yazısı)
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
+    startPrompt.js      Macera kapısının piksel onay penceresi
     library.js          Pokemon kütüphanesi (ekip, koleksiyon, jeton harcama)
     shop.js             Kecleon dükkanı ve çanta
     hud.js              Can barları ve cooldown göstergeleri

@@ -1,11 +1,30 @@
 // Ekranlar arası geçişler. DOM sınıf değişiklikleri tek yerde toplanır.
 const el = (id) => document.getElementById(id);
 
+const SCREENS = ['menu-screen', 'selection-screen', 'overworld-screen', 'battle-screen'];
+
+function show(id, { header = false, lockScroll = true } = {}) {
+    for (const screen of SCREENS) el(screen).classList.toggle('hidden', screen !== id);
+    el('main-header').classList.toggle('hidden', !header);
+    document.body.classList.toggle('battle-active', lockScroll);
+}
+
+// Ana menü: antrenörün içinde gezdiği piksel sahne (oyunun açılış ekranı)
+export function showMenuScreen() {
+    show('menu-screen');
+}
+
+// Karakter seçimi: ana menüdeki geçitten gelinir, iki kişilik moda çıkar
+export function showSelectionScreen() {
+    show('selection-screen', { header: true, lockScroll: false });
+}
+
 export function showBattleScreen() {
-    el('selection-screen').classList.add('hidden');
-    el('main-header').classList.add('hidden');
-    el('battle-screen').classList.remove('hidden');
-    document.body.classList.add('battle-active');
+    show('battle-screen');
+}
+
+export function showOverworldScreen() {
+    show('overworld-screen');
 }
 
 export function showGameOver(text) {
@@ -15,19 +34,4 @@ export function showGameOver(text) {
 
 export function hideGameOver() {
     el('gameover-screen').classList.add('hidden');
-}
-
-export function showOverworldScreen() {
-    el('selection-screen').classList.add('hidden');
-    el('main-header').classList.add('hidden');
-    el('overworld-screen').classList.remove('hidden');
-    document.body.classList.add('battle-active');
-}
-
-export function showSelectionScreen() {
-    el('overworld-screen').classList.add('hidden');
-    el('battle-screen').classList.add('hidden');
-    el('selection-screen').classList.remove('hidden');
-    el('main-header').classList.remove('hidden');
-    document.body.classList.remove('battle-active');
 }

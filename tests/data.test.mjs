@@ -254,6 +254,64 @@ check('hiç top yoksa null dönüyor', progress.bestBall() === null);
 
 progress.clear();
 
+// ---- Ana menü sahnesi ----
+// Menü gezilebilir bir sahne olduğu için yerleşimin iki şeyi garanti etmesi
+// gerekir: antrenör başladığı yerde sıkışmamalı ve her iki kapıya da
+// yürüyerek ulaşabilmeli. Bunu sahne üzerinde kaba bir BFS ile ölçüyoruz.
+const menu = await import('../src/menu/menuLayout.js');
+const { missingGlyphs } = await import('../src/menu/pixelFont.js');
+
+check('menü: başlangıç noktası boş', !menu.blocked(menu.START.x, menu.START.y));
+check('menü: geçidin arkasından dışarı çıkılamıyor', menu.blocked(500, 110));
+check('menü: macera kapısının içinden geçilemiyor', menu.blocked(930, 300));
+check('menü: evin içine girilemiyor', menu.blocked(200, 180));
+
+// Tabeladaki yazının her harfi piksel yazı tipinde var mı?
+for (const line of menu.GATE.sign.lines) {
+    const missing = missingGlyphs(line);
+    check(`menü: "${line}" yazısı çizilebiliyor`, missing.length === 0, missing.join(','));
+}
+
+// Ağaçların dibi patikaya, eve veya kapı önüne taşmamalı
+const treeBases = menu.TREES.map(menu.treeBase);
+const corridors = [
+    { name: 'ana patika', rect: { x: 60, y: 258, w: 930, h: 64 } },
+    { name: 'geçit kolu', rect: { x: 468, y: 180, w: 64, h: 110 } },
+    { name: 'kapı önü', rect: { x: 850, y: 240, w: 120, h: 100 } }
+];
+for (const corridor of corridors) {
+    const clash = treeBases.filter(base => menu.rectsOverlap(base, corridor.rect));
+    check(`menü: ${corridor.name} ağaçtan temiz`, clash.length === 0, `${clash.length} ağaç`);
+}
+
+// Başlangıçtan yürünerek nereye gidilebilir? (8 piksel adımlı ızgara)
+const STEP = 8;
+const seenCells = new Set();
+const cellKey = (x, y) => `${x},${y}`;
+const queue = [[Math.round(menu.START.x / STEP) * STEP, Math.round(menu.START.y / STEP) * STEP]];
+seenCells.add(cellKey(queue[0][0], queue[0][1]));
+let reachedGate = false;
+let reachedDoor = false;
+
+while (queue.length) {
+    const [x, y] = queue.shift();
+    if (menu.inGate(x, y)) reachedGate = true;
+    if (menu.nearDoor(x, y)) reachedDoor = true;
+    for (const [dx, dy] of [[STEP, 0], [-STEP, 0], [0, STEP], [0, -STEP]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx > menu.SCENE.w || ny > menu.SCENE.h) continue;
+        const key = cellKey(nx, ny);
+        if (seenCells.has(key) || menu.blocked(nx, ny)) continue;
+        seenCells.add(key);
+        queue.push([nx, ny]);
+    }
+}
+
+check('menü: geçide yürüyerek ulaşılıyor', reachedGate);
+check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedDoor);
+check('menü: gezilebilir alan makul büyüklükte', seenCells.size > 900, `${seenCells.size} kare`);
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

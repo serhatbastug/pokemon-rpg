@@ -1253,3 +1253,142 @@ canvas {
 .dex-cell.defeated .dex-tag {
     color: #fbbf24;
 }
+
+/* ---- Ana menü sahnesi ---- */
+/* Menü artık gezilebilir bir piksel sahne: canvas ekranı kaplar, ölçeklenirken
+   piksel bloklarının kenarları bulanmasın diye image-rendering: pixelated. */
+.menu-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.5rem 0 1rem;
+}
+
+.menu-stage {
+    width: 100%;
+    max-width: 1000px;
+    background: #06120b;
+    border: 3px solid #1f2937;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.6);
+    line-height: 0;
+}
+
+#menuCanvas {
+    width: 100%;
+    height: auto;
+    background: #123f26;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.menu-hint {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 1.6rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.menu-hint b {
+    color: var(--accent-gold);
+    font-weight: 600;
+}
+
+/* ---- Piksel diyalog kutusu (macera kapısı onayı) ---- */
+.pixel-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.72);
+    padding: 1rem;
+}
+
+.pixel-modal {
+    background: #101a33;
+    color: #f8fafc;
+    max-width: 520px;
+    width: 100%;
+    padding: 1.6rem 1.6rem 1.2rem;
+    text-align: center;
+    /* Köşesiz, kademeli çerçeve: klasik oyun diyalog kutusu görünümü */
+    box-shadow:
+        0 0 0 4px #f8fafc,
+        0 0 0 8px #101a33,
+        0 0 0 12px #1e3a8a,
+        0 14px 0 12px rgba(0, 0, 0, 0.45);
+}
+
+.pixel-title,
+.pixel-btn,
+.pixel-foot {
+    font-family: 'Press Start 2P', 'Space Grotesk', monospace;
+}
+
+.pixel-title {
+    font-size: 0.8rem;
+    color: var(--accent-gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 1.1rem;
+}
+
+.pixel-text {
+    font-family: var(--font-body);
+    font-size: 1.15rem;
+    line-height: 1.5;
+    margin-bottom: 1.4rem;
+}
+
+.pixel-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.pixel-btn {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 0.85rem 1.6rem;
+    color: #06210f;
+    background: #4ade80;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 0 4px #06210f, 0 6px 0 4px #166534;
+    transition: transform 0.08s linear, background 0.15s ease;
+}
+
+.pixel-btn:hover,
+.pixel-btn:focus-visible {
+    background: #86efac;
+    outline: none;
+}
+
+.pixel-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 4px #06210f, 0 2px 0 4px #166534;
+}
+
+.pixel-btn.ghost {
+    color: #f8fafc;
+    background: #475569;
+    box-shadow: 0 0 0 4px #0f172a, 0 6px 0 4px #1e293b;
+}
+
+.pixel-btn.ghost:hover,
+.pixel-btn.ghost:focus-visible {
+    background: #64748b;
+}
+
+.pixel-foot {
+    margin-top: 1.2rem;
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+}

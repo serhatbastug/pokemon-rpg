@@ -7,9 +7,11 @@ import { Shop } from './ui/shop.js';
 import { InputManager } from './core/input.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
-import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
 import { Overworld } from './world/Overworld.js';
+import { MenuScene } from './menu/MenuScene.js';
+import { StartPrompt } from './ui/startPrompt.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -31,10 +33,7 @@ const overworld = new Overworld({
     canvas: document.getElementById('worldCanvas'),
     input,
     progress,
-    onExit: () => {
-        overworld.stop();
-        showSelectionScreen();
-    },
+    onExit: () => returnToMenu(),
     onOpenShop: () => shop.toggle(),
     onMerchantLoaded: (name) => shop.setMerchantName(name)
 });
@@ -57,10 +56,47 @@ input.onKeyDown(e => {
     if (e.code === 'KeyE' && overworld.running) library.toggle();
 });
 
-document.getElementById('start-adventure-btn').addEventListener('click', async () => {
+// --- Ana menü sahnesi ---
+// Menü artık bir düğme listesi değil, antrenörün gezdiği bir sahne:
+// sağdaki orman kapısı macera moduna, yukarıdaki geçit iki kişilik moda çıkar.
+
+async function enterAdventure() {
+    menu.stop();
     showOverworldScreen();
     await overworld.start();
+}
+
+function returnToMenu() {
+    overworld.stop();
+    showMenuScreen();
+    menu.start();
+}
+
+const startPrompt = new StartPrompt({
+    onConfirm: () => enterAdventure(),
+    onCancel: () => menu.setPaused(false)
 });
+
+const menu = new MenuScene({
+    canvas: document.getElementById('menuCanvas'),
+    input,
+    // Kapının önünde F: sahne donar, onay penceresi açılır
+    onAdventureDoor: () => {
+        menu.setPaused(true);
+        startPrompt.show();
+    },
+    // Geçitten geçildi: ekran karardı, sıra karakter seçiminde
+    onTwoPlayerGate: () => {
+        menu.stop();
+        showSelectionScreen();
+    }
+});
+
+showMenuScreen();
+menu.start();
+
+document.getElementById('selection-back-btn').addEventListener('click', returnToMenu);
+document.getElementById('overworld-back-btn').addEventListener('click', returnToMenu);
 
 // Otomatik UI testleri (tests/ui.test.mjs) oyun durumunu buradan okur
 window.__overworld = overworld;
@@ -68,11 +104,7 @@ window.__game = game;
 window.__library = library;
 window.__shop = shop;
 window.__progress = progress;
-
-document.getElementById('overworld-back-btn').addEventListener('click', () => {
-    overworld.stop();
-    showSelectionScreen();
-});
+window.__menu = menu;
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();

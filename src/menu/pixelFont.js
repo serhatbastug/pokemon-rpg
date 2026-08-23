@@ -1,0 +1,97 @@
+// 5x7 piksel bitmap yazı tipi. Ana menü tabelası gibi canvas üstündeki
+// yazılar bununla çizilir: ctx.fillText kullanmak sahnenin piksel dilini
+// bozardı (yumuşatılmış kenarlar piksel bloklarının yanında yamalı durur).
+//
+// Her harf 7 satır x 5 sütun; '#' dolu piksel, '.' saydam.
+// Türkçe harflerde tepe/kuyruk işareti satır bütçesinden kısılır
+// (İ'nin noktası üst satıra, Ş'nin çengeli alt satıra).
+
+const GLYPHS = {
+    'A': ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    'B': ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+    'C': ['.####', '#....', '#....', '#....', '#....', '#....', '.####'],
+    'D': ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+    'E': ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+    'F': ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+    'G': ['.###.', '#...#', '#....', '#..##', '#...#', '#...#', '.###.'],
+    'H': ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    'I': ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
+    'J': ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+    'K': ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+    'L': ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+    'M': ['#...#', '##.##', '#.#.#', '#...#', '#...#', '#...#', '#...#'],
+    'N': ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+    'O': ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    'P': ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+    'R': ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+    'S': ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+    'T': ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+    'U': ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    'V': ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+    'Y': ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+    'Z': ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+
+    // Türkçe harfler
+    'İ': ['..#..', '.....', '#####', '..#..', '..#..', '..#..', '#####'],
+    'Ş': ['.####', '#....', '#....', '.###.', '....#', '####.', '..#..'],
+    'Ç': ['.####', '#....', '#....', '#....', '#....', '.####', '..#..'],
+    'Ö': ['.#.#.', '.....', '.###.', '#...#', '#...#', '#...#', '.###.'],
+    'Ü': ['.#.#.', '.....', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    'Ğ': ['#...#', '.###.', '.###.', '#....', '#..##', '#...#', '.###.'],
+
+    '!': ['..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..'],
+    '?': ['.###.', '#...#', '....#', '..##.', '..#..', '.....', '..#..'],
+    '-': ['.....', '.....', '.....', '#####', '.....', '.....', '.....'],
+    ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....']
+};
+
+export const GLYPH_W = 5;
+export const GLYPH_H = 7;
+const SPACING = 1; // harfler arası boş sütun (piksel cinsinden, ölçek uygulanmadan)
+
+// Yazı tipinde karşılığı olmayan bir harf var mı? (testler bunu kullanır)
+export function missingGlyphs(text) {
+    return [...text.toUpperCase()].filter(ch => !GLYPHS[ch]);
+}
+
+// Ölçek uygulanmış piksel genişliği
+export function measurePixelText(text, scale = 1) {
+    const chars = [...text];
+    if (chars.length === 0) return 0;
+    return (chars.length * (GLYPH_W + SPACING) - SPACING) * scale;
+}
+
+// (x, y) sol-üst köşe olacak şekilde çizer. align: 'left' | 'center'
+export function drawPixelText(ctx, text, x, y, {
+    scale = 2,
+    color = '#f8fafc',
+    shadow = null,      // verilirse yazının 1 piksel altına gölge kopyası çizilir
+    align = 'left'
+} = {}) {
+    const chars = [...text.toUpperCase()];
+    const width = measurePixelText(text, scale);
+    let ox = align === 'center' ? Math.round(x - width / 2) : Math.round(x);
+    const oy = Math.round(y);
+
+    const paint = (dx, dy, fill) => {
+        ctx.fillStyle = fill;
+        let cx = ox + dx;
+        for (const ch of chars) {
+            const glyph = GLYPHS[ch];
+            if (glyph) {
+                for (let r = 0; r < GLYPH_H; r++) {
+                    for (let c = 0; c < GLYPH_W; c++) {
+                        if (glyph[r][c] !== '#') continue;
+                        ctx.fillRect(cx + c * scale, oy + dy + r * scale, scale, scale);
+                    }
+                }
+            }
+            cx += (GLYPH_W + SPACING) * scale;
+        }
+    };
+
+    if (shadow) paint(0, scale, shadow);
+    paint(0, 0, color);
+
+    return width;
+}

@@ -31,6 +31,20 @@ async function hold(key, ms) {
     await page.keyboard.up(key);
 }
 
+// Ana menüden macera moduna geçiş: kapıya yaklaş, F'ye bas, EVET'e tıkla.
+// (Kapıya kadar yürümek yerine konum atanır; yürüyüşün kendisi ayrıca test
+// ediliyor, buradaki amaç macera moduna hızlı ve kararlı biçimde girmek.)
+async function enterAdventureFromMenu() {
+    await page.waitForFunction(() => window.__menu && window.__menu.running, { timeout: 15000 });
+    await page.evaluate(() => {
+        window.__menu.player.x = 800;
+        window.__menu.player.y = 300;
+    });
+    await page.keyboard.press('KeyF');
+    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
+    await page.click('#start-prompt-yes');
+}
+
 // Sayfadaki oyun durumunu okumak için Overworld örneğini global'e bağlarız
 async function worldState() {
     return page.evaluate(() => {
@@ -102,6 +116,69 @@ async function main() {
     await page.waitForSelector('.char-card', { timeout: 20000 });
     const cardCount = await page.$$eval('.char-card', els => els.length);
     check('9 karakter karti yuklendi', cardCount === 9, `${cardCount} kart`);
+
+    // --- Ana menü sahnesi ---
+    // Menü artık gezilebilir bir piksel sahne; karakter seçimine ancak
+    // yukarıdaki geçitten geçerek gidilir.
+    const menuVisible = await page.$eval('#menu-screen', el => !el.classList.contains('hidden'));
+    const selectionHidden = await page.$eval('#selection-screen', el => el.classList.contains('hidden'));
+    check('Acilista ana menu sahnesi geliyor', menuVisible && selectionHidden);
+    await wait(400);
+    await shot('00a-ana-menu');
+
+    const menuFps = await measureFps(2500);
+    check('Ana menu 50+ FPS', menuFps.fps >= 50, JSON.stringify(menuFps));
+
+    // Yürüyüş ve çarpışma: sola gidince evin/ormanın duvarında durmalı
+    const menuBefore = await page.evaluate(() => ({ ...window.__menu.player }));
+    await hold('KeyD', 350);
+    const menuAfter = await page.evaluate(() => ({ ...window.__menu.player }));
+    check('Antrenor menude yuruyor', menuAfter.x > menuBefore.x + 20,
+        `x ${Math.round(menuBefore.x)} -> ${Math.round(menuAfter.x)}`);
+
+    // Çarpışma: evin önünden yukarı yürünse de duvarından geçilemez
+    await page.evaluate(() => {
+        window.__menu.player.x = 215;
+        window.__menu.player.y = 300;
+    });
+    await hold('KeyW', 600);
+    const atHouse = await page.evaluate(() => ({ ...window.__menu.player }));
+    check('Evin duvarindan gecilemiyor', atHouse.y > 264,
+        `y ${Math.round(atHouse.y)} (ev dibi 260)`);
+
+    // Macera kapısı: yaklaş, F, onay penceresi
+    await page.evaluate(() => {
+        window.__menu.player.x = 800;
+        window.__menu.player.y = 300;
+    });
+    await wait(120);
+    // İpucu görünüyorsa antrenör gerçekten kapının önünde ve dışarıda duruyor
+    const hintVisible = await page.evaluate(() => window.__menu.doorHintVisible);
+    check('Kapinin onunde F ipucu goruluyor', hintVisible);
+    await shot('00b-kapi-onunde');
+    await page.keyboard.press('KeyF');
+    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
+    const promptText = await page.$eval('#start-prompt .pixel-text', el => el.textContent.trim());
+    check('Kapida F onay penceresi aciyor', promptText.includes('başlamak istiyor'), promptText);
+    await shot('00c-kapi-onayi');
+
+    // HAYIR: pencere kapanır, sahne kaldığı yerden devam eder
+    await page.click('#start-prompt-no');
+    await wait(200);
+    const promptClosed = await page.$eval('#start-prompt', el => el.classList.contains('hidden'));
+    const menuStillRunning = await page.evaluate(() => window.__menu.running && !window.__menu.paused);
+    check('HAYIR pencereyi kapatip menuye donuyor', promptClosed && menuStillRunning);
+
+    // Geçit: tabelanın altından yürüyerek geçilince ekran kararır ve
+    // karakter seçimi açılır
+    await page.evaluate(() => {
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 260;
+    });
+    await hold('KeyW', 1400);
+    await page.waitForFunction(() => !document.getElementById('selection-screen').classList.contains('hidden'), { timeout: 8000 });
+    const menuClosed = await page.evaluate(() => !window.__menu.running);
+    check('Gecitten gecince karakter secimi aciliyor', menuClosed);
     await shot('01-secim-ekrani');
 
     // --- İki kişilik mod: seçim akışı ---
@@ -146,7 +223,7 @@ async function main() {
 
     // Yeni akış: macera düğmesi karakter seçimini açar
     await page.evaluate(() => localStorage.removeItem('pokerpg-save-v2'));
-    await page.click('#start-adventure-btn');
+    await enterAdventureFromMenu();
     await page.waitForFunction(() => window.__overworld?.running && window.__overworld.partyPokemon.length > 0, { timeout: 30000 });
     await wait(500);
     // Pokemon artik pesimizden gelmiyor: poke topu firlatarak sahaya suruyoruz
@@ -265,7 +342,10 @@ async function main() {
     const tokensBefore = await page.evaluate(() => window.__overworld.progress.tokens);
     await page.evaluate(() => {
         const w = window.__overworld;
-        const e = w.enemies.find(e => e.kind === 'common');
+        // Ayakta olan bir düşman seçilmeli: yetenek testlerinde bayılmış olan
+        // ikinci kez bayılmaz, dolayısıyla jeton da düşürmez
+        const e = w.enemies.find(en => en.kind === 'common' && !en.fainted)
+            || w.enemies.find(en => en.kind === 'common');
         // Düşmanı antrenörün yanına getir ve canını düşür
         e.x = w.player.x + 60;
         e.y = w.player.y;
@@ -556,7 +636,7 @@ async function main() {
 
     await page.reload({ waitUntil: 'networkidle2' });
     await page.waitForSelector('.char-card', { timeout: 20000 });
-    await page.click('#start-adventure-btn');
+    await enterAdventureFromMenu();
     await page.waitForFunction(() => window.__overworld?.partyPokemon.length > 0, { timeout: 30000 });
     await page.keyboard.press('Digit1');
     await page.waitForFunction(() => !!window.__overworld.active, { timeout: 10000 });
@@ -745,6 +825,7 @@ async function main() {
     const passed = results.filter(r => r.passed).length;
     console.log(`\n===== ${passed}/${results.length} test gecti =====`);
     console.log('FPS ozeti:');
+    console.log(`  ana menu          : ${JSON.stringify(menuFps)}`);
     console.log(`  savas ekrani      : ${JSON.stringify(battleFps)}`);
     console.log(`  ana harita        : ${JSON.stringify(mainFps)}`);
     console.log(`  labirent (loc-1-1): ${JSON.stringify(locFps)}`);

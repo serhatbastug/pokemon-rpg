@@ -1,0 +1,296 @@
+// Ana menü: statik bir ekran değil, antrenörün içinde yürüdüğü piksel sahne.
+//
+//   sol   -> antrenörün evi (şimdilik etkileşimsiz)
+//   sağ   -> orman ve dibinde macera kapısı (yaklaş + F -> onay penceresi)
+//   yukarı-> "İKİ KİŞİLİK OYNA" tabelası ve altındaki geçit (içinden geçilince
+//            ekran yavaşça kararır, karakter seçimine gidilir)
+
+import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
+import { drawTrainer } from '../world/trainerSprite.js';
+import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
+import { drawPixelText } from './pixelFont.js';
+import {
+    SCENE, PX, START, PLAYER_SPEED, PLAYER_SCALE,
+    TREES, DOOR, GATE, blocked, nearDoor, inGate
+} from './menuLayout.js';
+import {
+    bakeGround, bakeHouse, bakeGate, bakeDoor, treeSpriteFor,
+    drawSmoke, drawGatePortal, drawDoorGlow, drawFireflies
+} from './menuArt.js';
+
+const FADE_FRAMES = 84;   // geçitten geçince kararma süresi (~1.4 sn)
+const INTRO_FRAMES = 26;  // sahneye girerken açılma süresi
+
+export class MenuScene {
+    constructor({ canvas, input, onAdventureDoor, onTwoPlayerGate }) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.input = input;
+        this.onAdventureDoor = onAdventureDoor || (() => {});
+        this.onTwoPlayerGate = onTwoPlayerGate || (() => {});
+
+        this.running = false;
+        this.paused = false;      // onay penceresi açıkken sahne donar
+        this.frame = 0;
+        this.fade = 0;            // 0 = açık, FADE_FRAMES = tamamen siyah
+        this.intro = 0;
+        this.leaving = false;     // geçiş başladı, bir daha tetiklenmesin
+
+        this.player = {
+            x: START.x,
+            y: START.y,
+            dir: 'down',
+            moving: false
+        };
+
+        // Ormanda süzülen ateşböcekleri (atmosfer)
+        this.fireflies = [];
+        for (let i = 0; i < 26; i++) {
+            this.fireflies.push({
+                x: Math.random() * SCENE.w,
+                y: 120 + Math.random() * (SCENE.h - 200),
+                angle: Math.random() * Math.PI * 2,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        input.onKeyDown(e => {
+            if (!this.running || this.paused || this.leaving) return;
+            // Tarayıcı sesi ancak bir etkileşimden sonra açar; menü müziği de
+            // bu yüzden ilk tuşa basılınca başlar (sayfa açılışında değil).
+            unlockAudio();
+            if (!this.musicStarted) {
+                this.musicStarted = true;
+                playMusic('town');
+            }
+            if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
+            if (e.code === 'KeyF') this.tryDoor();
+        });
+    }
+
+    // Sahnenin tüm sprite'ları bir kez hazırlanır; sonra yalnızca kopyalanır.
+    bake() {
+        if (this.ground) return;
+        this.ground = bakeGround();
+
+        const props = [bakeHouse(), bakeGate(), bakeDoor()];
+        for (const tree of TREES) {
+            const sprite = treeSpriteFor(tree);
+            props.push({
+                canvas: sprite.canvas,
+                x: tree.x - sprite.ox,
+                y: tree.y - sprite.oy,
+                baseY: tree.y
+            });
+        }
+        // Arkadan öne: dibi yukarıda olan önce çizilir
+        props.sort((a, b) => a.baseY - b.baseY);
+        this.props = props;
+    }
+
+    start() {
+        this.bake();
+        this.player.x = START.x;
+        this.player.y = START.y;
+        this.player.dir = 'up';
+        this.player.moving = false;
+        this.paused = false;
+        this.leaving = false;
+        this.fade = 0;
+        this.intro = INTRO_FRAMES;
+        this.running = true;
+        this.ctx.imageSmoothingEnabled = false;
+        if (this.musicStarted) playMusic('town');
+
+        // Overworld ile aynı sabit adımlı döngü
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        const stepMs = 1000 / FRAME_RATE;
+        let acc = 0;
+        let last = performance.now();
+
+        const loop = (now) => {
+            if (!this.running) return;
+            this.rafId = requestAnimationFrame(loop);
+
+            acc += Math.min(now - last, stepMs * 3);
+            last = now;
+            if (acc < stepMs) return;
+
+            while (acc >= stepMs) {
+                acc -= stepMs;
+                this.step();
+            }
+            this.draw();
+        };
+        this.rafId = requestAnimationFrame(loop);
+    }
+
+    stop() {
+        this.running = false;
+        stopMusic();
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+    }
+
+    // Onay penceresi açılırken/kapanırken çağrılır
+    setPaused(value) {
+        this.paused = value;
+        if (value) this.player.moving = false;
+    }
+
+    step() {
+        this.frame++;
+        if (this.intro > 0) this.intro--;
+
+        // Geçitten geçiş: ekran kararır, sonunda karakter seçimine devredilir
+        if (this.leaving) {
+            this.fade = Math.min(FADE_FRAMES, this.fade + 1);
+            if (this.fade >= FADE_FRAMES) {
+                this.running = false;
+                this.onTwoPlayerGate();
+            }
+            return;
+        }
+
+        if (!this.paused) {
+            this.movePlayer();
+            this.checkGate();
+        }
+        this.moveFireflies();
+    }
+
+    movePlayer() {
+        const { input, player } = this;
+        let dx = 0;
+        let dy = 0;
+        if (input.isDown('KeyA') || input.isDown('ArrowLeft')) dx -= 1;
+        if (input.isDown('KeyD') || input.isDown('ArrowRight')) dx += 1;
+        if (input.isDown('KeyW') || input.isDown('ArrowUp')) dy -= 1;
+        if (input.isDown('KeyS') || input.isDown('ArrowDown')) dy += 1;
+
+        player.moving = dx !== 0 || dy !== 0;
+        if (!player.moving) return;
+
+        // Çapraz giderken hız artmasın
+        const len = Math.hypot(dx, dy) || 1;
+        const vx = (dx / len) * PLAYER_SPEED;
+        const vy = (dy / len) * PLAYER_SPEED;
+
+        // Eksenler ayrı denenir: duvara sürtünerek yürünebilsin
+        if (!blocked(player.x + vx, player.y)) player.x += vx;
+        if (!blocked(player.x, player.y + vy)) player.y += vy;
+
+        player.x = Math.max(0, Math.min(SCENE.w, player.x));
+        player.y = Math.max(0, Math.min(SCENE.h, player.y));
+
+        if (dy < 0) player.dir = 'up';
+        else if (dy > 0) player.dir = 'down';
+        else if (dx < 0) player.dir = 'left';
+        else if (dx > 0) player.dir = 'right';
+    }
+
+    moveFireflies() {
+        for (const fly of this.fireflies) {
+            fly.angle += (Math.random() - 0.5) * 0.4;
+            fly.x += Math.cos(fly.angle) * 0.35;
+            fly.y += Math.sin(fly.angle) * 0.35;
+            if (fly.x < 20) fly.x = SCENE.w - 20;
+            if (fly.x > SCENE.w - 20) fly.x = 20;
+            if (fly.y < 110) fly.y = SCENE.h - 60;
+            if (fly.y > SCENE.h - 40) fly.y = 110;
+        }
+    }
+
+    // Antrenör geçidin altına girdi mi?
+    checkGate() {
+        if (!inGate(this.player.x, this.player.y)) return;
+        this.leaving = true;
+        this.player.moving = false;
+        Sfx.badge();
+    }
+
+    // F: macera kapısının önündeyse onay penceresini açar
+    tryDoor() {
+        if (!nearDoor(this.player.x, this.player.y)) return;
+        Sfx.buy();
+        this.onAdventureDoor();
+    }
+
+    get doorHintVisible() {
+        return !this.paused && !this.leaving && nearDoor(this.player.x, this.player.y);
+    }
+
+    draw() {
+        const { ctx, canvas, player } = this;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(this.ground, 0, 0);
+
+        // Ev, geçit, kapı ve ağaçlar antrenörle birlikte dip hizasına göre
+        // sıralanır: arkasındaki ağaç antrenörü örter, önündeki örtmez.
+        const feet = player.y;
+        let i = 0;
+        for (; i < this.props.length && this.props[i].baseY <= feet; i++) {
+            const prop = this.props[i];
+            ctx.drawImage(prop.canvas, Math.round(prop.x), Math.round(prop.y));
+        }
+        this.drawPlayer();
+        for (; i < this.props.length; i++) {
+            const prop = this.props[i];
+            ctx.drawImage(prop.canvas, Math.round(prop.x), Math.round(prop.y));
+        }
+
+        // Canlanan ayrıntılar
+        drawSmoke(ctx, this.frame);
+        drawGatePortal(ctx, this.frame);
+        drawDoorGlow(ctx, this.frame);
+        drawFireflies(ctx, this.fireflies, this.frame);
+
+        if (this.doorHintVisible) this.drawDoorHint();
+
+        // Kararma / açılma perdesi
+        const veil = this.leaving
+            ? this.fade / FADE_FRAMES
+            : (this.intro > 0 ? this.intro / INTRO_FRAMES : 0);
+        if (veil > 0) {
+            ctx.fillStyle = `rgba(2, 6, 23, ${veil})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+    drawPlayer() {
+        const { ctx, player } = this;
+        // Ayak altındaki gölge
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = '#052e16';
+        ctx.fillRect(Math.round((player.x - 14) / PX) * PX, Math.round((player.y + 2) / PX) * PX, PX * 7, PX * 2);
+        ctx.globalAlpha = 1;
+
+        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26), player.dir, player.moving, PLAYER_SCALE);
+    }
+
+    // Kapının üstünde zıplayan "F" tuş ipucu. Kapının çerçevesine binmesin
+    // diye lentonun epey üstünde, açıklığın tam ortasında durur.
+    drawDoorHint() {
+        const { ctx } = this;
+        const bob = Math.round(Math.sin(this.frame * 0.12) * 4 / PX) * PX;
+        const cx = Math.round((DOOR.frame.x + DOOR.frame.w / 2) / PX) * PX;
+        const y = DOOR.frame.y - 64 + bob;
+        const cap = PX * 7;
+
+        // Tuş kapağı: koyu çerçeve + açık yüzey + alt gölge
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(cx - cap / 2 - PX, y - PX, cap + PX * 2, cap + PX * 2);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(cx - cap / 2, y, cap, cap);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(cx - cap / 2, y + cap - PX, cap, PX);
+        drawPixelText(ctx, 'F', cx - cap / 2 + PX, y, { scale: 4, color: '#0f172a' });
+
+        // Altında küçük "AÇ" yazısı
+        drawPixelText(ctx, 'AÇ', cx, y + cap + PX * 3, {
+            scale: 2, color: '#fef3c7', shadow: '#0f172a', align: 'center'
+        });
+    }
+}

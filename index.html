@@ -9,7 +9,7 @@
     <!-- Google Fonts: Outfit & Space Grotesk -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,8 +17,22 @@
     <div class="twinkling"></div>
 
     <main class="app-container">
+        <!-- Ana Menü: antrenörün içinde gezdiği piksel sahne.
+             Sağdaki orman kapısı macera moduna, yukarıdaki geçit iki kişilik
+             moda açılır; ev şimdilik yalnızca dekordur. -->
+        <section id="menu-screen" class="screen menu-screen">
+            <div class="menu-stage">
+                <canvas id="menuCanvas" width="1000" height="560"></canvas>
+            </div>
+            <p class="menu-hint">
+                <span><b>WASD</b> / yön tuşları — yürü</span>
+                <span>Ormandaki kapı — <b>F</b></span>
+                <span>Tabelanın altındaki geçit — içinden geç</span>
+            </p>
+        </section>
+
         <!-- Header -->
-        <header class="main-header" id="main-header">
+        <header class="main-header hidden" id="main-header">
             <h1 class="game-title">POKÉ<span>RPG</span></h1>
             <p class="game-subtitle">2 Kişilik Gerçek Zamanlı Arena Savaşı</p>
             <div id="selection-status" class="selection-status">
@@ -28,13 +42,14 @@
         </header>
 
         <!-- Selection Screen -->
-        <section id="selection-screen" class="screen active">
-            <!-- Mod seçimi en üstte -->
+        <section id="selection-screen" class="screen hidden">
+            <!-- Buraya ana menüdeki geçitten gelinir: burası artık yalnızca
+                 iki kişilik modun karakter seçimidir. -->
             <div class="mode-buttons">
-                <button id="start-adventure-btn" class="start-adventure-btn">TEK KİŞİLİK OYNA</button>
+                <button id="selection-back-btn" class="back-btn">&larr; Ana Menü</button>
                 <button id="start-battle-btn" class="start-battle-btn not-ready">2 KİŞİLİK OYNA</button>
             </div>
-            <p id="mode-hint" class="mode-hint">2 kişilik mod için aşağıdan iki karakter seçin.</p>
+            <p id="mode-hint" class="mode-hint">Aşağıdan iki karakter seçin (P1 ve P2).</p>
             <h2 class="section-title">Karakterinizi Seçin</h2>
             <div id="character-grid" class="character-grid">
                 <div class="loading-spinner">Pokemonlar çağrılıyor...</div>
@@ -139,6 +154,19 @@
                 <div class="modal-body">
                     <!-- Dynamic details here -->
                 </div>
+            </div>
+        </section>
+
+        <!-- Macera kapısının onay penceresi (piksel diyalog kutusu) -->
+        <section id="start-prompt" class="pixel-overlay hidden">
+            <div class="pixel-modal">
+                <p class="pixel-title">MACERA KAPISI</p>
+                <p class="pixel-text">Oyuna başlamak istiyor musunuz?</p>
+                <div class="pixel-actions">
+                    <button id="start-prompt-yes" class="pixel-btn">EVET</button>
+                    <button id="start-prompt-no" class="pixel-btn ghost">HAYIR</button>
+                </div>
+                <p class="pixel-foot">Enter: evet &middot; Esc: hayır</p>
             </div>
         </section>
 

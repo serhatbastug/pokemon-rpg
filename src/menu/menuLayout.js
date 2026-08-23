@@ -9,7 +9,11 @@
 // Piksel birimi PX = 4: antrenör sprite'ı da 4 ölçeğiyle çizilir, böylece
 // sahnedeki her şey aynı piksel ızgarasına oturur.
 
-export const PX = 4;
+export { PX } from '../pixel/pixelDraw.js';
+import { PX } from '../pixel/pixelDraw.js';
+import { TREE_SIZES, treeBase } from '../pixel/trees.js';
+export { TREE_SIZES, treeBase };
+
 export const SCENE = { w: 1000, h: 560 };
 
 // Antrenörün ayak hizasındaki çarpışma kutusu
@@ -78,13 +82,6 @@ function mulberry32(seed) {
     };
 }
 
-// Ağaç boyları: gövde dibi (x, y) referans alınır.
-export const TREE_SIZES = {
-    big:   { canopyW: 112, canopyH: 116, trunkH: 48, trunkW: 20 },
-    mid:   { canopyW: 88,  canopyH: 92,  trunkH: 36, trunkW: 16 },
-    small: { canopyW: 64,  canopyH: 68,  trunkH: 28, trunkW: 12 }
-};
-
 // Ağaç dikilebilecek şeritler. Sıklık bilerek düşük tutuldu: taçlar üst üste
 // binip tek bir yeşil kütleye dönüşünce hiçbir ağaç okunmuyor.
 const BANDS = [
@@ -111,12 +108,6 @@ const KEEP_OUT = [
 
 export function rectsOverlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-
-// Bir ağacın gövde dibindeki engel kutusu
-export function treeBase(tree) {
-    const size = TREE_SIZES[tree.size];
-    return { x: tree.x - size.trunkW / 2 - 4, y: tree.y - 14, w: size.trunkW + 8, h: 18 };
 }
 
 function buildTrees() {

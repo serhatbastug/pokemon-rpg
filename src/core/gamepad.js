@@ -83,6 +83,7 @@ export class GamepadManager {
         this.state = { x: 0, y: 0, magnitude: 0, pressed: [] };
         this.held = new Set();
         this.connected = false;
+        this.armed = false;   // analog bir kez nötre dönmeden yön üretmez
         this.handlers = [];
 
         // Kol takıldığında tarayıcı bu olayı gönderir. Olay gelene kadar
@@ -98,6 +99,7 @@ export class GamepadManager {
 
     reset() {
         this.connected = false;
+        this.armed = false;
         this.held.clear();
         this.state = { x: 0, y: 0, magnitude: 0, pressed: [] };
     }
@@ -119,7 +121,13 @@ export class GamepadManager {
             return;
         }
 
-        this.state = readPad(pad);
+        const reading = readPad(pad);
+
+        // Bir kez bile nötre dönmemiş analog yön üretmez. Bozuk ya da yanlış
+        // eşlenmiş bir kol ekseni sabit 1.0 raporlayabiliyor; bu koruma
+        // olmadan karakter kendi kendine yürüyor.
+        if (reading.magnitude === 0) this.armed = true;
+        this.state = this.armed ? reading : { ...reading, x: 0, y: 0, magnitude: 0 };
 
         const now = new Set(this.state.pressed);
         for (const name of now) {

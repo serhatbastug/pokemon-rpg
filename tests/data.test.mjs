@@ -259,7 +259,7 @@ progress.clear();
 // gerekir: antrenör başladığı yerde sıkışmamalı ve her iki kapıya da
 // yürüyerek ulaşabilmeli. Bunu sahne üzerinde kaba bir BFS ile ölçüyoruz.
 const menu = await import('../src/menu/menuLayout.js');
-const { missingGlyphs } = await import('../src/menu/pixelFont.js');
+const { missingGlyphs } = await import('../src/pixel/pixelFont.js');
 
 check('menü: başlangıç noktası boş', !menu.blocked(menu.START.x, menu.START.y));
 check('menü: macera kemerinin içinden geçilemiyor', menu.blocked(500, 150));
@@ -317,6 +317,74 @@ check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedGat
 check('menü: iki kişilik portala yürüyerek girilebiliyor', reachedDoor);
 check('menü: gezilebilir alan makul büyüklükte', seenCells.size > 900, `${seenCells.size} kare`);
 
+// ---- Macera modu: şehir kenarı + orman girişi ----
+// Sahnenin iki güvencesi var: antrenör başladığı yerde sıkışmamalı ve
+// şehirden ormanın sonuna kadar yürüyerek gidebilmeli.
+const adv = await import('../src/adventure/adventureLayout.js');
+
+check('macera: başlangıç noktası boş', !adv.blocked(adv.START.x, adv.START.y));
+check('macera: şehirde binaların içine girilemiyor', adv.blocked(400, 100));
+check('macera: yolda yürünüyor', !adv.blocked(400, 250));
+check('macera: ağaç duvarından geçilemiyor', adv.blocked(950, 200));
+check('macera: boşluktan geçiliyor', !adv.blocked(950, (adv.GAP.top + adv.GAP.bottom) / 2));
+check('macera: dünyanın dışına çıkılamıyor', adv.blocked(adv.WORLD.w - 4, 335));
+
+// Orman koridoru dar mı? (şehir bandının yarısından ince olmalı)
+const corridorHeight = adv.FOREST.halfHeight * 2;
+const cityHeight = adv.CITY.walk.bottom - adv.CITY.walk.top;
+check('macera: orman koridoru şehirden dar', corridorHeight < cityHeight / 2,
+    `koridor ${corridorHeight}px, şehir ${cityHeight}px`);
+check('macera: boşluk antrenörün sığacağı kadar',
+    adv.GAP.bottom - adv.GAP.top >= adv.PLAYER_BOX.h * 2 && adv.GAP.bottom - adv.GAP.top <= 90,
+    `${adv.GAP.bottom - adv.GAP.top}px`);
+
+// Koridorun her noktasında yürünebilir bir orta çizgi var mı?
+let corridorOk = true;
+for (let x = adv.FOREST.x0 + 20; x < adv.WORLD.w - 20; x += 20) {
+    if (adv.blocked(x, adv.corridorAt(x).center)) corridorOk = false;
+}
+check('macera: koridorun ortası boyunca yürünebiliyor', corridorOk);
+
+// Hiçbir ağacın dibi yürünen alana taşmamalı
+const advBlockers = adv.TREES.filter(tree => {
+    const base = adv.treeBase(tree);
+    for (let px = base.x; px <= base.x + base.w; px += 4) {
+        for (let py = base.y; py <= base.y + base.h; py += 4) {
+            if (adv.walkableAt(px, py)) return true;
+        }
+    }
+    return false;
+});
+check('macera: ağaçlar yolu kapatmıyor', advBlockers.length === 0, `${advBlockers.length} ağaç`);
+
+// Şehirden ormanın sonuna yürünerek gidilebiliyor mu?
+const advStep = 8;
+const advSeen = new Set();
+const advQueue = [[Math.round(adv.START.x / advStep) * advStep, Math.round(adv.START.y / advStep) * advStep]];
+advSeen.add(advQueue[0].join(','));
+let advMaxX = 0;
+let reachedGapCell = false;
+while (advQueue.length) {
+    const [x, y] = advQueue.shift();
+    if (x > advMaxX) advMaxX = x;
+    if (adv.inGap(x, y)) reachedGapCell = true;
+    for (const [dx, dy] of [[advStep, 0], [-advStep, 0], [0, advStep], [0, -advStep]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const key = `${nx},${ny}`;
+        if (advSeen.has(key) || adv.blocked(nx, ny)) continue;
+        advSeen.add(key);
+        advQueue.push([nx, ny]);
+    }
+}
+check('macera: ormanın boşluğuna yürüyerek ulaşılıyor', reachedGapCell);
+check('macera: koridorun sonuna kadar yürünebiliyor', advMaxX > adv.WORLD.w - 60,
+    `en uzak x ${advMaxX} / ${adv.WORLD.w}`);
+
+// Mekan adının her harfi piksel yazı tipinde var mı?
+const advMissing = missingGlyphs(adv.LOCATION_NAME);
+check(`macera: "${adv.LOCATION_NAME}" yazısı çizilebiliyor`, advMissing.length === 0, advMissing.join(','));
+
 // ---- Oyun kolu (PS5 DualSense) ----
 // readPad saf bir fonksiyon: ham kol anlık görüntüsünü yöne çevirir.
 const { readPad, BUTTONS, DEADZONE } = await import('../src/core/gamepad.js');
@@ -351,6 +419,24 @@ check('kol: D-pad sol yön üretiyor', dpad.x === -1 && dpad.y === 0 && dpad.mag
 const diagonal = readPad(pad([0, 0], [BUTTONS.dpadUp, BUTTONS.dpadRight]));
 check('kol: D-pad çaprazı normalize ediliyor',
     Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 0.001);
+
+// Takılı kalmış eksen koruması: nötre dönmemiş analog yön üretmemeli
+const { GamepadManager } = await import('../src/core/gamepad.js');
+const stuckPad = pad([1, 0]);
+const fakeManager = Object.create(GamepadManager.prototype);
+fakeManager.state = { x: 0, y: 0, magnitude: 0, pressed: [] };
+fakeManager.held = new Set();
+fakeManager.handlers = [];
+fakeManager.connected = true;
+fakeManager.armed = false;
+fakeManager.firstPad = () => stuckPad;
+fakeManager.poll();
+check('kol: nötre dönmemiş eksen yön üretmiyor', fakeManager.stick().magnitude === 0);
+fakeManager.firstPad = () => pad([0, 0]);
+fakeManager.poll();
+fakeManager.firstPad = () => stuckPad;
+fakeManager.poll();
+check('kol: nötrü gördükten sonra analog çalışıyor', fakeManager.stick().magnitude === 1);
 
 check('kol: ÜÇGEN standart eşlemede 3. tuş', BUTTONS.triangle === 3);
 check('kol: Çarpı standart eşlemede 0. tuş', BUTTONS.cross === 0);

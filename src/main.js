@@ -8,11 +8,12 @@ import { InputManager } from './core/input.js';
 import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
-import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
 import { Overworld } from './world/Overworld.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
+import { AdventureScene } from './adventure/AdventureScene.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -65,7 +66,9 @@ input.onKeyDown(e => {
 // Kolun durumu MenuScene döngüsünde her karede taranır.
 const gamepad = new GamepadManager();
 
-async function enterAdventure() {
+// Eski overworld (ana harita). Menüden erişilmiyor - macera modu sıfırdan
+// kuruluyor - ama motor duruyor ve UI testleri buradan giriyor.
+async function enterOverworld() {
     menu.stop();
     showOverworldScreen();
     await overworld.start();
@@ -77,11 +80,24 @@ function returnToMenu() {
     menu.start();
 }
 
+const adventure = new AdventureScene({
+    canvas: document.getElementById('adventureCanvas'),
+    input,
+    gamepad,
+    onExit: () => {
+        adventure.stop();
+        showMenuScreen();
+        menu.start();
+    }
+});
+
 const startPrompt = new StartPrompt({
-    // Macera kapısı şimdilik bir yere götürmüyor: ana haritanın kaldırılması
-    // kararlaştırıldı, kapının açılacağı yer sonra belirlenecek. EVET de
-    // HAYIR gibi yalnızca pencereyi kapatır.
-    onConfirm: () => menu.setPaused(false),
+    // EVET: ekran yavaşça kararır, sonra şehrin kenarındaki macera sahnesi açılır
+    onConfirm: () => menu.beginExit(() => {
+        menu.stop();
+        showAdventureScreen();
+        adventure.start();
+    }),
     onCancel: () => menu.setPaused(false)
 });
 
@@ -122,9 +138,8 @@ window.__shop = shop;
 window.__progress = progress;
 window.__menu = menu;
 window.__gamepad = gamepad;
-// Macera modu menüden şimdilik açılmıyor (kapı bir yere götürmüyor) ama motor
-// duruyor; UI testleri maceraya buradan giriyor.
-window.__enterAdventure = enterAdventure;
+window.__adventure = adventure;
+window.__enterOverworld = enterOverworld;
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();

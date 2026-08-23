@@ -1,7 +1,7 @@
 // Ekranlar arası geçişler. DOM sınıf değişiklikleri tek yerde toplanır.
 const el = (id) => document.getElementById(id);
 
-const SCREENS = ['menu-screen', 'selection-screen', 'overworld-screen', 'battle-screen'];
+const SCREENS = ['menu-screen', 'adventure-screen', 'selection-screen', 'overworld-screen', 'battle-screen'];
 
 function show(id, { header = false, lockScroll = true } = {}) {
     for (const screen of SCREENS) el(screen).classList.toggle('hidden', screen !== id);
@@ -12,6 +12,11 @@ function show(id, { header = false, lockScroll = true } = {}) {
 // Ana menü: antrenörün içinde gezdiği piksel sahne (oyunun açılış ekranı)
 export function showMenuScreen() {
     show('menu-screen');
+}
+
+// Macera modu: şehrin kenarından ormanın girişine (menü gibi tam ekran)
+export function showAdventureScreen() {
+    show('adventure-screen');
 }
 
 // Karakter seçimi: ana menüdeki geçitten gelinir, iki kişilik moda çıkar

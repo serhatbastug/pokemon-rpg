@@ -8,15 +8,16 @@
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
-import { drawPixelText, measurePixelText } from './pixelFont.js';
+import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import {
     SCENE, PX, START, PLAYER_SPEED, PLAYER_SCALE,
     TREES, ADVENTURE, VERSUS, blocked, nearAdventureGate, inVersusPortal
 } from './menuLayout.js';
 import {
-    bakeGround, bakeHouse, bakeArch, treeSpriteFor,
+    bakeGround, bakeHouse, bakeArch,
     drawSmoke, drawArchSparks, drawFireflies
 } from './menuArt.js';
+import { treeSpriteFor } from '../pixel/trees.js';
 
 const FADE_FRAMES = 84;   // portaldan geçince kararma süresi (~1.4 sn)
 const INTRO_FRAMES = 26;  // sahneye girerken açılma süresi
@@ -171,12 +172,12 @@ export class MenuScene {
         // Onay penceresi açıkken de taranır: pencere kolla kapatılabilsin.
         this.gamepad?.poll();
 
-        // Portaldan geçiş: ekran kararır, sonunda karakter seçimine devredilir
+        // Çıkış: ekran yavaşça kararır, sonunda hedef sahneye devredilir
         if (this.leaving) {
             this.fade = Math.min(FADE_FRAMES, this.fade + 1);
             if (this.fade >= FADE_FRAMES) {
                 this.running = false;
-                this.onVersusPortal();
+                this.exitHandler?.();
             }
             return;
         }
@@ -242,12 +243,21 @@ export class MenuScene {
         }
     }
 
+    // Sahneden çıkış: ekran kararmaya başlar, bitince handler çağrılır.
+    // İki kişilik portal ve macera kapısı aynı geçişi kullanır.
+    beginExit(handler) {
+        if (this.leaving) return;
+        this.leaving = true;
+        this.paused = false;
+        this.player.moving = false;
+        this.exitHandler = handler;
+    }
+
     // Antrenör iki kişilik portalın kemeri altına girdi mi?
     checkVersusPortal() {
         if (!inVersusPortal(this.player.x, this.player.y)) return;
-        this.leaving = true;
-        this.player.moving = false;
         Sfx.badge();
+        this.beginExit(this.onVersusPortal);
     }
 
     // F: macera kapısının önündeyse onay penceresini açar

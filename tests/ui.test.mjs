@@ -35,8 +35,8 @@ async function hold(key, ms) {
 // (nereye açılacağı henüz belirlenmedi) ama motor duruyor ve test ediliyor;
 // testler maceraya main.js'in açtığı giriş noktasından giriyor.
 async function enterAdventureFromMenu() {
-    await page.waitForFunction(() => !!window.__enterAdventure, { timeout: 15000 });
-    await page.evaluate(() => window.__enterAdventure());
+    await page.waitForFunction(() => !!window.__enterOverworld, { timeout: 15000 });
+    await page.evaluate(() => window.__enterOverworld());
 }
 
 // Sayfadaki oyun durumunu okumak için Overworld örneğini global'e bağlarız
@@ -102,6 +102,12 @@ async function main() {
         if (res.status() >= 400 && !res.url().includes('favicon')) failedUrls.push(`${res.status()} ${res.url()}`);
     });
 
+    // Makineye takılı gerçek bir oyun kolu tarayıcıya görünüp testlere girdi
+    // gönderiyor (bir koşuda antrenör kendi kendine yürüdü). Testler
+    // donanımdan yalıtılsın diye kol listesi boşaltılıyor; kol davranışı
+    // aşağıdaki sahte kol bölümünde ayrıca test ediliyor.
+    await page.evaluateOnNewDocument(() => { navigator.getGamepads = () => []; });
+
     // --- Yükleme ---
     await page.goto(BASE_URL, { waitUntil: 'networkidle2' });
     check('Sayfa yuklendi', await page.title() === 'PokeRPG - Real-time Arena PvP', await page.title());
@@ -163,20 +169,65 @@ async function main() {
     const menuStillRunning = await page.evaluate(() => window.__menu.running && !window.__menu.paused);
     check('HAYIR pencereyi kapatip menuye donuyor', promptClosed && menuStillRunning);
 
-    // EVET de şimdilik bir yere götürmüyor: kapının nereye açılacağı belli
-    // değil, pencere kapanıp menüde kalınmalı
+    // EVET: ekran yavaşça kararır ve şehrin kenarındaki macera sahnesi açılır
+    // (konum yeniden atanıyor: aradaki adımlarda antrenör kemerin menzilinden
+    // çıkarsa F hiçbir şey yapmaz ve test sebepsiz kalır)
+    await page.evaluate(() => {
+        window.__menu.player.x = 500;
+        window.__menu.player.y = 250;
+    });
     await page.keyboard.press('KeyF');
     await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
     await page.click('#start-prompt-yes');
-    await wait(400);
-    const afterYes = await page.evaluate(() => ({
-        promptOpen: !document.getElementById('start-prompt').classList.contains('hidden'),
-        menuRunning: window.__menu.running && !window.__menu.paused,
-        overworldRunning: window.__overworld.running
+    await page.waitForFunction(() => window.__adventure && window.__adventure.running, { timeout: 8000 });
+    await wait(700);
+    const advOpen = await page.evaluate(() => ({
+        screen: !document.getElementById('adventure-screen').classList.contains('hidden'),
+        menuStopped: !window.__menu.running,
+        camera: Math.round(window.__adventure.camera.x),
+        following: window.__adventure.cameraFollowing
     }));
-    check('EVET simdilik maceraya goturmuyor',
-        !afterYes.promptOpen && afterYes.menuRunning && !afterYes.overworldRunning,
-        JSON.stringify(afterYes));
+    check('EVET macera sahnesini aciyor',
+        advOpen.screen && advOpen.menuStopped && advOpen.camera === 0 && !advOpen.following,
+        JSON.stringify(advOpen));
+    await shot('00e-sehir-kenari');
+
+    // --- Macera: şehirden ormanın girişine ---
+    // Boşluğa kadar kamera sabit; boşluktan geçilince ekran sağa kaymalı
+    await hold('KeyD', 2400);
+    await wait(400);
+    const inForest = await page.evaluate(() => ({
+        x: Math.round(window.__adventure.player.x),
+        camera: Math.round(window.__adventure.camera.x),
+        following: window.__adventure.cameraFollowing,
+        titleShown: window.__adventure.titleShown,
+        titleAlpha: window.__adventure.titleAlpha
+    }));
+    check('Bosluktan gecince kamera saga kayiyor',
+        inForest.following && inForest.camera > 60,
+        JSON.stringify(inForest));
+    check('Ormana girince mekan adi cikiyor',
+        inForest.titleShown && inForest.titleAlpha > 0,
+        `alpha ${inForest.titleAlpha.toFixed(2)}`);
+    await shot('00f-orman-girisi');
+
+    // Koridor dar: yukarı doğru yürümeye çalışınca kısa sürede ağaçlara takılır
+    const beforeUp = await page.evaluate(() => Math.round(window.__adventure.player.y));
+    await hold('KeyW', 900);
+    const afterUp = await page.evaluate(() => Math.round(window.__adventure.player.y));
+    check('Orman koridoru dar', beforeUp - afterUp < 120, `y ${beforeUp} -> ${afterUp}`);
+
+    // ESC ana menüye döner
+    await page.keyboard.press('Escape');
+    await wait(300);
+    const backToMenu = await page.evaluate(() => ({
+        menu: window.__menu.running,
+        adventure: window.__adventure.running,
+        screen: !document.getElementById('menu-screen').classList.contains('hidden')
+    }));
+    check('ESC maceradan ana menuye donuyor',
+        backToMenu.menu && !backToMenu.adventure && backToMenu.screen,
+        JSON.stringify(backToMenu));
 
     // Oyun kolu: kol yokken de sahne kolun durumunu sorunsuz tarıyor olmalı
     const padState = await page.evaluate(() => ({
@@ -200,6 +251,9 @@ async function main() {
         // ondan sonra başlıyor (kol yokken her kare getGamepads çağrılmasın)
         window.dispatchEvent(new Event('gamepadconnected'));
     });
+    // Analog bir kez nötr okunmadan yön üretmiyor (takılı kalmış eksen
+    // koruması); kol yeni bağlandı, birkaç kare nötr geçsin
+    await wait(250);
 
     await page.evaluate(() => {
         window.__menu.player.x = 500;

@@ -20,8 +20,8 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (354 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (85 test): ana menü sahnesi (yürüyüş, macera kapısı, portal, oyun kolu), ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run check` | Veri ve saf mantık testleri (369 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü ve macera sahnesi yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (89 test): ana menü sahnesi, macera sahnesi (kamera, orman girişi), oyun kolu, ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -39,10 +39,12 @@ açılır (`src/menu/`). Sahne tek ekrandır, kamera kaymaz:
 | Orta | "MACERA KAPISI" tabelalı taş kemer | Önüne gelip **F** / **ÜÇGEN**: "Oyuna başlamak istiyor musunuz?" penceresi açılır |
 | Sağ | "2 KİŞİLİK OYNA" tabelalı portal | Kemerin **altına yürüyün**: ekran yavaşça kararır, karakter seçimi açılır |
 
-> **Macera kapısı şimdilik bir yere götürmüyor.** Ana haritanın kaldırılmasına
-> karar verildi; kapının nereye açılacağı belirlenene kadar EVET de pencereyi
-> kapatmakla yetiniyor. Macera motoru duruyor ve UI testlerinde çalışıyor
-> (`window.__enterAdventure`).
+EVET denince ekran yavaşça kararır ve **macera modunun ilk sahnesi** açılır
+(aşağıya bakın).
+
+> Eski overworld (5 bölge portallı ana harita, jetonlar, dükkan) menüden
+> erişilmiyor: macera modu sıfırdan kuruluyor. Motoru duruyor ve UI
+> testlerinde çalışıyor (`window.__enterOverworld`).
 
 Sahne ekranı tamamen kaplar (canvas 1000x560, object-fit: contain).
 Ev, ağaç gövdeleri ve kemer ayakları engeldir; yerleşimin tutarlılığı (her iki
@@ -65,6 +67,32 @@ Analog ne kadar itilirse antrenör o kadar hızlı yürür. Kol bağlıyken kap�
 ipucundaki **F** simgesi yerine **üçgen** görünür. Eşleme `src/core/gamepad.js`
 içinde; ham kol verisini yöne çeviren `readPad` saf fonksiyon olduğu için
 `npm run check` içinde test edilir.
+
+## Macera Modu — İlk Sahne (`src/adventure/`)
+
+Şehrin kenarından ormanın girişine. Dünya ekrandan geniştir (2400x560), kamera
+antrenörü takip eder:
+
+```
+0 ------------------- 900 --- 1010 ------------------------- 2400
+|      ŞEHİR           |boşluk|     DAR ORMAN KORİDORU        |
+| binalar, asfalt yol, |      | yüksek ağaçlar, kıvrılan      |
+| kaldırım, yaya geçidi|      | ince patika                   |
+```
+
+- Antrenör şehirde, **ormanın girişine yakın** bir noktada başlar.
+- Ağaç duvarında yalnızca **antrenörün sığabileceği bir boşluk** açıktır
+  (70 piksel); iki yanı alçak ağaçlarla çerçevelenir.
+- Boşluktan geçilene kadar **kamera sabittir**; geçilince ekran antrenörle
+  birlikte sağa kayar.
+- Ormana girince **FISILTILI ORMAN GİRİŞİ** yazısı belirip kaybolur, müzik
+  şehirden ormana geçer.
+- Koridor bilerek dardır (110 piksel; şehir bandı 280 piksel).
+- **ESC** (kolda DAİRE) ana menüye döner.
+
+Bir çizim kuralı: ağaç tacı gövde dibinden **yukarı** doğru uzar, bu yüzden
+yürünen bandın altına uzun ağaç dikilemez - yolu tamamen örter. Koridorun
+altında yalnızca alçak bitki örtüsü vardır (`adventureLayout.js`).
 
 ## Kontroller
 
@@ -98,6 +126,7 @@ src/
     worldMap.js         Ana harita karo verisi ve portal konumları
   core/
     input.js            Klavye durumu takibi (InputManager)
+    gamepad.js          Oyun kolu (PS5 DualSense): analog yön ve tuş eşlemesi
   services/
     pokeapi.js          PokeAPI erişim katmanı
     apiCache.js         API yanıtları için bellek + localStorage önbelleği
@@ -129,11 +158,18 @@ src/
     render/
       TerrainRenderer.js  Karo desenleri ve zemin pişirme
       WorldRenderer.js    Portallar, tüccar, oyuncu, efektler ve HUD
+  pixel/
+    pixelDraw.js        Ortak piksel araçları: PX ızgarası, blok, gürültü
+    trees.js            Ağaç sprite'ları (small..huge), sahneler arası paylaşılır
+    pixelFont.js        5x7 piksel bitmap yazı tipi (tabelalar, mekan adı)
   menu/
     MenuScene.js        Ana menü sahnesi: yürüyüş, çarpışma, kapı ve portal
     menuLayout.js       Sahne yerleşimi (ev, kemerler, patikalar, ağaçlar) - DOM'suz
-    menuArt.js          Sahnenin piksel çizimleri (zemin, ağaç, ev, taş kemerler)
-    pixelFont.js        5x7 piksel bitmap yazı tipi (tabela yazıları)
+    menuArt.js          Sahnenin piksel çizimleri (zemin, ev, taş kemerler)
+  adventure/
+    AdventureScene.js   Macera ilk sahnesi: kamera takibi, orman girişi, mekan adı
+    adventureLayout.js  Şehir + koridor yerleşimi ve yürünebilirlik - DOM'suz
+    adventureArt.js     Asfalt, kaldırım, binalar, çit, patika, mekan adı kartı
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
     startPrompt.js      Macera kapısının piksel onay penceresi

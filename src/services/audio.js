@@ -158,7 +158,25 @@ export const Sfx = {
         blip({ type: 'square', from: 200, to: 90, duration: 0.25, volume: 0.25 });
     },
     status: () => blip({ type: 'sawtooth', from: 300, to: 220, duration: 0.25, volume: 0.25 }),
-    deny: () => blip({ type: 'square', from: 200, to: 140, duration: 0.14, volume: 0.25 })
+    deny: () => blip({ type: 'square', from: 200, to: 140, duration: 0.14, volume: 0.25 }),
+
+    // --- Prolog 3: kusatma ---
+    siren: () => {
+        blip({ type: 'sawtooth', from: 420, to: 700, duration: 0.5, volume: 0.16 });
+        blip({ type: 'sawtooth', from: 700, to: 420, duration: 0.5, volume: 0.16, delay: 0.5 });
+    },
+    metalSlam: () => {
+        noise({ duration: 0.45, volume: 0.4, filterFrom: 900, filterTo: 80 });
+        blip({ type: 'square', from: 140, to: 50, duration: 0.35, volume: 0.3 });
+    },
+    explosion: () => {
+        noise({ duration: 1.2, volume: 0.5, filterFrom: 1800, filterTo: 60 });
+        blip({ type: 'sawtooth', from: 90, to: 26, duration: 1.0, volume: 0.4 });
+    },
+    beamFall: () => {
+        noise({ duration: 0.7, volume: 0.45, filterFrom: 1400, filterTo: 120 });
+        blip({ type: 'square', from: 200, to: 60, duration: 0.5, volume: 0.32 });
+    }
 };
 
 // --- Basit döngüsel müzik ---
@@ -169,7 +187,9 @@ const TRACKS = {
     boss: { root: 110, scale: [0, 1, 5, 6, 7], tempo: 200, wave: 'square' },
     town: { root: 262, scale: [0, 4, 7, 9, 11], tempo: 330, wave: 'triangle' },
     // Harabe şehir: ağır, boşluklu, uyumsuz. Notalar arası uzun sessizlik.
-    ruin: { root: 131, scale: [0, 1, 5, 6, 8], tempo: 620, wave: 'triangle' }
+    ruin: { root: 131, scale: [0, 1, 5, 6, 8], tempo: 620, wave: 'triangle' },
+    // Kusatma: hizli, alcak, uyumsuz
+    siege: { root: 110, scale: [0, 1, 6, 7, 8], tempo: 190, wave: 'square' }
 };
 
 export function playMusic(name) {

@@ -8,12 +8,13 @@ import { InputManager } from './core/input.js';
 import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
-import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen, showSiegeScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
 import { Overworld } from './world/Overworld.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
+import { SiegeScene } from './adventure/SiegeScene.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -91,12 +92,31 @@ const adventure = new AdventureScene({
     }
 });
 
-const startPrompt = new StartPrompt({
-    // EVET: ekran yavaşça kararır, sonra şehrin kenarındaki macera sahnesi açılır
-    onConfirm: () => menu.beginExit(() => {
-        menu.stop();
+// Prolog 3: kuşatılan çalışma alanı. Sahnenin sonunda rögardan aşağı inilir.
+// Kanalizasyon bölümü henüz yazılmadı; şimdilik doğrudan şehir sahnesine
+// (prologun 4. bölümü) bağlanıyor - hikâyede zaten oradan çıkılıyor.
+const siege = new SiegeScene({
+    canvas: document.getElementById('siegeCanvas'),
+    input,
+    gamepad,
+    onExit: () => {
+        siege.stop();
+        showMenuScreen();
+        menu.start();
+    },
+    onFinish: () => {
+        siege.stop();
         showAdventureScreen();
         adventure.start();
+    }
+});
+
+const startPrompt = new StartPrompt({
+    // EVET: ekran yavaşça kararır, sonra prologun 3. bölümü açılır
+    onConfirm: () => menu.beginExit(() => {
+        menu.stop();
+        showSiegeScreen();
+        siege.start();
     }),
     onCancel: () => menu.setPaused(false)
 });
@@ -139,6 +159,7 @@ window.__progress = progress;
 window.__menu = menu;
 window.__gamepad = gamepad;
 window.__adventure = adventure;
+window.__siege = siege;
 window.__enterOverworld = enterOverworld;
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {

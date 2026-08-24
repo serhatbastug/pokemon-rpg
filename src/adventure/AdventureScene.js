@@ -15,7 +15,8 @@ import {
     WORLD, VIEW, PX, START, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
     GAP, TREES, CITY, WRECKS, blocked, inForest
 } from './adventureLayout.js';
-import { bakeGround, lampSprite, wreckSprite, witherCanvas, drawLocationTitle } from './adventureArt.js';
+import { bakeGround, lampSprite, wreckSprite, witherCanvas } from './adventureArt.js';
+import { drawLocationTitle } from '../pixel/screenText.js';
 
 const INTRO_FRAMES = 40;    // karanlıktan açılma (menüden kararmış geliyoruz)
 const TITLE_FRAMES = 230;   // mekan adının ekranda kalma süresi

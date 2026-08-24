@@ -169,7 +169,7 @@ async function main() {
     const menuStillRunning = await page.evaluate(() => window.__menu.running && !window.__menu.paused);
     check('HAYIR pencereyi kapatip menuye donuyor', promptClosed && menuStillRunning);
 
-    // EVET: ekran yavaşça kararır ve şehrin kenarındaki macera sahnesi açılır
+    // EVET: ekran yavaşça kararır ve PROLOG 3 (kuşatılan çalışma alanı) açılır
     // (konum yeniden atanıyor: aradaki adımlarda antrenör kemerin menzilinden
     // çıkarsa F hiçbir şey yapmaz ve test sebepsiz kalır)
     await page.evaluate(() => {
@@ -179,16 +179,77 @@ async function main() {
     await page.keyboard.press('KeyF');
     await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
     await page.click('#start-prompt-yes');
+    await page.waitForFunction(() => window.__siege && window.__siege.running, { timeout: 8000 });
+    await wait(700);
+    const siegeOpen = await page.evaluate(() => ({
+        screen: !document.getElementById('siege-screen').classList.contains('hidden'),
+        menuStopped: !window.__menu.running,
+        beat: window.__siege.script.name
+    }));
+    check('EVET prolog 3u (kusatma) aciyor',
+        siegeOpen.screen && siegeOpen.menuStopped, JSON.stringify(siegeOpen));
+    await shot('00d1-calisma-alani');
+
+    // --- Prolog 3: kurtaramama kuralı ---
+    // Betiği ayrılık anına kadar sür, oyuncuyu arkadaşa doğru yürüt: direk
+    // devrilmeli ve oyuncu bir daha kola geçememeli.
+    const siegeSplit = await page.evaluate(() => {
+        const s = window.__siege;
+        // Oyuncuyu ışınlamak yerine GERÇEKTEN sola yürüt: konumu doğrudan
+        // atarsak çarpışma atlanır ve test hiçbir şey doğrulamamış olur.
+        const realIsDown = s.input.isDown.bind(s.input);
+        s.input.isDown = (code) => code === 'KeyA' || realIsDown(code);
+        let steps = 0;
+        while (!s.state.beamDown && steps < 3000 && s.script.running) { s.step(); steps++; }
+        for (let i = 0; i < 400; i++) s.step();   // direk düştü, yüklenmeye devam
+        s.input.isDown = realIsDown;
+        s.draw();
+        return {
+            beamDown: s.state.beamDown,
+            playerX: Math.round(s.player.x),
+            friendX: Math.round(s.friend.x)
+        };
+    });
+    // Direğin sağ yüzü x=290 (siegeLayout.BEAM: x 236, w 54)
+    const BEAM_RIGHT = 290;
+    check('Direk devriliyor ve oyuncuyu arkadastan ayiriyor', siegeSplit.beamDown);
+    check('Direk dustukten sonra arkadasa gecilemiyor (kurtaramamali)',
+        siegeSplit.playerX > BEAM_RIGHT && siegeSplit.friendX < BEAM_RIGHT,
+        JSON.stringify(siegeSplit));
+    await shot('00d2-direk-devrildi');
+
+    // Dönüşüm: ekran yaratığa yakınlaşmalı, kolundaki turuncu bant görünmeli
+    const transform = await page.evaluate(() => {
+        const s = window.__siege;
+        let steps = 0;
+        while (s.script.name !== 'donusum' && steps < 6000 && s.script.running) { s.step(); steps++; }
+        for (let i = 0; i < 60; i++) s.step();
+        s.draw();
+        return { beat: s.script.name, zoom: s.state.zoom, creature: s.state.creature };
+    });
+    check('Donusumde ekran yaratiga yakinlasiyor',
+        transform.creature && transform.zoom > 1, JSON.stringify(transform));
+    await shot('00d3-donusum');
+
+    // Rögardan aşağı: prolog 4 (şehrin kenarı) açılmalı
+    await page.evaluate(() => {
+        const s = window.__siege;
+        let steps = 0;
+        while (s.script.name !== 'kacis' && steps < 6000 && s.script.running) { s.step(); steps++; }
+        s.player.x = 770;
+        s.player.y = 402;
+        for (let i = 0; i < 120 && s.running; i++) s.step();
+    });
     await page.waitForFunction(() => window.__adventure && window.__adventure.running, { timeout: 8000 });
     await wait(700);
     const advOpen = await page.evaluate(() => ({
         screen: !document.getElementById('adventure-screen').classList.contains('hidden'),
-        menuStopped: !window.__menu.running,
+        siegeStopped: !window.__siege.running,
         camera: Math.round(window.__adventure.camera.x),
         following: window.__adventure.cameraFollowing
     }));
-    check('EVET macera sahnesini aciyor',
-        advOpen.screen && advOpen.menuStopped && advOpen.camera === 0 && !advOpen.following,
+    check('Rogardan inince prolog 4 (sehrin kenari) aciliyor',
+        advOpen.screen && advOpen.siegeStopped && advOpen.camera === 0 && !advOpen.following,
         JSON.stringify(advOpen));
     await shot('00e-sehir-kenari');
 

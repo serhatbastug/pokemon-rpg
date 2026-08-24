@@ -506,6 +506,72 @@ check('sahne: sarsıntı sınırların içinde', (() => {
 check('sahne: parlama uçlarda sönük, tepede parlak',
     flash(0) === 0 && flash(1) === 0 && flash(0.12) > 0.99);
 
+// ---- Prolog 3: kuşatılan çalışma alanı ----
+// Sahnenin iki güvencesi var: direk düşmeden önce arkadaşın koluna
+// yürüyerek gidilebilmeli, düştükten sonra GİDİLEMEMELİ (oyuncu
+// kurtaramamalı) ama rögara hâlâ ulaşabilmeli (sahnenin çıkışı orası).
+const siege = await import('../src/adventure/siegeLayout.js');
+
+check('kuşatma: başlangıç noktası boş', !siege.blocked(siege.START.x, siege.START.y));
+check('kuşatma: arkadaşın başlangıcı boş', !siege.blocked(siege.FRIEND_START.x, siege.FRIEND_START.y));
+check('kuşatma: kolun önünde durulabiliyor',
+    !siege.blocked(siege.LEVER_STAND.x, siege.LEVER_STAND.y));
+check('kuşatma: bina cephesine girilemiyor', siege.blocked(500, 80));
+check('kuşatma: tel örgünün dışına çıkılamıyor', siege.blocked(500, 500));
+check('kuşatma: jeneratörün içinden geçilemiyor', siege.blocked(138, 278));
+check('kuşatma: kuleye girilemiyor', siege.blocked(878, 230));
+check('kuşatma: rögarın üstüne basılabiliyor',
+    !siege.blocked(siege.MANHOLE.x + siege.MANHOLE.w / 2, siege.MANHOLE.y + siege.MANHOLE.h / 2));
+check('kuşatma: direk düşmeden yerinde engel yok', !siege.blocked(263, 300, false));
+check('kuşatma: direk düşünce yeri engel oluyor', siege.blocked(263, 300, true));
+
+// Avluda yürünerek nereye gidilebiliyor? İki hâl için ayrı ayrı taranıyor.
+function siegeReach(beamDown) {
+    const step = 8;
+    const seen = new Set();
+    const startKey = [Math.round(siege.START.x / step) * step, Math.round(siege.START.y / step) * step];
+    const queue = [startKey];
+    seen.add(startKey.join(','));
+    while (queue.length) {
+        const [x, y] = queue.shift();
+        for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+            const nx = x + dx;
+            const ny = y + dy;
+            const key = `${nx},${ny}`;
+            if (seen.has(key) || siege.blocked(nx, ny, beamDown)) continue;
+            seen.add(key);
+            queue.push([nx, ny]);
+        }
+    }
+    return seen;
+}
+
+const nearKey = (set, px, py, step = 8) => {
+    for (let dx = -step; dx <= step; dx += step) {
+        for (let dy = -step; dy <= step; dy += step) {
+            const kx = Math.round((px + dx) / step) * step;
+            const ky = Math.round((py + dy) / step) * step;
+            if (set.has(`${kx},${ky}`)) return true;
+        }
+    }
+    return false;
+};
+
+const beforeBeam = siegeReach(false);
+const afterBeam = siegeReach(true);
+
+check('kuşatma: direk düşmeden kola yürünebiliyor',
+    nearKey(beforeBeam, siege.LEVER_STAND.x, siege.LEVER_STAND.y));
+check('kuşatma: direk düşünce kola ULAŞILAMIYOR (kurtaramamalı)',
+    !nearKey(afterBeam, siege.LEVER_STAND.x, siege.LEVER_STAND.y));
+check('kuşatma: direk düşse de rögara ulaşılıyor (sahnenin çıkışı)',
+    nearKey(afterBeam, siege.MANHOLE.x + siege.MANHOLE.w / 2, siege.MANHOLE.y + siege.MANHOLE.h / 2));
+check('kuşatma: direk düşünce oyuncunun alanı küçülüyor',
+    afterBeam.size < beforeBeam.size, `${beforeBeam.size} -> ${afterBeam.size}`);
+check('kuşatma: kalan alan hâlâ makul büyüklükte', afterBeam.size > 800, `${afterBeam.size} kare`);
+check(`kuşatma: "${siege.LOCATION_NAME}" yazısı çizilebiliyor`,
+    missingGlyphs(siege.LOCATION_NAME).length === 0);
+
 // ---- Prologun insanları ----
 // Arkadaşın sprite'ında turuncu bant hikâyenin tek ipucu; bir duruşta bile
 // düşerse ipucu kırılır. Bu yüzden ızgara tutarlılığıyla birlikte test edilir.

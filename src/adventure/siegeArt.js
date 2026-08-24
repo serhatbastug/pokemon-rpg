@@ -1,13 +1,14 @@
 // Kuşatılan çalışma alanının piksel çizimleri.
 //
 // Zemin (cephe, beton avlu, tel örgü, sabit nesneler) bir kez offscreen
-// canvas'a pişirilir. Hâli değişen şeyler - çelik kapı, devrilen direk,
-// örgünün ardındaki kalabalık, patlama - her karede üstüne çizilir.
+// canvas'a pişirilir. Hâli değişen şeyler - inen çelik kapı, örgünün
+// ardındaki kalabalık, avluya giren virüslüler, mermiler ve yere dağılan
+// yeşil lekeler - her karede üstüne çizilir.
 
 import { PX, newCanvas, blk, dot, hash } from '../pixel/pixelDraw.js';
 import {
     WORLD, FACADE, YARD, FENCE, CROWD, BREACH,
-    STEEL_DOOR, GENERATOR, TOWER, LEVER, MANHOLE, CRATES, BEAM, PYLON
+    STEEL_DOOR, GENERATOR, TOWER, LEVER, CRATES, PYLON
 } from './siegeLayout.js';
 
 // --- Paletler ---
@@ -33,8 +34,8 @@ export function bakeGround() {
     drawGenerator(ctx);
     drawTower(ctx);
     drawPylonBase(ctx);
+    drawPylonMast(ctx);
     drawLever(ctx);
-    drawManhole(ctx);
     for (const crate of CRATES) drawCrate(ctx, crate);
     drawGrime(ctx);
     return canvas;
@@ -179,19 +180,25 @@ function drawGenerator(ctx) {
             if (hash(x, y, 67) < 0.05) dot(ctx, x, y, RUST[Math.floor(hash(x, y, 71) * RUST.length)]);
         }
     }
-    // Kablo: jeneratörden kola gider - kolun ne işe yaradığını gözle anlatır
-    let cx = g.x + g.w / 2;
-    let cy = g.y + g.h;
-    for (let i = 0; i < 30; i++) {
-        dot(ctx, cx, cy, '#23262b');
-        dot(ctx, cx, cy + PX, '#15181c');
-        cx += (LEVER.x + 10 - (g.x + g.w / 2)) / 30;
-        cy += (LEVER.y - (g.y + g.h)) / 30 + Math.sin(i * 0.6) * 1.2;
+    // Kablo: jeneratörden duvar dibine, oradan kola. Avluyu boydan boya
+    // kesmesin diye iki düz parça halinde gidiyor; kolun neye bağlı olduğu
+    // yine gözle anlaşılıyor.
+    const railY = FACADE.h + PX;
+    for (let y = g.y; y > railY; y -= PX) {
+        dot(ctx, g.x + g.w / 2, y, '#23262b');
+        dot(ctx, g.x + g.w / 2 + PX, y, '#15181c');
+    }
+    for (let x = g.x + g.w / 2; x < LEVER.x + LEVER.w / 2; x += PX) {
+        dot(ctx, x, railY, '#23262b');
+        dot(ctx, x, railY + PX, '#15181c');
+        if (hash(x, 0, 193) < 0.08) blk(ctx, x, railY - PX, PX, PX * 3, '#3a4149');   // kelepçe
+    }
+    for (let y = railY; y > LEVER.y + LEVER.h; y -= PX) {
+        dot(ctx, LEVER.x + LEVER.w / 2, y, '#23262b');
     }
 }
 
-// Gözetleme kulesi: beton kaide ve üstünde çelik direk. Direk sahnenin
-// ortasında devrilecek, o yüzden gövdesi ayrı çiziliyor (drawFallenBeam).
+// Gözetleme kulesi: beton kaide, merdiven ve üstünde çelik direk. Dekor.
 function drawTower(ctx) {
     const t = TOWER;
     blk(ctx, t.x, t.y, t.w, t.h, '#6a6e75');
@@ -213,8 +220,7 @@ function drawTower(ctx) {
     blk(ctx, t.x + PX * 11, t.y - PX * 33, PX * 5, PX * 2, '#b3241f');
 }
 
-// Anten direğinin kaidesi: betona civatalı çelik ayak. Gövdesi ayrıca
-// çiziliyor (drawPylonMast), çünkü sahnenin ortasında devriliyor.
+// Anten direğinin kaidesi: betona civatalı çelik ayak.
 function drawPylonBase(ctx) {
     const p = PYLON;
     blk(ctx, p.x, p.y, p.w, p.h, '#5f6873');
@@ -234,10 +240,9 @@ function drawPylonBase(ctx) {
     }
 }
 
-// Ayakta duran anten direği: kaideden yukarı, cephenin üstüne kadar. Devrilince
-// artık çizilmez - yerine drawFallenBeam gelir.
-export function drawPylonMast(ctx, standing) {
-    if (!standing) return;
+// Anten direği: kaideden yukarı, cephenin üstüne kadar. Yalnızca dekor -
+// artık devrilmiyor, oyuncuyu arkadaşından ayıran şey acil çıkış kapısı.
+function drawPylonMast(ctx) {
     const p = PYLON;
     const x = p.x + PX * 3;
     const w = p.w - PX * 6;
@@ -283,23 +288,6 @@ export function drawLeverArm(ctx, pulled) {
     blk(ctx, baseX, y, PX * 2, PX * 6, '#b3241f');
     blk(ctx, baseX, y, PX * 2, PX, '#e04a45');
     blk(ctx, baseX - PX, y, PX, PX * 6, '#7d1815');
-}
-
-// Kapalı rögar kapağı: sahnenin çıkışı
-function drawManhole(ctx) {
-    const m = MANHOLE;
-    const cx = m.x + m.w / 2;
-    const cy = m.y + m.h / 2;
-    for (let y = m.y; y < m.y + m.h; y += PX) {
-        for (let x = m.x; x < m.x + m.w; x += PX) {
-            const d = Math.hypot((x - cx) / (m.w / 2), (y - cy) / (m.h / 2));
-            if (d > 1) continue;
-            ctx.fillStyle = d > 0.86 ? '#3a3f45' : (hash(x, y, 73) < 0.3 ? '#4a5057' : '#565d64');
-            ctx.fillRect(x, y, PX, PX);
-        }
-    }
-    blk(ctx, m.x + PX * 3, cy - PX, m.w - PX * 6, PX, '#2f353c');
-    blk(ctx, m.x + PX * 3, cy + PX, m.w - PX * 6, PX, '#2f353c');
 }
 
 // Sandık / kum torbası yığını
@@ -356,39 +344,6 @@ export function drawSteelDoor(ctx, closed) {
     for (let x = d.x; x < d.x + d.w; x += PX * 3) {
         blk(ctx, x, d.y + h - PX, PX * 3, PX,
             Math.floor(x / (PX * 3)) % 2 ? WARN.yellow : WARN.dark);
-    }
-}
-
-// Devrilmiş kule direği: avlunun sol üçte birini kapatır.
-// fall 0..1: 0 henüz düşmemiş (çizilmez), 1 yere çakılmış.
-export function drawFallenBeam(ctx, fall) {
-    if (fall <= 0) return;
-    const b = BEAM;
-    const h = Math.round((b.h * Math.min(1, fall)) / PX) * PX;
-    const y = b.y;
-
-    blk(ctx, b.x, y, b.w, h, '#79818c');
-    blk(ctx, b.x, y, PX * 2, h, '#9aa2ad');
-    blk(ctx, b.x + b.w - PX * 2, y, PX * 2, h, '#4e5563');
-    // Kaburgalar
-    for (let py = y; py < y + h; py += PX * 6) {
-        blk(ctx, b.x, py, b.w, PX, '#5f6873');
-    }
-    // Ezik ve pas
-    for (let py = y; py < y + h; py += PX) {
-        for (let px = b.x; px < b.x + b.w; px += PX) {
-            const r = hash(px, py, 101);
-            if (r < 0.06) dot(ctx, px, py, RUST[Math.floor(hash(px, py, 103) * RUST.length)]);
-            else if (r < 0.10) dot(ctx, px, py, '#4e5563');
-        }
-    }
-    // Yere çakıldığı yerde toz ve kırılan beton
-    if (fall >= 1) {
-        for (let i = 0; i < 40; i++) {
-            const px = b.x - 20 + hash(i, 0, 107) * (b.w + 40);
-            const py = y + h - 14 + hash(i, 1, 109) * 24;
-            dot(ctx, px, py, hash(i, 2, 113) < 0.5 ? '#8a8f96' : '#6e7278');
-        }
     }
 }
 
@@ -471,6 +426,90 @@ export function drawExplosion(ctx, t) {
         const py = cy - t * 190 * (0.4 + hash(i, 3, 143) * 0.6);
         ctx.globalAlpha = Math.max(0, 0.6 - t * 0.5);
         dot(ctx, px, py, hash(i, 4, 149) < 0.5 ? '#3b3a40' : '#2a292f');
+    }
+    ctx.globalAlpha = 1;
+}
+
+// --- Avluya giren virüslü ---
+// Örgünün ardındaki siluetlerden farkı: bu yakında, oyuncu boyunda ve
+// vurulabiliyor. Yine yüz yok - beyinleri eridiği için yön duygusu da yok,
+// sadece en yakın sıcaklığa doğru sürükleniyorlar.
+export function drawIntruder(ctx, x, y, frame, seed) {
+    const u = PX;
+    const sway = Math.round(Math.sin(frame * 0.09 + seed) * 1) * u;
+
+    ctx.globalAlpha = 0.3;
+    blk(ctx, x - u * 4, y, u * 8, u * 2, '#000000');
+    ctx.globalAlpha = 1;
+
+    // Bacaklar
+    blk(ctx, x - u * 3, y - u * 5, u * 2, u * 5, INFECTED.dark);
+    blk(ctx, x + u, y - u * 5, u * 2, u * 5, INFECTED.dark);
+    // Gövde
+    blk(ctx, x - u * 4 + sway, y - u * 13, u * 8, u * 8, INFECTED.body);
+    blk(ctx, x - u * 4 + sway, y - u * 13, u * 2, u * 8, INFECTED.light);
+    blk(ctx, x + u * 2 + sway, y - u * 13, u * 2, u * 8, INFECTED.dark);
+    // Sarkan kollar
+    blk(ctx, x - u * 6 + sway, y - u * 12, u * 2, u * 9, INFECTED.dark);
+    blk(ctx, x + u * 4 + sway, y - u * 11, u * 2, u * 9, INFECTED.dark);
+    // Baş: omuzlara gömülü
+    blk(ctx, x - u * 2 + sway, y - u * 17, u * 4, u * 4, INFECTED.head);
+    blk(ctx, x - u * 2 + sway, y - u * 17, u * 4, u, INFECTED.light);
+    dot(ctx, x - u * 2 + sway, y - u * 15, '#c2e04a');
+    dot(ctx, x + u + sway, y - u * 15, '#c2e04a');
+    // Kabarcıklar
+    for (let i = 0; i < 6; i++) {
+        const px = x - u * 4 + Math.floor(hash(seed, i, 401) * 8) * u + sway;
+        const py = y - u * 13 + Math.floor(hash(seed, i, 409) * 8) * u;
+        dot(ctx, px, py, hash(seed, i, 419) < 0.5 ? '#6f9a24' : '#2a4a0e');
+    }
+}
+
+// Parçalayıcı silahın mermisi: kısa, sıcak bir çizgi
+export function drawBullet(ctx, bullet) {
+    const { x, y, vx, vy } = bullet;
+    const len = 3;
+    for (let i = 0; i < len; i++) {
+        const px = x - vx * i * 0.9;
+        const py = y - vy * i * 0.9;
+        dot(ctx, px, py, i === 0 ? '#fff3c4' : (i === 1 ? '#f7c948' : '#c9761c'));
+    }
+}
+
+// Vurulan virüslünün yere dağılması. Virüs ÖLMEZ, dağılır: leke kalıcıdır ve
+// ateş ettikçe avlu daha da kirlenir. Oyuncuya ceza yok, ama yaptığı şeyin
+// işe yaramadığı gözle görülüyor.
+const SPLAT = ['#5d7a1c', '#486113', '#6f9124', '#374c0c'];
+
+export function drawSplat(ctx, splat) {
+    const { x, y, seed, radius } = splat;
+    for (let py = y - radius; py <= y + radius; py += PX) {
+        for (let px = x - radius; px <= x + radius; px += PX) {
+            const d = Math.hypot((px - x) / radius, (py - y) / (radius * 0.55));
+            if (d > 1) continue;
+            if (hash(px + seed, py, 421) > 0.72 - d * 0.45) continue;
+            ctx.fillStyle = SPLAT[Math.floor(hash(px, py + seed, 431) * SPLAT.length)];
+            ctx.fillRect(px, py, PX, PX);
+        }
+    }
+    // Sıçrayan damlalar
+    for (let i = 0; i < 8; i++) {
+        const angle = hash(seed, i, 433) * Math.PI * 2;
+        const dist = radius * (1 + hash(seed, i, 439) * 0.7);
+        dot(ctx, x + Math.cos(angle) * dist, y + Math.sin(angle) * dist * 0.55, SPLAT[1]);
+    }
+}
+
+// Vuruş anı: kısa bir yeşil patlama
+export function drawBurst(ctx, x, y, t) {
+    if (t <= 0 || t >= 1) return;
+    const radius = 6 + t * 26;
+    for (let i = 0; i < 30; i++) {
+        const angle = hash(i, 0, 443) * Math.PI * 2;
+        const dist = radius * (0.4 + hash(i, 1, 449) * 0.6);
+        ctx.globalAlpha = 1 - t;
+        dot(ctx, x + Math.cos(angle) * dist, y + Math.sin(angle) * dist * 0.6,
+            hash(i, 2, 457) < 0.4 ? '#c2e04a' : '#6f9124');
     }
     ctx.globalAlpha = 1;
 }

@@ -1,45 +1,51 @@
 // Prolog 3. bölüm: ÇALIŞMA ALANI KUŞATILIYOR.
 //
-// Sahnenin akışı bir betiktir (cutscene.js). Kabaca:
-//   siren -> tel örgü yarılır -> arkadaş acil durum koluna koşar ->
-//   oyuncu peşinden gider, TAM YETİŞECEKKEN kule direği aralarına devrilir ->
-//   arkadaş kolu çeker, çelik kapı iner, jeneratör patlar ->
-//   arkadaş direğin ardında yeşillenir -> dönüşür (ekran yakınlaşır,
-//   yaratık sığmaz) -> tek çıkış rögardır.
+// Avlu içerisidir. Beş sağlıklıyla burada çalışıyoruz. Virüslüler bizi bulur;
+// sağlıklıları üstteki acil çıkıştan geçiririz. Sorumlu olduğumuz için en son
+// biz ve arkadaşımız kalırız. Biz geçeriz - arkadaşımız kapının yanındaki kolu
+// çekmek için geri hamle yapar. Tam o sırada virüslüler içeri girer, sistem
+// bunu algılayıp acil çıkışı kapatır, ekran yavaşça kararır.
 //
-// Kurtaramama kuralı yerleşimle güvence altında: direk düşünce kola giden
-// yol kapanıyor (tests/data.test.mjs bunu doğruluyor), oyuncuya görünmez
-// duvar konmuyor.
+// OYUNCU HİÇBİR ŞEYİ GÖRMEZ: ne ısırılmayı, ne dönüşümü, ne kolun çekilip
+// çekilmediğini. Kapı kapanır, kararmanın içinde arkadaşımızın kola doğru
+// gittiğini görürüz, o kadar. Belirsizlik bilerek bırakılıyor - oyuncu
+// dönüştüğünü bilmiyor, belki de dönüşmedi.
 //
-// Kamera kaymaz; yalnızca dönüşümde 3 kat yakınlaşır. Yakınlaşma TAM SAYI
-// ölçek ve KESME geçiş: ara ölçekler pikselleri titretiyor, kesme hem daha
-// temiz hem daha sert.
+// Sağlıklıların tahliyesi BETİKTE: oyuncu onları tek tek toplamıyor, işi
+// kapıyı tutmak ve en son geçmek. Ateş edebiliyor (Space / KARE) ama
+// parçalayıcı silah virüsü öldürmüyor, etrafa dağıtıyor: vurulanın yerinde
+// kalıcı yeşil bir leke kalıyor. Kaybedilecek bir şey yok; yapılanın işe
+// yaramadığı gözle görülüyor.
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { newCanvas } from '../pixel/pixelDraw.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
-import { Cutscene, shakeOffset, flash } from './cutscene.js';
-import { drawFriend, drawCreature } from './people.js';
+import { Cutscene, shakeOffset } from './cutscene.js';
+import { drawFriend, drawSurvivor } from './people.js';
 import {
-    WORLD, VIEW, START, FRIEND_START, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
-    BEAM, LEVER_STAND, MANHOLE, blocked, onManhole
+    WORLD, VIEW, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
+    STEEL_DOOR, DOOR_STAND, LEVER_STAND, FRIEND_RETURN_PATH, QUEUE_POINT, YARD,
+    SURVIVOR_STARTS, SURVIVOR_PATHS, BREACH, FENCE,
+    BULLET_SPEED, BULLET_LIFE, FIRE_COOLDOWN, INFECTED_SPEED, INFECTED_RADIUS,
+    blocked, atDoor
 } from './siegeLayout.js';
 import {
-    bakeGround, drawSteelDoor, drawFallenBeam, drawCrowd,
-    drawExplosion, drawLeverArm, drawPylonMast
+    bakeGround, drawSteelDoor, drawCrowd, drawLeverArm,
+    drawIntruder, drawBullet, drawSplat, drawBurst
 } from './siegeArt.js';
 
 const INTRO_FRAMES = 46;
 const TITLE_FRAMES = 210;
 const TITLE_FADE = 34;
-const FRIEND_SPEED = 4.6;
-const ZOOM = 4;   // yaratik ekranin neredeyse tamamini kaplasin
+const WALK_SPEED = 2.4;          // sağlıklıların yürüyüşü
+const FRIEND_SPEED = 4.4;        // arkadaş koşuyor
+const FADE_FRAMES = 200;         // kararma yavaş: oyuncu ne olduğunu görmesin
 
-// Oyuncu bu çizgiyi geçince direk önüne devrilir. Direğin sağ yüzü 290'da,
-// yani mast tam burnunun dibine iniyor.
-const BEAM_GATE = BEAM.x + BEAM.w + 70;
+// Oyuncunun başlangıcı: avlunun ortası, herkesle birlikte
+const START = { x: 500, y: 330 };
+const FRIEND_START = { x: 566, y: 322 };
 
 export class SiegeScene {
     constructor({ canvas, input, gamepad, onExit, onFinish }) {
@@ -48,32 +54,30 @@ export class SiegeScene {
         this.input = input;
         this.gamepad = gamepad || null;
         this.onExit = onExit || (() => {});
-        this.onFinish = onFinish || (() => {});   // rögardan aşağı: sonraki bölüm
+        this.onFinish = onFinish || (() => {});
 
         this.running = false;
         this.frame = 0;
-
-        this.player = { x: START.x, y: START.y, dir: 'down', moving: false };
-        this.friend = { x: FRIEND_START.x, y: FRIEND_START.y, dir: 'down', moving: false };
 
         input.onKeyDown(e => {
             if (!this.running) return;
             unlockAudio();
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
+            if (e.code === 'Space') this.fire();
         });
 
         this.gamepad?.onButtonDown(button => {
             if (!this.running) return;
             unlockAudio();
             if (button === 'circle') this.onExit();
+            if (button === 'square') this.fire();      // KARE: ateş
         });
     }
 
     bake() {
         if (this.ground) return;
         this.ground = bakeGround();
-        // Dünya önce bu tampona çizilir, sonra ekrana (yakınlaşma için)
         const buffer = newCanvas(WORLD.w, WORLD.h);
         this.buffer = buffer.canvas;
         this.bufferCtx = buffer.ctx;
@@ -82,90 +86,80 @@ export class SiegeScene {
     // --- Sahne betiği ---
     buildScript() {
         const s = this.state;
+        const doorway = { x: DOOR_STAND.x, y: STEEL_DOOR.y + STEEL_DOOR.h - 8 };
+
         return new Cutscene([
             {
                 name: 'giris', frames: INTRO_FRAMES,
                 onEnter: () => { s.titleFrames = TITLE_FRAMES; }
             },
             {
-                // Siren çalar, kalabalık örgüye yüklenir. Oyuncu serbest.
-                name: 'baski', frames: 190, lock: false,
+                // Buldular. Siren çalar, kalabalık örgüye yüklenir.
+                name: 'alarm', frames: 160, lock: false,
                 onEnter: () => Sfx.siren(),
-                onStep: (st, t) => { st.pressure = t * 0.75; }
+                onStep: (st, t) => { st.pressure = t * 0.8; }
             },
             {
-                // Örgü yarılır: baskı tavana vurur
-                name: 'yarik', frames: 90, lock: false,
-                onEnter: () => { Sfx.metalSlam(); s.shake = 4; },
-                onStep: (st, t) => { st.pressure = 0.75 + t * 0.25; st.shake = 4 * (1 - t); }
+                // Örgü yarılıyor
+                name: 'yarik', frames: 70, lock: false,
+                onEnter: () => { Sfx.metalSlam(); s.shake = 5; },
+                onStep: (st, t) => { st.pressure = 0.8 + t * 0.2; st.shake = 5 * (1 - t); }
             },
             {
-                // Arkadaş kola koşar. Oyuncu peşinden gidebilir.
-                name: 'kosu', frames: 260, lock: false,
-                until: () => s.friendAtLever,
-                onStep: () => this.moveFriendToLever()
+                // Tahliye: beş sağlıklı sırayla kapıdan geçiyor. Oyuncu
+                // serbest ve ateş edebiliyor; tek tük virüslü içeri sızıyor.
+                name: 'tahliye', frames: 2000, lock: false,
+                onEnter: () => { s.evacuating = true; },
+                until: () => s.escaped >= this.survivors.length,
+                onStep: () => this.updateEvacuation(doorway)
             },
             {
-                // Ayrılık anı: oyuncu yaklaşınca direk düşer. Yaklaşmazsa
-                // süre üst sınırı devreye girer, sahne takılmaz.
-                name: 'ayrilik', frames: 300, lock: false,
-                until: () => s.beamDown
+                // Sıra bizde: "sorumlu olarak en son biz geçeceğiz".
+                // Arkadaş kapının yanında bekliyor, oyuncu kapıya gelmeli.
+                name: 'sira-bizde', frames: 1600, lock: false,
+                until: () => atDoor(this.player.x, this.player.y),
+                onStep: () => this.moveActorTo(this.friend, { x: DOOR_STAND.x + 50, y: DOOR_STAND.y }, WALK_SPEED)
             },
             {
-                name: 'devrilme', frames: 54,
-                onEnter: () => { this.dropBeam(); },
-                onStep: (st, t) => { st.beamFall = Math.min(1, t * 1.6); st.shake = 7 * (1 - t); }
+                // Biz geçiyoruz: kapı boşluğunda durup geri dönüp bakıyoruz
+                name: 'biz-geciyoruz', frames: 80,
+                onStep: () => {
+                    this.moveActorTo(this.player, doorway, 2.2, true);
+                    this.player.dir = 'down';
+                }
             },
             {
-                // Arkadaş kolu çeker; çelik kapı iner
-                name: 'kolu-cek', frames: 80, lock: false,
-                onEnter: () => { s.friend.dir = 'left'; },
+                // Arkadaşımız geri hamle yapıyor: kola doğru
+                name: 'geri-hamle', frames: 30,
+                onEnter: () => { s.friendReturning = true; },
+                onStep: () => this.moveFriendBack()
+            },
+            {
+                // Virüslüler içeri doluyor
+                name: 'iceri-giriyorlar', frames: 30,
+                onEnter: () => { s.flood = true; Sfx.metalSlam(); },
+                onStep: () => this.moveFriendBack()
+            },
+            {
+                // Sistem algılıyor: acil çıkış iniyor. KARARMA BURADA BAŞLIYOR -
+                // arkadaşımız hâlâ yolda, oyuncu onu kola doğru giderken görüyor.
+                name: 'kapi-kapaniyor', frames: 100,
+                onEnter: () => { s.alarmLight = true; Sfx.beamFall(); },
                 onStep: (st, t) => {
-                    st.leverPulled = Math.min(1, t * 2);
-                    st.doorClosed = Math.max(0, (t - 0.35) / 0.65);
+                    st.doorClosed = Math.min(1, t * 1.3);
+                    st.shake = 6 * (1 - t);
+                    st.fadeOut = t * 0.35;
+                    this.moveFriendBack(0.7);
                 },
-                onExit: () => Sfx.metalSlam()
+                onExit: () => { s.doorClosed = 1; Sfx.metalSlam(); }
             },
             {
-                name: 'patlama', frames: 120, lock: false,
-                onEnter: () => { Sfx.explosion(); s.doorClosed = 1; },
+                // Kararma tamamlanıyor. Kolun çekilip çekilmediğini GÖRMÜYORUZ.
+                name: 'kararma', frames: FADE_FRAMES,
                 onStep: (st, t) => {
-                    st.explosion = t;
-                    st.flash = flash(t * 2);
-                    st.shake = 10 * Math.max(0, 1 - t * 1.6);
-                }
-            },
-            {
-                // Yeşillenme: oyuncu direğin ardından izliyor. Uzaktan.
-                name: 'yesillenme', frames: 260, lock: false,
-                onEnter: () => { s.friend.pose = 'hunch'; },
-                onStep: (st, t) => { st.greenness = t; }
-            },
-            {
-                // Dönüşüm: parlama, ardından KESME ile 3 kat yakınlaşma.
-                // Yaratık ekrana sığmıyor; kalkan kolunda turuncu bant var.
-                name: 'donusum', frames: 150,
-                onEnter: () => { s.greenness = 1; Sfx.bossWake(); },
-                onStep: (st, t) => {
-                    st.flash = t < 0.1 ? 1 : Math.max(0, 0.5 - t);
-                    if (t >= 0.1) st.zoom = ZOOM;
-                    st.creature = t >= 0.1;
-                    st.shake = t < 0.5 ? 6 : 0;
-                }
-            },
-            {
-                // Geri çekilme: yine kesme
-                name: 'geri', frames: 70,
-                onEnter: () => { s.zoom = 1; }
-            },
-            {
-                // Tek çıkış rögar. Oyuncu üstüne basınca sahne biter.
-                name: 'kacis', frames: 0, lock: false,
-                until: () => onManhole(s.player.x, s.player.y)
-            },
-            {
-                name: 'cikis', frames: 46,
-                onStep: (st, t) => { st.fadeOut = t; },
+                    st.fadeOut = 0.35 + 0.65 * t * t;    // önce yavaş, sonra hızlı
+                    this.moveFriendBack(0.7);
+                },
                 onExit: () => this.onFinish()
             }
         ], s).start();
@@ -173,27 +167,33 @@ export class SiegeScene {
 
     start() {
         this.bake();
-        this.player = { x: START.x, y: START.y, dir: 'down', moving: false };
-        this.friend = { x: FRIEND_START.x, y: FRIEND_START.y, dir: 'down', moving: false, pose: null };
         this.frame = 0;
+        this.player = { x: START.x, y: START.y, dir: 'down', moving: false };
+        this.friend = { x: FRIEND_START.x, y: FRIEND_START.y, dir: 'down', moving: false, leg: 0 };
+        this.survivors = SURVIVOR_STARTS.map((start, i) => ({
+            x: start.x, y: start.y, dir: 'down', moving: false, index: i,
+            leg: 0,                    // tahliye yolunda kacinci ara nokta
+            state: 'bekliyor'          // bekliyor -> sirada -> geciyor -> gecti
+        }));
+        this.bullets = [];
+        this.splats = [];
+        this.bursts = [];
+        this.intruders = [];
+        this.cooldown = 0;
 
         this.state = {
             player: this.player,
-            friend: this.friend,
             pressure: 0,
             shake: 0,
-            flash: 0,
             fadeOut: 0,
-            zoom: 1,
-            beamDown: false,
-            beamFall: 0,
-            friendAtLever: false,
-            leverPulled: 0,
+            titleFrames: 0,
             doorClosed: 0,
-            explosion: 0,
-            greenness: 0,
-            creature: false,
-            titleFrames: 0
+            leverPulled: 0,
+            escaped: 0,
+            evacuating: false,
+            friendReturning: false,
+            flood: false,
+            alarmLight: false
         };
 
         this.script = this.buildScript();
@@ -232,49 +232,87 @@ export class SiegeScene {
         this.frame++;
         const s = this.state;
         if (s.titleFrames > 0) s.titleFrames--;
+        if (this.cooldown > 0) this.cooldown--;
 
         this.gamepad?.poll();
         if (!this.script.locked) this.movePlayer();
-        this.checkBeamGate();
+        this.updateBullets();
+        this.updateIntruders();
+        this.updateBursts();
         this.script.step();
 
-        // Siren betik boyunca aralıklı çalar
-        if (this.frame % 150 === 0 && !s.beamDown) Sfx.siren();
+        if (this.frame % 170 === 0 && !s.flood) Sfx.siren();
     }
 
-    // Direk, oyuncu arkadaşa doğru koşup çizgiyi geçtiği anda devrilir.
-    // Arkadaş direğin bölgesini geçmeden tetiklenmez: yoksa arkadaş yanlış
-    // tarafta kalıyor ve sahne anlamını kaybediyor.
-    checkBeamGate() {
-        const s = this.state;
-        if (s.beamDown || this.friend.x > BEAM.x) return;
-        if (this.player.x < BEAM_GATE) this.dropBeam();
+    // --- Tahliye ---
+    // Sağlıklılar tek tek sıraya gelip kapıdan geçiyor. Sıradaki yoksa
+    // bekleyenlerden kapıya en yakını çağrılıyor.
+    updateEvacuation(doorway) {
+        const queued = this.survivors.find(p => p.state === 'sirada' || p.state === 'geciyor');
+        if (!queued) {
+            const waiting = this.survivors.filter(p => p.state === 'bekliyor');
+            if (waiting.length) {
+                waiting.sort((a, b) =>
+                    Math.hypot(a.x - QUEUE_POINT.x, a.y - QUEUE_POINT.y) -
+                    Math.hypot(b.x - QUEUE_POINT.x, b.y - QUEUE_POINT.y));
+                waiting[0].state = 'sirada';
+            }
+        }
+
+        for (const person of this.survivors) {
+            if (person.state === 'sirada') {
+                // Yolu elle yazılmış ara noktalardan geçiyor: yol bulma yok,
+                // düz gidince jeneratörle direğin arasında sıkışıyorlardı.
+                const path = SURVIVOR_PATHS[person.index];
+                const target = path[person.leg] || QUEUE_POINT;
+                if (this.moveActorTo(person, target, WALK_SPEED)) {
+                    if (person.leg < path.length - 1) person.leg++;
+                    else person.state = 'geciyor';
+                }
+            } else if (person.state === 'geciyor') {
+                person.dir = 'up';
+                if (this.moveActorTo(person, doorway, WALK_SPEED, true)) {
+                    person.state = 'gecti';
+                    this.state.escaped++;
+                }
+            }
+        }
     }
 
-    dropBeam() {
-        const s = this.state;
-        if (s.beamDown) return;
-        s.beamDown = true;
-        s.shake = 7;
-        Sfx.beamFall();
-    }
-
-    moveFriendToLever() {
-        const s = this.state;
-        const dx = LEVER_STAND.x - this.friend.x;
-        const dy = LEVER_STAND.y - this.friend.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < FRIEND_SPEED) {
-            this.friend.x = LEVER_STAND.x;
-            this.friend.y = LEVER_STAND.y;
+    // Arkadaşımızın geri hamlesi: avluya inip dolanarak kola çıkıyor.
+    // Vardığında kola uzanıp öyle kalıyor - çekip çekmediğini görmüyoruz.
+    moveFriendBack(speedScale = 1) {
+        const path = FRIEND_RETURN_PATH;
+        const leg = this.friend.leg || 0;
+        if (leg >= path.length) {
+            this.friend.dir = 'up';          // kola uzanmış, sırtı bize dönük
             this.friend.moving = false;
-            s.friendAtLever = true;
             return;
         }
-        this.friend.x += (dx / dist) * FRIEND_SPEED;
-        this.friend.y += (dy / dist) * FRIEND_SPEED;
-        this.friend.moving = true;
-        this.friend.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+        if (this.moveActorTo(this.friend, path[leg], FRIEND_SPEED * speedScale)) {
+            this.friend.leg = leg + 1;
+        }
+    }
+
+    // Bir aktörü hedefe doğru yürütür; vardıysa true döner.
+    // ignoreWalls: kapı boşluğu avlunun dışında kaldığı için gerekiyor.
+    moveActorTo(actor, target, speed, ignoreWalls = false) {
+        const dx = target.x - actor.x;
+        const dy = target.y - actor.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < speed) {
+            actor.x = target.x;
+            actor.y = target.y;
+            actor.moving = false;
+            return true;
+        }
+        const nx = actor.x + (dx / dist) * speed;
+        const ny = actor.y + (dy / dist) * speed;
+        if (ignoreWalls || !blocked(nx, actor.y)) actor.x = nx;
+        if (ignoreWalls || !blocked(actor.x, ny)) actor.y = ny;
+        actor.moving = true;
+        actor.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+        return false;
     }
 
     movePlayer() {
@@ -302,13 +340,111 @@ export class SiegeScene {
         const len = Math.hypot(dx, dy) || 1;
         const vx = (dx / len) * speed;
         const vy = (dy / len) * speed;
-        const beamDown = this.state.beamDown;
-
-        if (!blocked(player.x + vx, player.y, beamDown)) player.x += vx;
-        if (!blocked(player.x, player.y + vy, beamDown)) player.y += vy;
+        if (!blocked(player.x + vx, player.y)) player.x += vx;
+        if (!blocked(player.x, player.y + vy)) player.y += vy;
 
         if (Math.abs(dy) >= Math.abs(dx)) player.dir = dy < 0 ? 'up' : 'down';
         else player.dir = dx < 0 ? 'left' : 'right';
+    }
+
+    // --- Silah ---
+    fire() {
+        if (!this.running || this.script.locked || this.cooldown > 0) return;
+        this.cooldown = FIRE_COOLDOWN;
+
+        const dir = this.player.dir;
+        const vx = dir === 'left' ? -BULLET_SPEED : dir === 'right' ? BULLET_SPEED : 0;
+        const vy = dir === 'up' ? -BULLET_SPEED : dir === 'down' ? BULLET_SPEED : 0;
+        this.bullets.push({
+            x: this.player.x + vx * 2,
+            y: this.player.y - 16 + vy * 2,
+            vx, vy, life: BULLET_LIFE
+        });
+        Sfx.shoot();
+    }
+
+    updateBullets() {
+        for (const bullet of this.bullets) {
+            bullet.x += bullet.vx;
+            bullet.y += bullet.vy;
+            bullet.life--;
+            if (bullet.y < YARD.top - 20 || bullet.y > FENCE.y || bullet.x < 0 || bullet.x > WORLD.w) {
+                bullet.life = 0;
+            }
+            for (const intruder of this.intruders) {
+                if (intruder.dead) continue;
+                if (Math.hypot(bullet.x - intruder.x, bullet.y - (intruder.y - 26)) > INFECTED_RADIUS + 8) continue;
+                // Virüs ölmez, DAĞILIR: yerinde kalıcı bir leke bırakır
+                intruder.dead = true;
+                bullet.life = 0;
+                this.splats.push({
+                    x: Math.round(intruder.x), y: Math.round(intruder.y),
+                    radius: 18 + Math.random() * 10, seed: Math.floor(Math.random() * 1000)
+                });
+                this.bursts.push({ x: intruder.x, y: intruder.y - 24, t: 0 });
+                Sfx.playerHurt();
+            }
+        }
+        this.bullets = this.bullets.filter(b => b.life > 0);
+        this.intruders = this.intruders.filter(i => !i.dead);
+    }
+
+    // Avluya sızan virüslüler. Beyinleri eridiği için yönleri kaba: en yakın
+    // insana doğru sürükleniyorlar ve yavaşlar (konaksız hal zayıftır).
+    updateIntruders() {
+        const s = this.state;
+        const period = s.flood ? 10 : (s.evacuating ? 70 : 0);
+        const cap = s.flood ? 18 : 4;
+        if (period > 0 && this.frame % period === 0 && this.intruders.length < cap) {
+            this.intruders.push({
+                x: BREACH.x + Math.random() * BREACH.w,
+                y: FENCE.y - 2,
+                seed: Math.floor(Math.random() * 1000)
+            });
+        }
+
+        for (const intruder of this.intruders) {
+            const target = this.nearestPerson(intruder);
+            const dx = target.x - intruder.x;
+            const dy = target.y - intruder.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            let mx = (dx / dist) * INFECTED_SPEED;
+            let my = (dy / dist) * INFECTED_SPEED;
+
+            // Birbirlerini itsinler: itme kuvveti olmadan hepsi aynı noktaya
+            // yığılıp tek bir yeşil sütuna dönüşüyor ve arkasındaki kimse
+            // görünmüyordu.
+            for (const other of this.intruders) {
+                if (other === intruder) continue;
+                const ox = intruder.x - other.x;
+                const oy = intruder.y - other.y;
+                const gap = Math.hypot(ox, oy);
+                if (gap > 34 || gap === 0) continue;
+                mx += (ox / gap) * 0.6;
+                my += (oy / gap) * 0.6;
+            }
+
+            // Duvarlara takılmasınlar diye yalnızca avlu sınırına bakılıyor
+            intruder.x = clamp(intruder.x + mx, 20, WORLD.w - 20);
+            intruder.y = clamp(intruder.y + my, YARD.top + 10, FENCE.y - 2);
+        }
+    }
+
+    nearestPerson(from) {
+        const people = [this.player, this.friend,
+            ...this.survivors.filter(p => p.state !== 'gecti')];
+        let best = people[0];
+        let bestDist = Infinity;
+        for (const person of people) {
+            const dist = Math.hypot(person.x - from.x, person.y - from.y);
+            if (dist < bestDist) { bestDist = dist; best = person; }
+        }
+        return best;
+    }
+
+    updateBursts() {
+        for (const burst of this.bursts) burst.t += 0.06;
+        this.bursts = this.bursts.filter(b => b.t < 1);
     }
 
     get titleAlpha() {
@@ -330,71 +466,69 @@ export class SiegeScene {
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Tamponu ekrana aktar: yakınlaşma ve sarsıntı burada uygulanır
-        const zoom = s.zoom;
-        const vw = Math.round(VIEW.w / zoom);
-        const vh = Math.round(VIEW.h / zoom);
-        // Yakın planda odak yaratığın GÖVDE ORTASI: ayaklarına odaklanınca
-        // baş kadrajın dışında kalıyor ve gözler hiç görünmüyor.
-        const focus = zoom > 1
-            ? { x: this.friend.x, y: this.friend.y - 50 }
-            : { x: WORLD.w / 2, y: WORLD.h / 2 };
         const shake = shakeOffset(this.frame, s.shake);
-        const sx = clamp(Math.round(focus.x - vw / 2) + shake.x, 0, WORLD.w - vw);
-        const sy = clamp(Math.round(focus.y - vh / 2) + shake.y, 0, WORLD.h - vh);
-        ctx.drawImage(this.buffer, sx, sy, vw, vh, 0, 0, VIEW.w, VIEW.h);
+        ctx.drawImage(this.buffer, clamp(shake.x, -12, 12), clamp(shake.y, -12, 12));
 
-        // Ekrana sabit katmanlar
         drawLocationTitle(ctx, LOCATION_NAME, this.titleAlpha, VIEW.w);
 
-        if (s.flash > 0) {
-            ctx.fillStyle = `rgba(255, 246, 214, ${Math.min(1, s.flash)})`;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        const dark = this.script.name === 'giris'
-            ? 1 - this.script.progress
-            : s.fadeOut;
+        const dark = this.script.name === 'giris' ? 1 - this.script.progress : s.fadeOut;
         if (dark > 0) {
             ctx.fillStyle = `rgba(2, 6, 23, ${Math.min(1, dark)})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
     }
 
-    // Dünyayı tampona çizer (kamera/yakınlaşma uygulanmadan, 1:1)
     drawWorld() {
         const ctx = this.bufferCtx;
         const s = this.state;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.ground, 0, 0);
 
+        // Yere dağılan virüs: kalıcı, herkesin altında
+        for (const splat of this.splats) drawSplat(ctx, splat);
+
         drawCrowd(ctx, this.frame, s.pressure);
-        drawSteelDoor(ctx, s.doorClosed);
-        // Anten direği ayaktayken cephenin önünde yükselir; devrilince
-        // yerini avluya düşen gövdesine (drawFallenBeam) bırakır.
-        drawPylonMast(ctx, !s.beamDown);
         drawLeverArm(ctx, s.leverPulled);
 
-        // Arkadaş ve oyuncu dip hizasına göre sıralanır
-        const actors = [
-            { y: this.friend.y, draw: () => this.drawFriendActor(ctx) },
-            { y: this.player.y, draw: () => this.drawPlayerActor(ctx) }
-        ].sort((a, b) => a.y - b.y);
+        // Kapı kapanırken yanıp sönen kırmızı uyarı ışığı
+        if (s.alarmLight && Math.sin(this.frame * 0.25) > 0) {
+            ctx.globalAlpha = 0.45;
+            ctx.fillStyle = '#b3241f';
+            ctx.fillRect(STEEL_DOOR.x - 24, STEEL_DOOR.y - 12, STEEL_DOOR.w + 48, 16);
+            ctx.globalAlpha = 1;
+        }
+
+        // Herkes dip hizasına göre sıralanır
+        const actors = [];
+        for (const person of this.survivors) {
+            if (person.state === 'gecti') continue;
+            actors.push({
+                y: person.y,
+                draw: () => drawSurvivor(ctx, Math.round(person.x), Math.round(person.y - 26),
+                    person.dir, person.moving, PLAYER_SCALE, person.index)
+            });
+        }
+        for (const intruder of this.intruders) {
+            actors.push({
+                y: intruder.y,
+                draw: () => drawIntruder(ctx, Math.round(intruder.x), Math.round(intruder.y),
+                    this.frame, intruder.seed)
+            });
+        }
+        actors.push({
+            y: this.friend.y,
+            draw: () => drawFriend(ctx, Math.round(this.friend.x), Math.round(this.friend.y - 26),
+                this.friend.dir, this.friend.moving, PLAYER_SCALE, 0)
+        });
+        actors.push({ y: this.player.y, draw: () => this.drawPlayerActor(ctx) });
+        actors.sort((a, b) => a.y - b.y);
         for (const actor of actors) actor.draw();
 
-        // Devrilen direk aktörlerden SONRA: yere düşerken önlerinden geçiyor
-        drawFallenBeam(ctx, s.beamFall);
-        drawExplosion(ctx, s.explosion);
-    }
+        // Çelik kapı aktörlerin ÜSTÜNDE: inerken ardında kalanı örtmeli
+        drawSteelDoor(ctx, s.doorClosed);
 
-    drawFriendActor(ctx) {
-        const s = this.state;
-        if (s.creature) {
-            drawCreature(ctx, this.friend.x, this.friend.y + 8);
-            return;
-        }
-        const pose = this.friend.pose || this.friend.dir;
-        drawFriend(ctx, Math.round(this.friend.x), Math.round(this.friend.y - 26),
-            pose, this.friend.moving, PLAYER_SCALE, s.greenness);
+        for (const bullet of this.bullets) drawBullet(ctx, bullet);
+        for (const burst of this.bursts) drawBurst(ctx, burst.x, burst.y, burst.t);
     }
 
     drawPlayerActor(ctx) {

@@ -1,23 +1,27 @@
 // Prolog 3. bölüm: ÇALIŞMA ALANI KUŞATILIYOR.
 //
-// Kapalı bir araştırma binasının beton avlusu. Yukarıda bina cephesi ve çelik
-// kapı, aşağıda tel örgü; örgünün ardında virüslüler birikiyor. Arkadaş acil
-// durum kolunu çekmek için avlunun soluna koşar, oyuncu peşinden gider ve tam
-// yetişecekken kule direği aralarına devrilir. Kurtaramaz.
+// AVLU İÇERİSİDİR. Diğer sağlıklılarla burada çalışıyoruz. Virüslüler bizi
+// bulur; sağlıklıları üstteki ACİL ÇIKIŞ kapısından geçiririz. Sorumlu
+// olduğumuz için en son biz ve arkadaşımız kalırız. Biz geçeriz; arkadaşımız
+// kapının yanındaki kolu çekmek için geri hamle yapar. Tam o sırada
+// virüslüler içeri girer, sistem bunu algılayıp acil çıkışı kapatır ve
+// ekran yavaşça kararır.
+//
+// OYUNCU HİÇBİR ŞEYİ GÖRMEZ: ne ısırılmayı, ne dönüşümü, ne kolun çekilip
+// çekilmediğini. Belirsizlik bilerek bırakılıyor.
+//
+// Kol tesisi tamamen mühürler. Tesis zaten virüslülerin kaçamayacağı şekilde
+// tasarlandı; kolun çekilip çekilmediği bu yüzden şehrin kaderini belirliyor.
 //
 // Burada DOM/canvas yok - sadece sayılar (tests/data.test.mjs bunu kullanıyor).
 //
 //   0 -------------------------------------------------- 1000
-//   |  ARASTIRMA BINASI CEPHESI        [ CELIK KAPI ]      |  0..170
+//   |  CEPHE      [ ACIL CIKIS ] [KOL]                     |  0..170
 //   |------------------------------------------------------|
 //   |  jenerator                              [ KULE ]     |
-//   |  BETON AVLU                                          |  170..450
-//   |  [KOL]                          rogar (o)            |
-//   |======== TEL ORGU ================ TEL ORGU ==========|  450..480
+//   |  BETON AVLU  (sagliklilar burada calisiyor)          |  170..450
+//   |======== TEL ORGU ====[ YARIK ]==== TEL ORGU =========|  450..480
 //   |  >>>>>>>>> VIRUSLULER <<<<<<<<<<                     |  480..560
-//
-// Sahne tek ekran: kamera kaymaz. Dönüşümün son anında ekran 2 kat
-// yakınlaşır (tam sayı ölçek, piksel bozulmasın diye kesme geçişle).
 
 import { PX } from '../pixel/pixelDraw.js';
 
@@ -32,32 +36,44 @@ export const PLAYER_SCALE = 4;
 
 export const LOCATION_NAME = 'ÇALIŞMA ALANI';
 
-// Oyuncu çelik kapıdan yeni çıkmış halde başlar; arkadaş yanındadır.
-export const START = { x: 520, y: 210 };
-export const FRIEND_START = { x: 466, y: 210 };
-
 // --- Şeritler ---
-export const FACADE = { y: 0, h: 170 };          // bina cephesi (tamamı engel)
-export const YARD = { top: 170, bottom: 450 };   // yürünebilir beton avlu
-export const FENCE = { y: 450, h: 30 };          // tel örgü (engel)
-export const CROWD = { y: 480, h: 80 };          // örgünün ardındaki kalabalık
+export const FACADE = { y: 0, h: 170 };
+export const YARD = { top: 170, bottom: 450 };
+export const FENCE = { y: 450, h: 30 };
+export const CROWD = { y: 480, h: 80 };
+
+// --- Acil çıkış ---
+// Kapı sahnenin başında açıktır; sistem virüslüleri algılayınca iner.
+export const STEEL_DOOR = { x: 440, y: 96, w: 120, h: 74 };
+// Kapının önündeki durma noktası: geçmek için buraya gelinir
+export const DOOR_STAND = { x: STEEL_DOOR.x + STEEL_DOOR.w / 2, y: 192 };
+export const DOOR_REACH = 34;
+
+export function atDoor(x, y) {
+    return Math.hypot(x - DOOR_STAND.x, y - DOOR_STAND.y) <= DOOR_REACH;
+}
+
+// --- Tesisi mühürleyen kol ---
+// Kapının hemen sağında, cephe duvarına monte. Arkadaşımız buraya koşuyor.
+export const LEVER = { x: 604, y: 128, w: 36, h: 46 };
+export const LEVER_STAND = { x: LEVER.x + LEVER.w / 2, y: 198 };
+
+// Arkadaşımızın geri hamlesi. Kapıdan kola düz bir çizgi çok kısa: bir
+// saniyede varıyor ve "kararma anında kola doğru gittiğini görüyoruz" olmuyor.
+// Bu yüzden avluya iniyor, içeri dolanların arasından dolanıp kola çıkıyor.
+export const FRIEND_RETURN_PATH = [
+    { x: 566, y: 272 },
+    { x: 720, y: 276 },
+    { x: 720, y: 200 },   // sandığın sağından dolaşıyor
+    LEVER_STAND
+];
 
 // --- Sabit nesneler ---
-// Çelik kapı: sahnenin başında açık, kol çekilince iner. Cephe zaten engel
-// olduğu için kapının kendisi çarpışmaya girmiyor; yalnızca çizim değişiyor.
-export const STEEL_DOOR = { x: 440, y: 96, w: 120, h: 74 };
-
 export const GENERATOR = { x: 86, y: 244, w: 104, h: 68 };
 export const TOWER = { x: 826, y: 176, w: 104, h: 108 };
-export const LEVER = { x: 112, y: 372, w: 40, h: 46 };
-
-// Anten direği: avlunun sol üstünde, kaidesi betona civatalı. Gövdesi cephenin
-// üstüne kadar yükselir ve kuşatma sırasında DEVRİLİR - BEAM tam bunun düştüğü
-// yer. (Sağdaki gözetleme kulesi dekor; oradan bir şey düşmüyor.)
+// Anten direği: yalnızca dekor, artık devrilmiyor (ayıran şey kapının kendisi)
 export const PYLON = { x: 244, y: 176, w: 40, h: 52 };
-export const MANHOLE = { x: 748, y: 386, w: 44, h: 32 };
 
-// Avluya dağılmış sandık ve kum torbası yığınları
 export const CRATES = [
     { x: 300, y: 196, w: 56, h: 40 },
     { x: 646, y: 214, w: 48, h: 36 },
@@ -65,34 +81,57 @@ export const CRATES = [
     { x: 590, y: 366, w: 60, h: 34 }
 ];
 
-// Tel örgünün yarıldığı yer: kalabalık buradan bastırıyor. Yürünebilir
-// değil - oyuncu dışarı çıkamaz, yalnızca baskıyı görür.
-export const BREACH = { x: 620, w: 130 };
+// Tel örgünün yarıldığı yer: virüslüler buradan giriyor. Kapı ve kol SAĞDA
+// olduğu için yarık SOLDA: yoksa içeri girenler doğrudan kolun dibine
+// yığılıyor ve kararma sırasında arkadaşımızı görmemiz imkânsızlaşıyor.
+export const BREACH = { x: 180, w: 130 };
+export const BREACH_CENTER = BREACH.x + BREACH.w / 2;
 
-// Kulenin devrilen direği: sahnenin ortasında düşer ve avlunun sol üçte
-// birini kapatır. Düşene kadar engel DEĞİLDİR (bakınız beamDown).
-export const BEAM = { x: 236, y: 178, w: 54, h: 268 };
+// --- Sağlıklılar ---
+// Bizim hariç TAM BEŞ kişi. Bu sayı prolog 4'te de tutmak zorunda: ormanın
+// ağzında yeşillenip vurulacak olanlar bunlar.
+export const SURVIVOR_COUNT = 5;
 
-// Rögar bu sahnede ENGEL DEĞİL: kapağı henüz kapalı ve sahnenin çıkışı orası,
-// oyuncunun üstüne basabilmesi gerekiyor. (Şehir sahnesindeki rögar açık
-// olduğu için engeldi - aynı nesne, farklı hâl.)
-const STATIC_OBSTACLES = [GENERATOR, TOWER, LEVER, PYLON, ...CRATES];
+export const SURVIVOR_STARTS = [
+    { x: 238, y: 296 },
+    { x: 356, y: 392 },
+    { x: 700, y: 304 },
+    { x: 780, y: 386 },
+    { x: 176, y: 214 }
+];
+
+// Kapının önünde sıraya girdikleri nokta; tek tek buradan geçiyorlar
+export const QUEUE_POINT = { x: DOOR_STAND.x, y: 236 };
+
+// Sağlıklıların kapıya giderken izlediği yol. ELLE yazıldı: bu insanlarda yol
+// bulma yok, hedefe düz gidiyorlar; jeneratörle anten direği arasında kalan
+// kişi yolu kendi bulamıyordu. Test her ara noktayı ve aradaki her adımı
+// yürünebilirlik açısından tarıyor.
+//
+// Ortak koridor y=290: jeneratörün (y<312 ama x<190) sağında ve sandıkların
+// arasında kalan tek boydan boya açık şerit.
+export const SURVIVOR_PATHS = [
+    [{ x: 238, y: 290 }, { x: 500, y: 290 }, QUEUE_POINT],
+    [{ x: 356, y: 290 }, { x: 500, y: 290 }, QUEUE_POINT],
+    [{ x: 700, y: 290 }, { x: 500, y: 290 }, QUEUE_POINT],
+    [{ x: 780, y: 290 }, { x: 500, y: 290 }, QUEUE_POINT],
+    // Jeneratörün üstünde sıkışan kişi: önce sağa çıkıyor, sonra iniyor
+    [{ x: 214, y: 214 }, { x: 214, y: 290 }, { x: 500, y: 290 }, QUEUE_POINT]
+];
+
+const STATIC_OBSTACLES = [GENERATOR, TOWER, PYLON, ...CRATES];
 
 function inBox(box, x, y) {
     return x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
 }
 
-// Sahnenin çarpışma mantığı. beamDown, direğin düşüp düşmediğini söyler:
-// aynı yerleşim iki hâlde kullanılıyor, ayrı bir harita tutmaya gerek yok.
-export function walkableAt(x, y, beamDown = false) {
+export function walkableAt(x, y) {
     if (x < 16 || x > WORLD.w - 16) return false;
     if (y < YARD.top || y > YARD.bottom) return false;
-    if (STATIC_OBSTACLES.some(box => inBox(box, x, y))) return false;
-    if (beamDown && inBox(BEAM, x, y)) return false;
-    return true;
+    return !STATIC_OBSTACLES.some(box => inBox(box, x, y));
 }
 
-export function blocked(x, y, beamDown = false) {
+export function blocked(x, y) {
     const hw = PLAYER_BOX.w / 2;
     const hh = PLAYER_BOX.h / 2;
     const points = [
@@ -100,27 +139,14 @@ export function blocked(x, y, beamDown = false) {
         [x - hw, y + hh], [x + hw, y + hh],
         [x, y - hh], [x, y + hh]
     ];
-    return points.some(([px, py]) => !walkableAt(px, py, beamDown));
+    return points.some(([px, py]) => !walkableAt(px, py));
 }
 
-// Kolun önünde durulacak nokta: arkadaş buraya koşar
-export const LEVER_STAND = { x: LEVER.x + LEVER.w + 26, y: LEVER.y + 10 };
-
-// Direk düştükten sonra oyuncunun arkadaşa yaklaşabildiği en yakın nokta
-// buranın sağında kalır. Sahne bu mesafeyi "yarı yarıya" anlatım için
-// kullanıyor: yeşillenme buradan izleniyor, dönüşümde ekran yakınlaşıyor.
-export const BLOCKED_STAND = { x: BEAM.x + BEAM.w + 20, y: 320 };
-
-// Oyuncu arkadaşa "neredeyse yetişti" sayılır mı? Direk tam bu anda düşer.
-export const REACH_DISTANCE = 96;
-
-export function nearFriend(playerX, playerY, friendX, friendY) {
-    return Math.hypot(playerX - friendX, playerY - friendY) <= REACH_DISTANCE;
-}
-
-// Rögarın üstünde mi? (sahnenin çıkışı)
-export function onManhole(x, y) {
-    const cx = MANHOLE.x + MANHOLE.w / 2;
-    const cy = MANHOLE.y + MANHOLE.h / 2;
-    return Math.hypot(x - cx, y - cy) < 40;
-}
+// --- Silah ---
+// Parçalayıcı silah virüsü ÖLDÜRMEZ, etrafa dağıtır. Vurulan virüslü çöker
+// ama yere kalıcı bir yeşil leke bırakır: ateş ettikçe avlu daha da kirlenir.
+export const BULLET_SPEED = 9;
+export const BULLET_LIFE = 70;        // kare
+export const FIRE_COOLDOWN = 12;      // kare
+export const INFECTED_SPEED = 0.9;    // konaksız hal yavaştır
+export const INFECTED_RADIUS = 16;

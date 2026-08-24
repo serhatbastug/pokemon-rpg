@@ -209,10 +209,33 @@ function paletteFor(greenness) {
 // pose: 'down' | 'up' | 'left' | 'right' | 'hunch'
 // greenness: 0..1 yeşillenme
 export function drawFriend(ctx, x, y, pose, moving, scale = 4, greenness = 0) {
+    drawPerson(ctx, x, y, pose, moving, scale, paletteFor(greenness));
+}
+
+// --- Diğer sağlıklılar ---
+// Bizim hariç beş kişi. Aynı ızgarayı kullanıyorlar ama TURUNCU BANTLARI YOK:
+// bant yalnızca arkadaşa ait, ipucu ancak tek kişide durursa çalışıyor.
+// ('o' ve 'O' harfleri önlük rengine eşleniyor, yani kol düz kalıyor.)
+const SURVIVOR_TINTS = [
+    { l: '#e6e9ec', L: '#bcc2c8', h: '#2b2119', b: '#3f4756' },
+    { l: '#cfd6dd', L: '#a7aeb6', h: '#4a3826', b: '#39414d' },
+    { l: '#dfe3e8', L: '#b3b9c0', h: '#1d1c1a', b: '#46414f' },
+    { l: '#d7dde3', L: '#adb4bb', h: '#5b4630', b: '#3c4a44' },
+    { l: '#e2e6ea', L: '#b8bec5', h: '#332828', b: '#4a3f3a' }
+];
+
+const survivorPalettes = SURVIVOR_TINTS.map(tint => ({
+    ...COLORS, ...tint, o: tint.l, O: tint.L
+}));
+
+export function drawSurvivor(ctx, x, y, pose, moving, scale = 4, index = 0) {
+    drawPerson(ctx, x, y, pose, moving, scale, survivorPalettes[index % survivorPalettes.length]);
+}
+
+function drawPerson(ctx, x, y, pose, moving, scale, palette) {
     const key = pose === 'left' || pose === 'right' ? 'side' : pose;
     const frames = FRIEND_FRAMES[key] || FRIEND_FRAMES.down;
     const frame = frames[moving && frames.length > 1 ? Math.floor(Date.now() / 160) % frames.length : 0];
-    const palette = paletteFor(greenness);
 
     const cols = frame[0].length;
     const rows = frame.length;

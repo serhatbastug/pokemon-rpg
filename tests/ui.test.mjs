@@ -190,55 +190,85 @@ async function main() {
         siegeOpen.screen && siegeOpen.menuStopped, JSON.stringify(siegeOpen));
     await shot('00d1-calisma-alani');
 
-    // --- Prolog 3: kurtaramama kuralı ---
-    // Betiği ayrılık anına kadar sür, oyuncuyu arkadaşa doğru yürüt: direk
-    // devrilmeli ve oyuncu bir daha kola geçememeli.
-    const siegeSplit = await page.evaluate(() => {
+    // --- Prolog 3: tahliye ---
+    // Beş sağlıklının HEPSİ kapıdan geçmeli. Sayı önemli: prolog 4'te ormanın
+    // ağzında yeşillenip vurulacak olanlar bunlar. Biri yolda takılırsa dört
+    // kişi geçiyor ve sonraki bölüm tutmuyor.
+    const evac = await page.evaluate(() => {
         const s = window.__siege;
-        // Oyuncuyu ışınlamak yerine GERÇEKTEN sola yürüt: konumu doğrudan
-        // atarsak çarpışma atlanır ve test hiçbir şey doğrulamamış olur.
-        const realIsDown = s.input.isDown.bind(s.input);
-        s.input.isDown = (code) => code === 'KeyA' || realIsDown(code);
         let steps = 0;
-        while (!s.state.beamDown && steps < 3000 && s.script.running) { s.step(); steps++; }
-        for (let i = 0; i < 400; i++) s.step();   // direk düştü, yüklenmeye devam
-        s.input.isDown = realIsDown;
+        while (s.script.name !== 'sira-bizde' && steps < 6000 && s.script.running) { s.step(); steps++; }
         s.draw();
         return {
-            beamDown: s.state.beamDown,
-            playerX: Math.round(s.player.x),
-            friendX: Math.round(s.friend.x)
+            beat: s.script.name,
+            escaped: s.state.escaped,
+            total: s.survivors.length,
+            stuck: s.survivors.filter(p => p.state !== 'gecti').length
         };
     });
-    // Direğin sağ yüzü x=290 (siegeLayout.BEAM: x 236, w 54)
-    const BEAM_RIGHT = 290;
-    check('Direk devriliyor ve oyuncuyu arkadastan ayiriyor', siegeSplit.beamDown);
-    check('Direk dustukten sonra arkadasa gecilemiyor (kurtaramamali)',
-        siegeSplit.playerX > BEAM_RIGHT && siegeSplit.friendX < BEAM_RIGHT,
-        JSON.stringify(siegeSplit));
-    await shot('00d2-direk-devrildi');
+    check('Bes saglikli da acil cikistan geciyor',
+        evac.escaped === 5 && evac.total === 5 && evac.stuck === 0, JSON.stringify(evac));
 
-    // Dönüşüm: ekran yaratığa yakınlaşmalı, kolundaki turuncu bant görünmeli
-    const transform = await page.evaluate(() => {
+    // Silah: vurulan virüslü ölmüyor, dağılıyor - yerinde kalıcı leke kalıyor
+    const weapon = await page.evaluate(() => {
+        const s = window.__siege;
+        // Önünde bir virüslü olsun diye elle yerleştiriliyor
+        s.intruders.push({ x: 500, y: 380, seed: 1 });
+        s.player.x = 500;
+        s.player.y = 290;
+        s.player.dir = 'down';
+        const before = s.splats.length;
+        s.cooldown = 0;
+        s.fire();
+        for (let i = 0; i < 30; i++) s.step();
+        s.draw();
+        return { splatsBefore: before, splatsAfter: s.splats.length };
+    });
+    check('Ates edilen viruslu dagiliyor ve yerde kalici leke birakiyor',
+        weapon.splatsAfter > weapon.splatsBefore, JSON.stringify(weapon));
+    await shot('00d2-tahliye-ve-silah');
+
+    // En son biz geçiyoruz: oyuncu kapıya YÜRÜYEREK gelmeli
+    const lastOut = await page.evaluate(() => {
+        const s = window.__siege;
+        s.player.x = 500;
+        s.player.y = 330;
+        const real = s.input.isDown.bind(s.input);
+        s.input.isDown = (c) => c === 'KeyW' || real(c);
+        let steps = 0;
+        while (s.script.name === 'sira-bizde' && steps < 900) { s.step(); steps++; }
+        s.input.isDown = real;
+        s.draw();
+        return { beat: s.script.name, steps };
+    });
+    check('Kapiya gelince biz de geciyoruz',
+        lastOut.beat === 'biz-geciyoruz', JSON.stringify(lastOut));
+
+    // Kapı kapanıyor, ekran kararıyor: arkadaşımız hâlâ kola doğru gidiyor.
+    // Ne ısırılmayı ne dönüşümü görüyoruz - sahnede öyle bir an yok.
+    const closing = await page.evaluate(() => {
         const s = window.__siege;
         let steps = 0;
-        while (s.script.name !== 'donusum' && steps < 6000 && s.script.running) { s.step(); steps++; }
-        for (let i = 0; i < 60; i++) s.step();
+        while (s.script.name !== 'kararma' && steps < 3000 && s.script.running) { s.step(); steps++; }
+        for (let i = 0; i < 30; i++) s.step();
         s.draw();
-        return { beat: s.script.name, zoom: s.state.zoom, creature: s.state.creature };
+        return {
+            beat: s.script.name,
+            doorClosed: s.state.doorClosed,
+            fadeOut: +s.state.fadeOut.toFixed(2),
+            leverPulled: s.state.leverPulled,
+            friendVisible: s.friend.y > 0
+        };
     });
-    check('Donusumde ekran yaratiga yakinlasiyor',
-        transform.creature && transform.zoom > 1, JSON.stringify(transform));
-    await shot('00d3-donusum');
+    check('Acil cikis kapaniyor ve ekran karariyor',
+        closing.doorClosed === 1 && closing.fadeOut > 0.3, JSON.stringify(closing));
+    check('Kolun cekilip cekilmedigi gosterilmiyor', closing.leverPulled === 0);
+    await shot('00d3-kararma');
 
-    // Rögardan aşağı: prolog 4 (şehrin kenarı) açılmalı
+    // Kararma bitince prolog 4 (şehrin kenarı) açılıyor
     await page.evaluate(() => {
         const s = window.__siege;
-        let steps = 0;
-        while (s.script.name !== 'kacis' && steps < 6000 && s.script.running) { s.step(); steps++; }
-        s.player.x = 770;
-        s.player.y = 402;
-        for (let i = 0; i < 120 && s.running; i++) s.step();
+        for (let i = 0; i < 400 && s.running && s.script.running; i++) s.step();
     });
     await page.waitForFunction(() => window.__adventure && window.__adventure.running, { timeout: 8000 });
     await wait(700);
@@ -248,7 +278,7 @@ async function main() {
         camera: Math.round(window.__adventure.camera.x),
         following: window.__adventure.cameraFollowing
     }));
-    check('Rogardan inince prolog 4 (sehrin kenari) aciliyor',
+    check('Kararmadan sonra prolog 4 (sehrin kenari) aciliyor',
         advOpen.screen && advOpen.siegeStopped && advOpen.camera === 0 && !advOpen.following,
         JSON.stringify(advOpen));
     await shot('00e-sehir-kenari');

@@ -507,38 +507,48 @@ check('sahne: parlama uçlarda sönük, tepede parlak',
     flash(0) === 0 && flash(1) === 0 && flash(0.12) > 0.99);
 
 // ---- Prolog 3: kuşatılan çalışma alanı ----
-// Sahnenin iki güvencesi var: direk düşmeden önce arkadaşın koluna
-// yürüyerek gidilebilmeli, düştükten sonra GİDİLEMEMELİ (oyuncu
-// kurtaramamalı) ama rögara hâlâ ulaşabilmeli (sahnenin çıkışı orası).
+// Avlu içerisidir; çıkış üstteki acil çıkış kapısı. Sahnenin güvenceleri:
+// beş sağlıklının da başladığı yer boş olmalı, hepsi kapıya yürüyebilmeli,
+// ve kol kapıya yakın olmalı (arkadaş oraya "geri hamle" yapıyor).
 const siege = await import('../src/adventure/siegeLayout.js');
 
-check('kuşatma: başlangıç noktası boş', !siege.blocked(siege.START.x, siege.START.y));
-check('kuşatma: arkadaşın başlangıcı boş', !siege.blocked(siege.FRIEND_START.x, siege.FRIEND_START.y));
-check('kuşatma: kolun önünde durulabiliyor',
-    !siege.blocked(siege.LEVER_STAND.x, siege.LEVER_STAND.y));
+check('kuşatma: bizim hariç tam beş sağlıklı var',
+    siege.SURVIVOR_COUNT === 5 && siege.SURVIVOR_STARTS.length === 5,
+    `${siege.SURVIVOR_STARTS.length} kişi`);
 check('kuşatma: bina cephesine girilemiyor', siege.blocked(500, 80));
 check('kuşatma: tel örgünün dışına çıkılamıyor', siege.blocked(500, 500));
 check('kuşatma: jeneratörün içinden geçilemiyor', siege.blocked(138, 278));
 check('kuşatma: kuleye girilemiyor', siege.blocked(878, 230));
-check('kuşatma: rögarın üstüne basılabiliyor',
-    !siege.blocked(siege.MANHOLE.x + siege.MANHOLE.w / 2, siege.MANHOLE.y + siege.MANHOLE.h / 2));
-check('kuşatma: direk düşmeden yerinde engel yok', !siege.blocked(263, 300, false));
-check('kuşatma: direk düşünce yeri engel oluyor', siege.blocked(263, 300, true));
+check('kuşatma: anten direğine girilemiyor', siege.blocked(264, 200));
+check('kuşatma: kapının önünde durulabiliyor',
+    !siege.blocked(siege.DOOR_STAND.x, siege.DOOR_STAND.y));
+check('kuşatma: kolun önünde durulabiliyor',
+    !siege.blocked(siege.LEVER_STAND.x, siege.LEVER_STAND.y));
+check('kuşatma: sıra noktası boş', !siege.blocked(siege.QUEUE_POINT.x, siege.QUEUE_POINT.y));
 
-// Avluda yürünerek nereye gidilebiliyor? İki hâl için ayrı ayrı taranıyor.
-function siegeReach(beamDown) {
+// Kol kapıya YAKIN olmalı: arkadaş oraya geri dönüyor, uzaksa hamle anlamsız
+const leverGap = Math.abs(siege.LEVER_STAND.x - siege.DOOR_STAND.x);
+check('kuşatma: kol acil çıkışa yakın', leverGap < 200, `${leverGap}px`);
+
+// Sağlıklıların hepsi başladığı yerde sıkışmadan durabiliyor mu?
+const stuckSurvivors = siege.SURVIVOR_STARTS.filter(p => siege.blocked(p.x, p.y));
+check('kuşatma: sağlıklıların başlangıçları boş', stuckSurvivors.length === 0,
+    JSON.stringify(stuckSurvivors));
+
+// Avluda yürünerek kapıya ulaşılıyor mu? (herkes için tek tek)
+function siegeReach(from) {
     const step = 8;
     const seen = new Set();
-    const startKey = [Math.round(siege.START.x / step) * step, Math.round(siege.START.y / step) * step];
-    const queue = [startKey];
-    seen.add(startKey.join(','));
+    const start = [Math.round(from.x / step) * step, Math.round(from.y / step) * step];
+    const queue = [start];
+    seen.add(start.join(','));
     while (queue.length) {
         const [x, y] = queue.shift();
         for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
             const nx = x + dx;
             const ny = y + dy;
             const key = `${nx},${ny}`;
-            if (seen.has(key) || siege.blocked(nx, ny, beamDown)) continue;
+            if (seen.has(key) || siege.blocked(nx, ny)) continue;
             seen.add(key);
             queue.push([nx, ny]);
         }
@@ -557,18 +567,55 @@ const nearKey = (set, px, py, step = 8) => {
     return false;
 };
 
-const beforeBeam = siegeReach(false);
-const afterBeam = siegeReach(true);
+let allReachDoor = true;
+for (const start of siege.SURVIVOR_STARTS) {
+    if (!nearKey(siegeReach(start), siege.DOOR_STAND.x, siege.DOOR_STAND.y)) allReachDoor = false;
+}
+check('kuşatma: beş sağlıklı da kapıya yürüyebiliyor', allReachDoor);
 
-check('kuşatma: direk düşmeden kola yürünebiliyor',
-    nearKey(beforeBeam, siege.LEVER_STAND.x, siege.LEVER_STAND.y));
-check('kuşatma: direk düşünce kola ULAŞILAMIYOR (kurtaramamalı)',
-    !nearKey(afterBeam, siege.LEVER_STAND.x, siege.LEVER_STAND.y));
-check('kuşatma: direk düşse de rögara ulaşılıyor (sahnenin çıkışı)',
-    nearKey(afterBeam, siege.MANHOLE.x + siege.MANHOLE.w / 2, siege.MANHOLE.y + siege.MANHOLE.h / 2));
-check('kuşatma: direk düşünce oyuncunun alanı küçülüyor',
-    afterBeam.size < beforeBeam.size, `${beforeBeam.size} -> ${afterBeam.size}`);
-check('kuşatma: kalan alan hâlâ makul büyüklükte', afterBeam.size > 800, `${afterBeam.size} kare`);
+// Elle yazılan tahliye yolları gerçekten temiz mi? Sağlıklılarda yol bulma
+// yok; bir ara nokta duvara denk gelirse o kişi orada takılıp kalıyor ve
+// kapıdan beş değil dört kişi geçiyor.
+check('kuşatma: her sağlıklının bir tahliye yolu var',
+    siege.SURVIVOR_PATHS.length === siege.SURVIVOR_STARTS.length);
+
+const badPathSteps = [];
+siege.SURVIVOR_PATHS.forEach((path, i) => {
+    let from = siege.SURVIVOR_STARTS[i];
+    for (const to of path) {
+        const dist = Math.hypot(to.x - from.x, to.y - from.y);
+        const steps = Math.max(1, Math.ceil(dist / 4));
+        for (let s = 0; s <= steps; s++) {
+            const x = from.x + (to.x - from.x) * (s / steps);
+            const y = from.y + (to.y - from.y) * (s / steps);
+            // Son ara nokta kapı önü sırası; oradan sonrası kapı boşluğu
+            if (siege.blocked(x, y)) badPathSteps.push(`#${i} (${Math.round(x)},${Math.round(y)})`);
+        }
+        from = to;
+    }
+});
+check('kuşatma: tahliye yollarının her adımı yürünebilir',
+    badPathSteps.length === 0, badPathSteps.slice(0, 4).join(' '));
+
+// Arkadaşın geri hamlesi de elle yazılı bir yol: takılırsa kola hiç varamaz
+// ve sahne "kola doğru gidiyor" anlatısını kaybeder.
+const badReturn = [];
+let rFrom = { x: siege.DOOR_STAND.x + 50, y: siege.DOOR_STAND.y };
+for (const to of siege.FRIEND_RETURN_PATH) {
+    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - rFrom.x, to.y - rFrom.y) / 4));
+    for (let i = 0; i <= steps; i++) {
+        const x = rFrom.x + (to.x - rFrom.x) * (i / steps);
+        const y = rFrom.y + (to.y - rFrom.y) * (i / steps);
+        if (siege.blocked(x, y)) badReturn.push(`(${Math.round(x)},${Math.round(y)})`);
+    }
+    rFrom = to;
+}
+check('kuşatma: arkadaşın kola dönüş yolu açık', badReturn.length === 0, badReturn.slice(0, 4).join(' '));
+
+const yardCells = siegeReach(siege.SURVIVOR_STARTS[0]);
+check('kuşatma: avlu makul büyüklükte', yardCells.size > 2000, `${yardCells.size} kare`);
+check('kuşatma: virüslülerin girdiği yarık avluya açılıyor',
+    nearKey(yardCells, siege.BREACH_CENTER, siege.FENCE.y - 20));
 check(`kuşatma: "${siege.LOCATION_NAME}" yazısı çizilebiliyor`,
     missingGlyphs(siege.LOCATION_NAME).length === 0);
 

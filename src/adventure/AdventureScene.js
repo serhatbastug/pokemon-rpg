@@ -19,6 +19,9 @@ import { hash } from '../pixel/pixelDraw.js';
 import { drawSurvivor } from './people.js';
 import { drawBullet, drawSplat, drawBurst } from '../pixel/weaponFx.js';
 import { Cutscene } from './cutscene.js';
+import { Dialogue, VOICE_PITCH } from './dialogue.js';
+import { CITY_HOPE, CITY_DOUBT, CITY_ONWARD, FOREST_STOPPED, FOREST_AFTER } from './prologLines.js';
+import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import {
     WORLD, VIEW, PX, START, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
     GAP, TREES, CITY, WRECKS, blocked, inForest,
@@ -55,12 +58,18 @@ export class AdventureScene {
 
         this.player = { x: START.x, y: START.y, dir: 'right', moving: false };
 
+        // Dublaj yok: balon harf harf yazilir, her harfte kisa bir "bit" cikar
+        this.dialogue = new Dialogue({
+            onBeep: (who) => Sfx.talk(VOICE_PITCH[who] || 1)
+        });
+
         input.onKeyDown(e => {
             if (!this.running) return;
             unlockAudio();
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
             if (e.code === 'Space') this.fire();
+            if (e.code === 'KeyF') this.dialogue.advance();
         });
 
         this.gamepad?.onButtonDown(button => {
@@ -68,6 +77,7 @@ export class AdventureScene {
             unlockAudio();
             if (button === 'circle') this.onExit();
             if (button === 'square') this.fire();      // KARE: ates
+            if (button === 'cross') this.dialogue.advance();
         });
     }
 
@@ -147,6 +157,7 @@ export class AdventureScene {
         this.splats = [];
         this.bursts = [];
         this.cooldown = 0;
+        this.dialogue.cut();
         this.script = this.buildScript();
 
         this.running = true;
@@ -187,7 +198,24 @@ export class AdventureScene {
         const state = {};
         return new Cutscene([
             {
-                // Rögardan çıkıldı, ormana doğru yürünüyor. Oyuncu serbest.
+                // Rögar kapağından yeni çıkıldı: arkada bıraktığımız kişi
+                name: 'umut', frames: 900,
+                onEnter: () => this.dialogue.start(CITY_HOPE),
+                until: () => !this.dialogue.active
+            },
+            {
+                // Prolog 3'te konuşandan BAŞKASI cevap veriyor
+                name: 'supheler', frames: 1600,
+                onEnter: () => this.dialogue.start(CITY_DOUBT),
+                until: () => !this.dialogue.active
+            },
+            {
+                name: 'ormana', frames: 1400,
+                onEnter: () => this.dialogue.start(CITY_ONWARD),
+                until: () => !this.dialogue.active
+            },
+            {
+                // Ormana doğru yürünüyor. Oyuncu serbest.
                 name: 'yuruyus', frames: 0, lock: false,
                 until: () => this.player.x >= FOREST_MOUTH_X
             },
@@ -195,6 +223,12 @@ export class AdventureScene {
                 // Ormanın ağzı: yanımızdakiler yerlerine dağılıyor
                 name: 'orman-agzi', frames: 90, lock: false,
                 onStep: () => this.spreadCompanions()
+            },
+            {
+                // Hepsi durdu. Neden durduklarını daha bilmiyoruz.
+                name: 'neden-durdunuz', frames: 900,
+                onEnter: () => this.dialogue.start(FOREST_STOPPED),
+                until: () => !this.dialogue.active
             },
             {
                 // Yeşilleniyorlar. Sırayla: hep birden olunca kaza gibi
@@ -208,6 +242,15 @@ export class AdventureScene {
                 name: 'vurus', frames: 0, lock: false,
                 until: () => this.companions.every(c => c.down),
                 onStep: () => this.updateTurned()
+            },
+            {
+                // Vuruştan sonra bir süre balon yok: sessizlik anlatıyor.
+                name: 'sessizlik', frames: 90
+            },
+            {
+                name: 'zordu', frames: 900,
+                onEnter: () => this.dialogue.start(FOREST_AFTER),
+                until: () => !this.dialogue.active
             },
             {
                 // Son sağlıklı insan olarak ormana giriyoruz
@@ -224,7 +267,8 @@ export class AdventureScene {
         if (this.cooldown > 0) this.cooldown--;
 
         this.gamepad?.poll();
-        this.movePlayer();
+        this.dialogue.step();
+        if (!this.script.locked) this.movePlayer();
         if (this.script.name === 'yuruyus') this.followPlayer();
         this.updateBullets();
         this.updateBursts();
@@ -448,7 +492,8 @@ export class AdventureScene {
             if (person.down) continue;
             layers.push({
                 y: person.y,
-                draw: () => drawSurvivor(ctx, Math.round(person.x), Math.round(person.y - 26),
+                draw: () => drawSurvivor(ctx, Math.round(person.x),
+                    Math.round(person.y - 26) + this.bob('saglikli-' + person.index),
                     person.dir, person.moving, PLAYER_SCALE, person.index, person.greenness)
             });
         }
@@ -458,6 +503,7 @@ export class AdventureScene {
 
         for (const bullet of this.bullets) drawBullet(ctx, bullet);
         for (const burst of this.bursts) drawBurst(ctx, burst.x, burst.y, burst.t);
+        this.drawBubble(ctx, camX);
 
         ctx.restore();
 
@@ -469,6 +515,40 @@ export class AdventureScene {
             ctx.fillStyle = `rgba(2, 6, 23, ${this.intro / INTRO_FRAMES})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+    }
+
+    // --- Konuşma ---
+
+    // Konuşanın kafası sallanır: dublaj olmadığı için "bu kişi konuşuyor"
+    // bilgisini bu hareket taşıyor.
+    bob(who) {
+        if (this.dialogue.speaker !== who) return 0;
+        return Math.floor(this.frame / 7) % 2 === 0 ? -PX : 0;
+    }
+
+    speakerActor() {
+        const who = this.dialogue.speaker;
+        if (!who) return null;
+        if (who === 'biz') return this.player;
+        const match = /^saglikli-(\d+)$/.exec(who);
+        if (!match) return null;
+        const person = this.companions[Number(match[1])];
+        return person && !person.down ? person : null;
+    }
+
+    // camX: kamera kaydığı için balon dünya koordinatında çiziliyor ama
+    // ekranın içinde kalması gerekiyor.
+    drawBubble(ctx, camX) {
+        if (!this.dialogue.active) return;
+        const actor = this.speakerActor();
+        if (!actor) return;
+        const text = this.dialogue.visibleText;
+        if (!text) return;
+
+        const lines = wrapPixelText(text, 440, 2);
+        drawSpeechBubble(ctx, Math.round(actor.x), Math.round(actor.y) - 58, lines, {
+            scale: 2, viewLeft: camX, viewW: VIEW.w
+        });
     }
 
     drawAsh() {
@@ -499,6 +579,7 @@ export class AdventureScene {
         ctx.fillRect(Math.round((player.x - 14) / PX) * PX, Math.round((player.y + 2) / PX) * PX, PX * 7, PX * 2);
         ctx.globalAlpha = 1;
 
-        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26), player.dir, player.moving, PLAYER_SCALE);
+        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26) + this.bob('biz'),
+            player.dir, player.moving, PLAYER_SCALE);
     }
 }

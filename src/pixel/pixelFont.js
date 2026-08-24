@@ -39,6 +39,13 @@ const GLYPHS = {
     'Ü': ['.#.#.', '.....', '#...#', '#...#', '#...#', '#...#', '.###.'],
     'Ğ': ['#...#', '.###.', '.###.', '#....', '#..##', '#...#', '.###.'],
 
+    'X': ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+    'W': ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#'],
+    'Q': ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+    ',': ['.....', '.....', '.....', '.....', '..##.', '..##.', '.##..'],
+    '.': ['.....', '.....', '.....', '.....', '.....', '.##..', '.##..'],
+    "'": ['..#..', '..#..', '.....', '.....', '.....', '.....', '.....'],
+    ':': ['.....', '.##..', '.##..', '.....', '.##..', '.##..', '.....'],
     '0': ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
     '1': ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
     '2': ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
@@ -61,8 +68,17 @@ export const GLYPH_H = 7;
 const SPACING = 1; // harfler arası boş sütun (piksel cinsinden, ölçek uygulanmadan)
 
 // Yazı tipinde karşılığı olmayan bir harf var mı? (testler bunu kullanır)
+// Türkçe büyük harf: JS'in toUpperCase'i 'i' harfini 'I' yapıyor, oysa
+// Türkçe'de 'İ' olmalı. Yazı tipi yalnızca büyük harf içerdiği için bütün
+// metin buradan geçiyor; diyalog küçük harfle yazılıp burada büyütülüyor.
+const TR_UPPER = { 'i': 'İ', 'ı': 'I' };
+
+export function trUpper(text) {
+    return [...text].map(ch => TR_UPPER[ch] || ch.toUpperCase()).join('');
+}
+
 export function missingGlyphs(text) {
-    return [...text.toUpperCase()].filter(ch => !GLYPHS[ch]);
+    return [...trUpper(text)].filter(ch => !GLYPHS[ch] && ch !== ' ');
 }
 
 // Ölçek uygulanmış piksel genişliği
@@ -79,7 +95,7 @@ export function drawPixelText(ctx, text, x, y, {
     shadow = null,      // verilirse yazının 1 piksel altına gölge kopyası çizilir
     align = 'left'
 } = {}) {
-    const chars = [...text.toUpperCase()];
+    const chars = [...trUpper(text)];
     const width = measurePixelText(text, scale);
     let ox = align === 'center' ? Math.round(x - width / 2) : Math.round(x);
     const oy = Math.round(y);

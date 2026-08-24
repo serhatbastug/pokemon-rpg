@@ -295,6 +295,9 @@ async function main() {
 
     const turned = await page.evaluate(() => {
         const a = window.__adventure;
+        // Rögardan çıkış konuşmaları bitene kadar bekle
+        let waited = 0;
+        while (a.script.name !== 'yuruyus' && waited < 4000 && a.script.running) { a.step(); waited++; }
         const real = a.input.isDown.bind(a.input);
         a.input.isDown = (c) => c === 'KeyD' || real(c);
         // Ormanın ağzına yürü, sonra yeşillenmenin bitmesini bekle
@@ -323,8 +326,15 @@ async function main() {
             a.fire();
             for (let i = 0; i < 16; i++) a.step();
         }
-        for (let i = 0; i < 30; i++) a.step();
-        return { down: a.companions.filter(c => c.down).length, splats: a.splats.length, allDown: !!a.allDown };
+        // Vuruştan sonra sessizlik ve "işte bu gerçekten zordu..." repliği var;
+        // ormana ancak onlar bitince girilebiliyor.
+        let waited = 0;
+        while (!a.allDown && waited < 4000 && a.script.running) { a.step(); waited++; }
+        return {
+            down: a.companions.filter(c => c.down).length,
+            splats: a.splats.length,
+            allDown: !!a.allDown
+        };
     });
     check('Besini de vuruyoruz ve yerde kalici leke kaliyor',
         shooting.down === 5 && shooting.splats === 5 && shooting.allDown,

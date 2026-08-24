@@ -20,10 +20,13 @@
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
-import { newCanvas } from '../pixel/pixelDraw.js';
+import { newCanvas, PX } from '../pixel/pixelDraw.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
 import { Cutscene, shakeOffset } from './cutscene.js';
 import { drawFriend, drawSurvivor } from './people.js';
+import { Dialogue, VOICE_PITCH } from './dialogue.js';
+import { SIEGE_SPOTTED, SIEGE_PLAN, SIEGE_AGREE, SIEGE_CALL } from './prologLines.js';
+import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import {
     WORLD, VIEW, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
     STEEL_DOOR, DOOR_STAND, LEVER_STAND, FRIEND_RETURN_PATH, QUEUE_POINT, YARD,
@@ -59,12 +62,18 @@ export class SiegeScene {
         this.running = false;
         this.frame = 0;
 
+        // Dublaj yok: balon harf harf yazilir, her harfte kisa bir "bit" cikar
+        this.dialogue = new Dialogue({
+            onBeep: (who) => Sfx.talk(VOICE_PITCH[who] || 1)
+        });
+
         input.onKeyDown(e => {
             if (!this.running) return;
             unlockAudio();
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
             if (e.code === 'Space') this.fire();
+            if (e.code === 'KeyF') this.dialogue.advance();
         });
 
         this.gamepad?.onButtonDown(button => {
@@ -72,6 +81,7 @@ export class SiegeScene {
             unlockAudio();
             if (button === 'circle') this.onExit();
             if (button === 'square') this.fire();      // KARE: ateş
+            if (button === 'cross') this.dialogue.advance();
         });
     }
 
@@ -100,6 +110,28 @@ export class SiegeScene {
                 onStep: (st, t) => { st.pressure = t * 0.8; }
             },
             {
+                // Arkadaşımız tel örgüyü gösteriyor
+                name: 'fark-ettik', frames: 900,
+                onEnter: () => {
+                    this.dialogue.start(SIEGE_SPOTTED);
+                    this.friend.dir = 'down';
+                },
+                until: () => !this.dialogue.active,
+                onStep: (st) => { st.pressure = 0.85; }
+            },
+            {
+                // Planı biz söylüyoruz
+                name: 'plan', frames: 1600,
+                onEnter: () => this.dialogue.start(SIEGE_PLAN),
+                until: () => !this.dialogue.active
+            },
+            {
+                // Sağlıklılardan biri onaylıyor
+                name: 'onay', frames: 1600,
+                onEnter: () => this.dialogue.start(SIEGE_AGREE),
+                until: () => !this.dialogue.active
+            },
+            {
                 // Örgü yarılıyor
                 name: 'yarik', frames: 70, lock: false,
                 onEnter: () => { Sfx.metalSlam(); s.shake = 5; },
@@ -123,6 +155,7 @@ export class SiegeScene {
             {
                 // Biz geçiyoruz: kapı boşluğunda durup geri dönüp bakıyoruz
                 name: 'biz-geciyoruz', frames: 80,
+                onEnter: () => this.dialogue.start(SIEGE_CALL),
                 onStep: () => {
                     this.moveActorTo(this.player, doorway, 2.2, true);
                     this.player.dir = 'down';
@@ -144,7 +177,11 @@ export class SiegeScene {
                 // Sistem algılıyor: acil çıkış iniyor. KARARMA BURADA BAŞLIYOR -
                 // arkadaşımız hâlâ yolda, oyuncu onu kola doğru giderken görüyor.
                 name: 'kapi-kapaniyor', frames: 100,
-                onEnter: () => { s.alarmLight = true; Sfx.beamFall(); },
+                onEnter: () => {
+                    s.alarmLight = true;
+                    Sfx.beamFall();
+                    this.dialogue.cut();       // cümle kapıyla birlikte kesilir
+                },
                 onStep: (st, t) => {
                     st.doorClosed = Math.min(1, t * 1.3);
                     st.shake = 6 * (1 - t);
@@ -180,6 +217,7 @@ export class SiegeScene {
         this.bursts = [];
         this.intruders = [];
         this.cooldown = 0;
+        this.dialogue.cut();
 
         this.state = {
             player: this.player,
@@ -235,6 +273,7 @@ export class SiegeScene {
         if (this.cooldown > 0) this.cooldown--;
 
         this.gamepad?.poll();
+        this.dialogue.step();
         if (!this.script.locked) this.movePlayer();
         this.updateBullets();
         this.updateIntruders();
@@ -504,7 +543,8 @@ export class SiegeScene {
             if (person.state === 'gecti') continue;
             actors.push({
                 y: person.y,
-                draw: () => drawSurvivor(ctx, Math.round(person.x), Math.round(person.y - 26),
+                draw: () => drawSurvivor(ctx, Math.round(person.x),
+                    Math.round(person.y - 26) + this.bob(`saglikli-${person.index}`),
                     person.dir, person.moving, PLAYER_SCALE, person.index)
             });
         }
@@ -517,7 +557,8 @@ export class SiegeScene {
         }
         actors.push({
             y: this.friend.y,
-            draw: () => drawFriend(ctx, Math.round(this.friend.x), Math.round(this.friend.y - 26),
+            draw: () => drawFriend(ctx, Math.round(this.friend.x),
+                Math.round(this.friend.y - 26) + this.bob('arkadas'),
                 this.friend.dir, this.friend.moving, PLAYER_SCALE, 0)
         });
         actors.push({ y: this.player.y, draw: () => this.drawPlayerActor(ctx) });
@@ -526,6 +567,8 @@ export class SiegeScene {
 
         // Çelik kapı aktörlerin ÜSTÜNDE: inerken ardında kalanı örtmeli
         drawSteelDoor(ctx, s.doorClosed);
+
+        this.drawBubble(ctx);
 
         for (const bullet of this.bullets) drawBullet(ctx, bullet);
         for (const burst of this.bursts) drawBurst(ctx, burst.x, burst.y, burst.t);
@@ -537,8 +580,42 @@ export class SiegeScene {
         ctx.fillStyle = '#101418';
         ctx.fillRect(Math.round(player.x - 14), Math.round(player.y + 2), 28, 8);
         ctx.globalAlpha = 1;
-        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26),
+        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26) + this.bob('biz'),
             player.dir, player.moving, PLAYER_SCALE);
+    }
+
+    // --- Konuşma ---
+
+    // Konuşanın kafası sallanır: dublaj olmadığı için ağız yerine bu
+    // hareket "bu kişi konuşuyor" bilgisini taşıyor.
+    bob(who) {
+        if (this.dialogue.speaker !== who) return 0;
+        return Math.floor(this.frame / 7) % 2 === 0 ? -PX : 0;
+    }
+
+    // Konuşan kim? Balon onun tepesinde açılıyor.
+    speakerActor() {
+        const who = this.dialogue.speaker;
+        if (!who) return null;
+        if (who === 'biz') return this.player;
+        if (who === 'arkadas') return this.friend;
+        const match = /^saglikli-(\d+)$/.exec(who);
+        if (!match) return null;
+        const person = this.survivors[Number(match[1])];
+        return person && person.state !== 'gecti' ? person : null;
+    }
+
+    drawBubble(ctx) {
+        if (!this.dialogue.active) return;
+        const actor = this.speakerActor();
+        if (!actor) return;
+        const text = this.dialogue.visibleText;
+        if (!text) return;
+
+        const lines = wrapPixelText(text, 440, 2);
+        drawSpeechBubble(ctx, Math.round(actor.x), Math.round(actor.y) - 58, lines, {
+            scale: 2, viewLeft: 0, viewW: VIEW.w
+        });
     }
 }
 

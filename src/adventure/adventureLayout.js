@@ -144,11 +144,11 @@ export const COMPANION_COUNT = 5;
 
 // Rögardan çıkınca dizildikleri yerler (deliğin çevresi)
 export const COMPANION_STARTS = [
-    { x: 690, y: 372 },
-    { x: 646, y: 348 },
-    { x: 736, y: 366 },
-    { x: 662, y: 402 },
-    { x: 716, y: 408 }
+    { x: 700, y: 364 },
+    { x: 626, y: 344 },
+    { x: 766, y: 382 },
+    { x: 648, y: 412 },
+    { x: 730, y: 424 }
 ];
 
 // Ormanın ağzında durdukları yerler: yeşillendikleri ve vurulduğumuz an

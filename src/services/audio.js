@@ -160,6 +160,13 @@ export const Sfx = {
     status: () => blip({ type: 'sawtooth', from: 300, to: 220, duration: 0.25, volume: 0.25 }),
     deny: () => blip({ type: 'square', from: 200, to: 140, duration: 0.14, volume: 0.25 }),
 
+    // Konusma: dublaj yok, harf harf yazilirken cikan kisa "bit" sesi.
+    // Perde konusana gore degisiyor, yoksa herkes ayni karakter gibi duyuluyor.
+    talk: (pitch = 1) => blip({
+        type: 'square', from: 640 * pitch, to: 540 * pitch,
+        duration: 0.04, volume: 0.10
+    }),
+
     // --- Prolog 3: kusatma ---
     siren: () => {
         blip({ type: 'sawtooth', from: 420, to: 700, duration: 0.5, volume: 0.16 });

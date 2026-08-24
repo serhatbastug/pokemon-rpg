@@ -1,0 +1,62 @@
+// Prologun konuşmaları.
+//
+// Metin tek yerde duruyor ki sahneler arasında ton kaysın istemeyelim ve
+// yazım düzeltmesi tek dosyada yapılabilsin. Konuşan kimlikleri
+// dialogue.js'teki VOICE_PITCH ile eşleşiyor.
+//
+// Balon kesmeleri (aynı kişinin arka arkaya iki balonu) bilerek: uzun cümle
+// tek balonda okunmuyor.
+
+// --- Prolog 3: çalışma alanı ---
+
+// Virüslüler tel örgüye dayandığı an
+export const SIEGE_SPOTTED = [
+    { speaker: 'arkadas', text: 'Şuraya bakın, olamaz burayı da bulmuşlar.' }
+];
+
+// Bizim planımız
+export const SIEGE_PLAN = [
+    { speaker: 'biz', text: 'Bu beyinleri erimiş virüsler için iyi bir süre,' },
+    { speaker: 'biz', text: 'herneyse acil kaçış planı için hemen ormana kaçalım, orada daha yavaş olduklarını gördük.' },
+    { speaker: 'biz', text: 'Hem bizim ormanda olduğumuzu anlamaları uzun sürer.' }
+];
+
+// Sağlıklılardan biri onaylıyor
+export const SIEGE_AGREE = [
+    { speaker: 'saglikli-0', text: 'Tamamdır hemen gidelim, ulaştığımız verilere göre herhangi bir delikli koruma onlar için engel değil, deliklerden geçebiliyorlar.' }
+];
+
+// Biz geçerken arkadaşımız geri dönüyor. Cümle KAPI KAPANINCA KESİLİYOR -
+// son balon bilerek yarım.
+export const SIEGE_CALL = [
+    { speaker: 'biz', text: 'Haydi gel.' },
+    { speaker: 'biz', text: 'HEY nereye gidiyors-' }
+];
+
+// --- Prolog 4: şehrin kenarı ---
+
+// Rögar kapağından çıkınca
+export const CITY_HOPE = [
+    { speaker: 'biz', text: 'Umarım o iyidir.' }
+];
+
+// Prolog 3'te konuşandan BAŞKASI cevap veriyor
+export const CITY_DOUBT = [
+    { speaker: 'saglikli-1', text: 'Umarım öyledir fakat ben öyle olduğunu zannetmiyorum,' },
+    { speaker: 'saglikli-1', text: 'sonuçta virüslerin arasında tek sağlıklı.' }
+];
+
+export const CITY_ONWARD = [
+    { speaker: 'biz', text: 'Eh, orası doğru. En iyisi şimdi önümüze bakmak,' },
+    { speaker: 'biz', text: 'ORMANA.' }
+];
+
+// Ormanın ağzında hepsi duruyor
+export const FOREST_STOPPED = [
+    { speaker: 'biz', text: 'Hey, neden durdunuz?' }
+];
+
+// Hepsini vurduktan sonra
+export const FOREST_AFTER = [
+    { speaker: 'biz', text: 'İşte bu gerçekten zordu...' }
+];

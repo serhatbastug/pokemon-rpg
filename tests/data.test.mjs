@@ -639,6 +639,73 @@ check('kuşatma: virüslülerin girdiği yarık avluya açılıyor',
 check(`kuşatma: "${siege.LOCATION_NAME}" yazısı çizilebiliyor`,
     missingGlyphs(siege.LOCATION_NAME).length === 0);
 
+// ---- Diyalog ----
+// Dublaj yok: yazı harf harf açılıyor, her birkaç harfte "bıt" sesi çıkıyor.
+const { Dialogue, VOICE_PITCH } = await import('../src/adventure/dialogue.js');
+
+const beeps = [];
+const talk = new Dialogue({ onBeep: (who) => beeps.push(who) }).start([
+    { speaker: 'biz', text: 'Merhaba dunya' },
+    { speaker: 'arkadas', text: 'Evet' }
+]);
+
+check('diyalog: ilk satır girişte açılıyor', talk.active && talk.speaker === 'biz');
+check('diyalog: başta hiçbir harf yazılmamış', talk.visibleText === '');
+for (let i = 0; i < 6; i++) talk.step();
+check('diyalog: yazı harf harf açılıyor',
+    talk.visibleText.length > 0 && talk.visibleText.length < 'Merhaba dunya'.length,
+    `"${talk.visibleText}"`);
+check('diyalog: yazılırken ses çıkıyor', beeps.length > 0 && beeps.every(w => w === 'biz'));
+
+talk.advance();
+check('diyalog: ilk basış yazıyı tamamlıyor', talk.finishedTyping && talk.speaker === 'biz');
+talk.advance();
+check('diyalog: ikinci basış sonraki satıra geçiyor', talk.speaker === 'arkadas');
+
+// Yazı bitince kendiliğinden ilerlemeli (oyuncu tuşa basmasa da)
+let guard = 0;
+while (talk.active && guard++ < 2000) talk.step();
+check('diyalog: kendiliğinden ilerleyip bitiyor', !talk.active && guard < 2000, `${guard} kare`);
+
+// Kesme: kapı kapanınca cümle ortasında kalmalı
+const cutTalk = new Dialogue().start([{ speaker: 'biz', text: 'Yarim kalacak' }]);
+cutTalk.step();
+cutTalk.cut();
+check('diyalog: cut() balonu anında kapatıyor', !cutTalk.active && cutTalk.visibleText === '');
+
+// Boşlukta ses çıkmamalı, yoksa konuşma sürekli vızıltıya dönüyor
+const spaceBeeps = [];
+const spacey = new Dialogue({ onBeep: () => spaceBeeps.push(1) }).start([
+    { speaker: 'biz', text: '          ' }
+]);
+for (let i = 0; i < 40; i++) spacey.step();
+check('diyalog: boşluklarda ses çıkmıyor', spaceBeeps.length === 0, `${spaceBeeps.length} ses`);
+
+// ---- Prologun konuşmaları ----
+// Yazı tipi yalnızca büyük harf ve sınırlı noktalama içeriyor; bir karakter
+// eksikse o harf ekranda hiç çizilmiyor ve cümlede boşluk kalıyor.
+const lines = await import('../src/adventure/prologLines.js');
+const allLines = Object.values(lines).flat();
+
+check('konuşma: prologda replik var', allLines.length >= 12, `${allLines.length} replik`);
+
+const missingInDialogue = [];
+const unknownSpeakers = [];
+for (const line of allLines) {
+    const missing = missingGlyphs(line.text);
+    if (missing.length) missingInDialogue.push(`"${line.text.slice(0, 20)}": ${missing.join('')}`);
+    if (!VOICE_PITCH[line.speaker]) unknownSpeakers.push(line.speaker);
+}
+check('konuşma: bütün harfler yazı tipinde var', missingInDialogue.length === 0,
+    missingInDialogue.slice(0, 3).join(' | '));
+check('konuşma: her konuşanın ses perdesi tanımlı', unknownSpeakers.length === 0,
+    [...new Set(unknownSpeakers)].join(','));
+
+// Tek balona sığmayacak kadar uzun replik okunmuyor
+const tooLong = allLines.filter(line => line.text.length > 150);
+check('konuşma: hiçbir replik balona sığmayacak kadar uzun değil',
+    tooLong.length === 0, tooLong.map(l => l.text.length).join(','));
+
 // ---- Prologun insanları ----
 // Arkadaşın sprite'ında turuncu bant hikâyenin tek ipucu; bir duruşta bile
 // düşerse ipucu kırılır. Bu yüzden ızgara tutarlılığıyla birlikte test edilir.

@@ -283,8 +283,61 @@ async function main() {
         JSON.stringify(advOpen));
     await shot('00e-sehir-kenari');
 
+    // --- Prolog 4: rögardan beş kişiyle çıkış ---
+    // Ormanın ağzında hepsi yeşilleniyor ve hepsini vuruyoruz. Ormana ancak
+    // ondan sonra girilir: "son sağlıklı insan" olmak sahnenin can alıcı yeri.
+    const companions = await page.evaluate(() => ({
+        count: window.__adventure.companions.length,
+        beat: window.__adventure.script.name
+    }));
+    check('Rogardan bes saglikli bizimle cikiyor',
+        companions.count === 5, JSON.stringify(companions));
+
+    const turned = await page.evaluate(() => {
+        const a = window.__adventure;
+        const real = a.input.isDown.bind(a.input);
+        a.input.isDown = (c) => c === 'KeyD' || real(c);
+        // Ormanın ağzına yürü, sonra yeşillenmenin bitmesini bekle
+        for (let i = 0; i < 300 && a.script.name === 'yuruyus'; i++) a.step();
+        a.input.isDown = real;
+        let steps = 0;
+        while (a.script.name !== 'vurus' && steps < 3000 && a.script.running) { a.step(); steps++; }
+        return {
+            beat: a.script.name,
+            green: a.companions.filter(c => c.greenness >= 1).length,
+            allDown: !!a.allDown
+        };
+    });
+    check('Ormanin agzinda besi de yesilleniyor',
+        turned.green === 5 && !turned.allDown, JSON.stringify(turned));
+
+    // Sağlıklıyken ateş etmek işe yaramamalı; yalnızca dönüşenler vurulur
+    const shooting = await page.evaluate(() => {
+        const a = window.__adventure;
+        for (let round = 0; round < 40 && a.companions.some(c => !c.down); round++) {
+            const t = a.companions.find(c => !c.down);
+            a.player.x = t.x - 70;
+            a.player.y = t.y;
+            a.player.dir = 'right';
+            a.cooldown = 0;
+            a.fire();
+            for (let i = 0; i < 16; i++) a.step();
+        }
+        for (let i = 0; i < 30; i++) a.step();
+        return { down: a.companions.filter(c => c.down).length, splats: a.splats.length, allDown: !!a.allDown };
+    });
+    check('Besini de vuruyoruz ve yerde kalici leke kaliyor',
+        shooting.down === 5 && shooting.splats === 5 && shooting.allDown,
+        JSON.stringify(shooting));
+    await shot('00e2-vurus');
+
     // --- Macera: şehirden ormanın girişine ---
     // Boşluğa kadar kamera sabit; boşluktan geçilince ekran sağa kaymalı
+    await page.evaluate(() => {
+        const a = window.__adventure;
+        a.player.x = 760;
+        a.player.y = 335;
+    });
     await hold('KeyD', 2400);
     await wait(400);
     const inForest = await page.evaluate(() => ({

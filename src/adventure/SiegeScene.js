@@ -32,9 +32,9 @@ import {
     blocked, atDoor
 } from './siegeLayout.js';
 import {
-    bakeGround, drawSteelDoor, drawCrowd, drawLeverArm,
-    drawIntruder, drawBullet, drawSplat, drawBurst
+    bakeGround, drawSteelDoor, drawCrowd, drawLeverArm, drawIntruder
 } from './siegeArt.js';
+import { drawBullet, drawSplat, drawBurst } from '../pixel/weaponFx.js';
 
 const INTRO_FRAMES = 46;
 const TITLE_FRAMES = 210;

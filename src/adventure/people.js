@@ -228,8 +228,34 @@ const survivorPalettes = SURVIVOR_TINTS.map(tint => ({
     ...COLORS, ...tint, o: tint.l, O: tint.L
 }));
 
-export function drawSurvivor(ctx, x, y, pose, moving, scale = 4, index = 0) {
-    drawPerson(ctx, x, y, pose, moving, scale, survivorPalettes[index % survivorPalettes.length]);
+// Sağlıklılar da yeşillenebiliyor: prolog 4'te ormanın ağzında hepsi dönüyor.
+// Her kişinin kendi rengi olduğu için palet kişi başına ayrı hesaplanıyor.
+const survivorSickCache = new Map();
+
+function survivorPalette(index, greenness) {
+    const base = survivorPalettes[index % survivorPalettes.length];
+    if (greenness <= 0) return base;
+
+    const step = Math.round(greenness * 20);
+    const key = `${index % survivorPalettes.length}:${step}`;
+    const cached = survivorSickCache.get(key);
+    if (cached) return cached;
+
+    const t = step / 20;
+    const palette = { ...base };
+    for (const [letter, target] of Object.entries(SICK)) {
+        if (!base[letter]) continue;
+        palette[letter] = mix(base[letter], target, t);
+    }
+    // Kolun düz kalması için bant harfleri önlükle birlikte kayıyor
+    palette.o = palette.l;
+    palette.O = palette.L;
+    survivorSickCache.set(key, palette);
+    return palette;
+}
+
+export function drawSurvivor(ctx, x, y, pose, moving, scale = 4, index = 0, greenness = 0) {
+    drawPerson(ctx, x, y, pose, moving, scale, survivorPalette(index, greenness));
 }
 
 function drawPerson(ctx, x, y, pose, moving, scale, palette) {

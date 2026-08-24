@@ -136,6 +136,40 @@ export function inForest(x) {
     return x >= FOREST.x0;
 }
 
+// --- Yanımızdaki sağlıklılar ---
+// Prolog 3'te acil çıkıştan geçirdiğimiz BEŞ kişi rögardan bizimle çıkıyor.
+// Ormanın ağzında onlar da yeşilleniyor; hepsini vurup ormana SON SAĞLIKLI
+// İNSAN olarak giriyoruz. Sayı prolog 3'le aynı olmak zorunda.
+export const COMPANION_COUNT = 5;
+
+// Rögardan çıkınca dizildikleri yerler (deliğin çevresi)
+export const COMPANION_STARTS = [
+    { x: 690, y: 372 },
+    { x: 646, y: 348 },
+    { x: 736, y: 366 },
+    { x: 662, y: 402 },
+    { x: 716, y: 408 }
+];
+
+// Ormanın ağzında durdukları yerler: yeşillendikleri ve vurulduğumuz an
+export const COMPANION_STAND = [
+    { x: 766, y: 392 },
+    { x: 812, y: 356 },
+    { x: 846, y: 404 },
+    { x: 800, y: 302 },
+    { x: 862, y: 318 }
+];
+
+// Oyuncu bu çizgiyi geçince ormanın ağzına varılmış sayılır: arkadakiler
+// durur ve yeşillenmeye başlar.
+export const FOREST_MOUTH_X = 858;
+
+// --- Silah ---
+// Prolog 3'teki parçalayıcı silah elimizde. Virüsü öldürmüyor, dağıtıyor.
+export const BULLET_SPEED = 9;
+export const BULLET_LIFE = 80;
+export const FIRE_COOLDOWN = 14;
+
 // --- Ağaçlar ---
 // Sabit tohumlu üreteç: sahne her açılışta birebir aynı çıkar.
 function mulberry32(seed) {

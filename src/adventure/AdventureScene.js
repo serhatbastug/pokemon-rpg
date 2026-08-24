@@ -5,15 +5,25 @@
 // boşluk. Boşluktan geçilene kadar kamera sabit durur; geçilince ekran
 // antrenörle birlikte sağa kayar ve dar orman koridoruna girilir. Ormana
 // girişte mekan adı belirir.
+//
+// PROLOGUN 4. BÖLÜMÜ: rögardan yalnız çıkmıyoruz. Prolog 3'te acil çıkıştan
+// geçirdiğimiz BEŞ sağlıklı da bizimle. Ormanın ağzına varınca onlar da
+// yeşilleniyor - kanalizasyondaki yoğun maruziyet sürelerini bitirdi - ve
+// hepsini vurup ormana SON SAĞLIKLI İNSAN olarak giriyoruz.
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { treeSpriteFor } from '../pixel/trees.js';
 import { hash } from '../pixel/pixelDraw.js';
+import { drawSurvivor } from './people.js';
+import { drawBullet, drawSplat, drawBurst } from '../pixel/weaponFx.js';
+import { Cutscene } from './cutscene.js';
 import {
     WORLD, VIEW, PX, START, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
-    GAP, TREES, CITY, WRECKS, blocked, inForest
+    GAP, TREES, CITY, WRECKS, blocked, inForest,
+    COMPANION_STARTS, COMPANION_STAND, FOREST_MOUTH_X,
+    BULLET_SPEED, BULLET_LIFE, FIRE_COOLDOWN
 } from './adventureLayout.js';
 import { bakeGround, lampSprite, wreckSprite, witherCanvas } from './adventureArt.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
@@ -22,6 +32,9 @@ const INTRO_FRAMES = 40;    // karanlıktan açılma (menüden kararmış geliyo
 const TITLE_FRAMES = 230;   // mekan adının ekranda kalma süresi
 const TITLE_FADE = 34;
 const ASH_COUNT = 72;       // havada süzülen kül
+const FOLLOW_SPEED = 3.0;   // yanımızdakiler peşimizden geliyor
+const FOLLOW_GAP = 44;      // dibimize girmesinler
+const TURN_STAGGER = 70;    // yeşillenme sırayla, hep birden değil
 
 export class AdventureScene {
     constructor({ canvas, input, gamepad, onExit }) {
@@ -47,12 +60,14 @@ export class AdventureScene {
             unlockAudio();
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
+            if (e.code === 'Space') this.fire();
         });
 
         this.gamepad?.onButtonDown(button => {
             if (!this.running) return;
             unlockAudio();
             if (button === 'circle') this.onExit();
+            if (button === 'square') this.fire();      // KARE: ates
         });
     }
 
@@ -119,8 +134,21 @@ export class AdventureScene {
         this.titleFrames = 0;
         this.titleShown = false;
         this.enteredForest = false;
+        this.allDown = false;
         this.intro = INTRO_FRAMES;
         this.frame = 0;
+
+        // Rögardan bizimle çıkan beş sağlıklı
+        this.companions = COMPANION_STARTS.map((start, i) => ({
+            x: start.x, y: start.y, dir: 'right', moving: false, index: i,
+            greenness: 0, turning: false, down: false
+        }));
+        this.bullets = [];
+        this.splats = [];
+        this.bursts = [];
+        this.cooldown = 0;
+        this.script = this.buildScript();
+
         this.running = true;
         this.ctx.imageSmoothingEnabled = false;
         playMusic('ruin');
@@ -154,16 +182,160 @@ export class AdventureScene {
         this.rafId = null;
     }
 
+    // Sahnenin akışı: yürüyüş -> ormanın ağzı -> yeşillenme -> vuruş -> orman
+    buildScript() {
+        const state = {};
+        return new Cutscene([
+            {
+                // Rögardan çıkıldı, ormana doğru yürünüyor. Oyuncu serbest.
+                name: 'yuruyus', frames: 0, lock: false,
+                until: () => this.player.x >= FOREST_MOUTH_X
+            },
+            {
+                // Ormanın ağzı: yanımızdakiler yerlerine dağılıyor
+                name: 'orman-agzi', frames: 90, lock: false,
+                onStep: () => this.spreadCompanions()
+            },
+            {
+                // Yeşilleniyorlar. Sırayla: hep birden olunca kaza gibi
+                // duruyor, sırayla olunca kaçınılmaz gibi.
+                name: 'yesillenme', frames: TURN_STAGGER * 5 + 60, lock: false,
+                onEnter: () => Sfx.status(),
+                onStep: (st, t) => this.updateTurning(t)
+            },
+            {
+                // Hepsini vuruyoruz. Yaklaşıyorlar; kaçmak bir işe yaramaz.
+                name: 'vurus', frames: 0, lock: false,
+                until: () => this.companions.every(c => c.down),
+                onStep: () => this.updateTurned()
+            },
+            {
+                // Son sağlıklı insan olarak ormana giriyoruz
+                name: 'orman', frames: 0, lock: false,
+                onEnter: () => { this.allDown = true; }
+            }
+        ], state).start();
+    }
+
     step() {
         this.frame++;
         if (this.intro > 0) this.intro--;
         if (this.titleFrames > 0) this.titleFrames--;
+        if (this.cooldown > 0) this.cooldown--;
 
         this.gamepad?.poll();
         this.movePlayer();
+        if (this.script.name === 'yuruyus') this.followPlayer();
+        this.updateBullets();
+        this.updateBursts();
+        this.script.step();
         this.checkForestEntry();
         this.updateCamera();
         this.updateAsh();
+    }
+
+    // --- Yanımızdaki sağlıklılar ---
+
+    // Peşimizden geliyorlar ama dibimize girmiyorlar
+    followPlayer() {
+        for (const person of this.companions) {
+            const targetX = this.player.x - FOLLOW_GAP - person.index * 6;
+            const targetY = this.player.y + (person.index - 2) * 18;
+            this.stepToward(person, targetX, targetY, FOLLOW_SPEED, 26);
+        }
+    }
+
+    // Ormanın ağzında yerlerine dağılıyorlar
+    spreadCompanions() {
+        for (const person of this.companions) {
+            const spot = COMPANION_STAND[person.index];
+            this.stepToward(person, spot.x, spot.y, FOLLOW_SPEED, 3);
+        }
+    }
+
+    // Sırayla yeşilleniyorlar
+    updateTurning(t) {
+        const elapsed = t * (TURN_STAGGER * 5 + 60);
+        for (const person of this.companions) {
+            const start = person.index * TURN_STAGGER;
+            const progress = (elapsed - start) / TURN_STAGGER;
+            if (progress <= 0) continue;
+            if (!person.turning) {
+                person.turning = true;
+                Sfx.status();
+            }
+            person.greenness = Math.min(1, progress);
+            person.moving = false;
+        }
+    }
+
+    // Dönüşenler üstümüze geliyor. Konaksız hal yavaştır; kaçabilirsin ama
+    // ormana onlarla girmiş olursun.
+    updateTurned() {
+        for (const person of this.companions) {
+            if (person.down) continue;
+            person.greenness = 1;
+            this.stepToward(person, this.player.x, this.player.y, 1.1, 24);
+        }
+    }
+
+    stepToward(actor, tx, ty, speed, stopAt) {
+        const dx = tx - actor.x;
+        const dy = ty - actor.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= stopAt) { actor.moving = false; return true; }
+        const nx = actor.x + (dx / dist) * speed;
+        const ny = actor.y + (dy / dist) * speed;
+        if (!blocked(nx, actor.y)) actor.x = nx;
+        if (!blocked(actor.x, ny)) actor.y = ny;
+        actor.moving = true;
+        actor.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+        return false;
+    }
+
+    // --- Silah ---
+    // Prolog 3'ten kalan parçalayıcı silah. Space / KARE.
+    fire() {
+        if (!this.running || this.cooldown > 0) return;
+        this.cooldown = FIRE_COOLDOWN;
+        const dir = this.player.dir;
+        const vx = dir === 'left' ? -BULLET_SPEED : dir === 'right' ? BULLET_SPEED : 0;
+        const vy = dir === 'up' ? -BULLET_SPEED : dir === 'down' ? BULLET_SPEED : 0;
+        this.bullets.push({
+            x: this.player.x + vx * 2,
+            y: this.player.y - 16 + vy * 2,
+            vx, vy, life: BULLET_LIFE
+        });
+        Sfx.shoot();
+    }
+
+    updateBullets() {
+        for (const bullet of this.bullets) {
+            bullet.x += bullet.vx;
+            bullet.y += bullet.vy;
+            bullet.life--;
+            if (bullet.x < 0 || bullet.x > WORLD.w || bullet.y < 0 || bullet.y > WORLD.h) bullet.life = 0;
+            for (const person of this.companions) {
+                // Yalnızca dönüşmüş olanlar vurulabiliyor: sağlıklıyken
+                // ateş etmek bir işe yaramamalı.
+                if (person.down || person.greenness < 1) continue;
+                if (Math.hypot(bullet.x - person.x, bullet.y - (person.y - 26)) > 22) continue;
+                person.down = true;
+                bullet.life = 0;
+                this.splats.push({
+                    x: Math.round(person.x), y: Math.round(person.y),
+                    radius: 20 + Math.random() * 10, seed: Math.floor(Math.random() * 1000)
+                });
+                this.bursts.push({ x: person.x, y: person.y - 24, t: 0 });
+                Sfx.playerHurt();
+            }
+        }
+        this.bullets = this.bullets.filter(b => b.life > 0);
+    }
+
+    updateBursts() {
+        for (const burst of this.bursts) burst.t += 0.06;
+        this.bursts = this.bursts.filter(b => b.t < 1);
     }
 
     // Kül sola-aşağı süzülür, ekranın dışına çıkınca karşı kenardan döner
@@ -220,7 +392,9 @@ export class AdventureScene {
         if (!this.cameraFollowing && this.player.x > GAP.x0) {
             this.cameraFollowing = true;
         }
-        if (!this.enteredForest && inForest(this.player.x)) {
+        // Ormana giriş yazısı ancak hepsi vurulduktan sonra: son sağlıklı
+        // insan olarak girmek sahnenin can alıcı yeri.
+        if (!this.enteredForest && this.allDown && inForest(this.player.x)) {
             this.enteredForest = true;
             this.titleFrames = TITLE_FRAMES;
             this.titleShown = true;
@@ -260,18 +434,30 @@ export class AdventureScene {
         const sw = Math.min(WORLD.w - camX, VIEW.w);
         ctx.drawImage(this.ground, camX, 0, sw, WORLD.h, camX, 0, sw, WORLD.h);
 
-        // Ağaçlar ve lambalar antrenörle birlikte dip hizasına göre sıralanır
-        const feet = player.y;
+        // Vurulanların yere dağılan izi: kalıcı, herkesin altında
+        for (const splat of this.splats) drawSplat(ctx, splat);
+
+        // Ağaçlar, lambalar, antrenör ve yanımızdakiler dip hizasına göre
+        // tek bir sırada çizilir; yoksa biri ağacın önünde yanlış duruyor.
         const left = camX - 220;
         const right = camX + VIEW.w + 220;
-        let i = 0;
-        for (; i < this.props.length && this.props[i].baseY <= feet; i++) {
-            this.drawProp(this.props[i], left, right);
+        const layers = this.props
+            .filter(prop => prop.x + prop.canvas.width >= left && prop.x <= right)
+            .map(prop => ({ y: prop.baseY, draw: () => this.drawProp(prop, left, right) }));
+        for (const person of this.companions) {
+            if (person.down) continue;
+            layers.push({
+                y: person.y,
+                draw: () => drawSurvivor(ctx, Math.round(person.x), Math.round(person.y - 26),
+                    person.dir, person.moving, PLAYER_SCALE, person.index, person.greenness)
+            });
         }
-        this.drawPlayer();
-        for (; i < this.props.length; i++) {
-            this.drawProp(this.props[i], left, right);
-        }
+        layers.push({ y: player.y, draw: () => this.drawPlayer() });
+        layers.sort((a, b) => a.y - b.y);
+        for (const layer of layers) layer.draw();
+
+        for (const bullet of this.bullets) drawBullet(ctx, bullet);
+        for (const burst of this.bursts) drawBurst(ctx, burst.x, burst.y, burst.t);
 
         ctx.restore();
 

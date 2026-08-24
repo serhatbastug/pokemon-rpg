@@ -381,6 +381,26 @@ check('macera: ormanın boşluğuna yürüyerek ulaşılıyor', reachedGapCell);
 check('macera: koridorun sonuna kadar yürünebiliyor', advMaxX > adv.WORLD.w - 60,
     `en uzak x ${advMaxX} / ${adv.WORLD.w}`);
 
+// Yanımızdaki beş sağlıklı: prolog 3'ten gelen sayı burada da tutmalı.
+// Hem çıktıkları yer hem ormanın ağzında durdukları yer boş olmalı, yoksa
+// içlerinden biri duvara gömülü duruyor ya da hiç vurulamıyor.
+check('macera: yanımızda tam beş sağlıklı var',
+    adv.COMPANION_COUNT === 5 &&
+    adv.COMPANION_STARTS.length === 5 &&
+    adv.COMPANION_STAND.length === 5);
+
+const badCompanionSpots = [
+    ...adv.COMPANION_STARTS.map((p, i) => (adv.blocked(p.x, p.y) ? `çıkış#${i}` : null)),
+    ...adv.COMPANION_STAND.map((p, i) => (adv.blocked(p.x, p.y) ? `duruş#${i}` : null))
+].filter(Boolean);
+check('macera: sağlıklıların çıkış ve duruş yerleri boş',
+    badCompanionSpots.length === 0, badCompanionSpots.join(','));
+
+// Ormanın ağzı boşluktan ÖNCE olmalı: yeşillenme ve vuruş şehir tarafında
+// geçiyor, dar koridorda değil.
+check('macera: ormanın ağzı boşluktan önce', adv.FOREST_MOUTH_X < adv.GAP.x0,
+    `${adv.FOREST_MOUTH_X} / ${adv.GAP.x0}`);
+
 // Mekan adının her harfi piksel yazı tipinde var mı?
 const advMissing = missingGlyphs(adv.LOCATION_NAME);
 check(`macera: "${adv.LOCATION_NAME}" yazısı çizilebiliyor`, advMissing.length === 0, advMissing.join(','));

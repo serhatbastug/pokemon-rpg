@@ -441,6 +441,94 @@ check('kol: nötrü gördükten sonra analog çalışıyor', fakeManager.stick()
 check('kol: ÜÇGEN standart eşlemede 3. tuş', BUTTONS.triangle === 3);
 check('kol: Çarpı standart eşlemede 0. tuş', BUTTONS.cross === 0);
 
+// ---- Sahne betiği (prolog) ----
+// Cutscene saf mantık: anlar sırayla geçmeli, kilit doğru anlarda açılmalı,
+// koşullu an sonsuza kadar takılmamalı.
+const { Cutscene, shakeOffset, flash } = await import('../src/adventure/cutscene.js');
+
+const log = [];
+const scene = new Cutscene([
+    { name: 'bekle', frames: 3, onEnter: () => log.push('bekle') },
+    { name: 'yuru', frames: 2, lock: false, onEnter: () => log.push('yuru') },
+    { name: 'ani', onEnter: () => log.push('ani') },        // süresiz: tek karede biter
+    { name: 'son', frames: 2, onEnter: () => log.push('son') }
+]).start();
+
+check('sahne: ilk an girişte başlıyor', scene.name === 'bekle' && log.length === 1);
+check('sahne: varsayılan olarak kontrol kilitli', scene.locked);
+for (let i = 0; i < 3; i++) scene.step();
+check('sahne: süre dolunca sonraki ana geçiyor', scene.name === 'yuru', String(scene.name));
+check('sahne: lock:false olan anda oyuncu hareket edebiliyor', !scene.locked);
+// 'ani' süresiz olduğu için 'yuru' bitince tek karede yutulup 'son'a geçilmeli
+for (let i = 0; i < 2; i++) scene.step();
+check('sahne: süresiz an tek karede yutuluyor', scene.name === 'son' && log.join(',') === 'bekle,yuru,ani,son',
+    log.join(','));
+for (let i = 0; i < 2; i++) scene.step();
+check('sahne: son andan sonra bitiyor', scene.finished && !scene.running);
+check('sahne: bittikten sonra kilit kalkıyor', !scene.locked);
+
+// Koşullu an: koşul gerçekleşince geçmeli
+const condState = { vardi: false };
+const condScene = new Cutscene([
+    { name: 'yuru', frames: 0, until: (s) => s.vardi },
+    { name: 'bitti', frames: 1 }
+], condState).start();
+for (let i = 0; i < 50; i++) condScene.step();
+check('sahne: koşul gerçekleşmeden koşullu anda bekliyor', condScene.name === 'yuru');
+condState.vardi = true;
+condScene.step();
+check('sahne: koşul gerçekleşince geçiyor', condScene.name === 'bitti', String(condScene.name));
+
+// Koşul hiç gerçekleşmezse süre üst sınırı devreye girmeli (sahne kilitlenmesin)
+const stuck = new Cutscene([
+    { name: 'bekle', frames: 5, until: () => false },
+    { name: 'bitti', frames: 1 }
+]).start();
+for (let i = 0; i < 5; i++) stuck.step();
+check('sahne: koşul gelmezse süre üst sınırı kurtarıyor', stuck.name === 'bitti', String(stuck.name));
+
+check('sahne: ilerleme 0..1 arasında', (() => {
+    const s = new Cutscene([{ name: 'a', frames: 4 }]).start();
+    if (s.progress !== 0) return false;
+    s.step(); s.step();
+    return s.progress === 0.5;
+})());
+
+check('sahne: sarsıntı sıfır güçte kaymıyor',
+    shakeOffset(17, 0).x === 0 && shakeOffset(17, 0).y === 0);
+check('sahne: sarsıntı sınırların içinde', (() => {
+    for (let f = 0; f < 200; f++) {
+        const o = shakeOffset(f, 6);
+        if (Math.abs(o.x) > 6 || Math.abs(o.y) > 4) return false;
+    }
+    return true;
+})());
+check('sahne: parlama uçlarda sönük, tepede parlak',
+    flash(0) === 0 && flash(1) === 0 && flash(0.12) > 0.99);
+
+// ---- Prologun insanları ----
+// Arkadaşın sprite'ında turuncu bant hikâyenin tek ipucu; bir duruşta bile
+// düşerse ipucu kırılır. Bu yüzden ızgara tutarlılığıyla birlikte test edilir.
+const { FRIEND_FRAMES } = await import('../src/adventure/people.js');
+
+const FRIEND_LETTERS = new Set(['k', 'h', 's', 'S', 'l', 'L', 'o', 'O', 'b', 'y', '.']);
+let friendGridOk = true;
+let friendLetterOk = true;
+const bandMissing = [];
+
+for (const [pose, frames] of Object.entries(FRIEND_FRAMES)) {
+    frames.forEach((frame, i) => {
+        if (frame.length !== 16) friendGridOk = false;
+        if (frame.some(row => row.length !== 12)) friendGridOk = false;
+        if (frame.some(row => [...row].some(ch => !FRIEND_LETTERS.has(ch)))) friendLetterOk = false;
+        if (!frame.some(row => row.includes('o'))) bandMissing.push(`${pose}[${i}]`);
+    });
+}
+
+check('arkadaş: bütün kareler 12x16 ızgarada', friendGridOk);
+check('arkadaş: tanımsız renk harfi yok', friendLetterOk);
+check('arkadaş: turuncu bant her duruşta görünüyor', bandMissing.length === 0, bandMissing.join(','));
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

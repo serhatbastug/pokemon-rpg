@@ -1,23 +1,26 @@
-// Macera modunun ilk sahnesi: şehrin kenarından ormanın girişine.
+// Macera modunun ilk sahnesi: harabe şehrin kenarından ormanın girişine.
 //
-// Solda bildiğimiz şehir (asfalt yol, kaldırım, binalar), sağda ağaç duvarı ve
-// duvarda antrenörün sığabileceği bir boşluk. Boşluktan geçilene kadar kamera
-// sabit durur; geçilince ekran antrenörle birlikte sağa kayar ve dar orman
-// koridoruna girilir. Ormana girişte mekan adı belirir.
+// Solda salgının geçtiği ölü şehir (terk edilmiş araçlar, çöken cepheler,
+// açık bir rögar), sağda ağaç duvarı ve duvarda antrenörün sığabileceği bir
+// boşluk. Boşluktan geçilene kadar kamera sabit durur; geçilince ekran
+// antrenörle birlikte sağa kayar ve dar orman koridoruna girilir. Ormana
+// girişte mekan adı belirir.
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { treeSpriteFor } from '../pixel/trees.js';
+import { hash } from '../pixel/pixelDraw.js';
 import {
     WORLD, VIEW, PX, START, PLAYER_SPEED, PLAYER_SCALE, LOCATION_NAME,
-    GAP, TREES, CITY, blocked, inForest
+    GAP, TREES, CITY, WRECKS, blocked, inForest
 } from './adventureLayout.js';
-import { bakeGround, lampSprite, drawLocationTitle } from './adventureArt.js';
+import { bakeGround, lampSprite, wreckSprite, witherCanvas, drawLocationTitle } from './adventureArt.js';
 
 const INTRO_FRAMES = 40;    // karanlıktan açılma (menüden kararmış geliyoruz)
 const TITLE_FRAMES = 230;   // mekan adının ekranda kalma süresi
 const TITLE_FADE = 34;
+const ASH_COUNT = 72;       // havada süzülen kül
 
 export class AdventureScene {
     constructor({ canvas, input, gamepad, onExit }) {
@@ -60,26 +63,48 @@ export class AdventureScene {
         const props = [];
         for (const tree of TREES) {
             const sprite = treeSpriteFor(tree);
+            // Şehre yakın ağaçlar kurumuş, ormandakiler canlı. Sınır keskin
+            // olmasın diye arada rastgele karışırlar.
+            const witherChance = (780 - tree.x) / 260 + 1;
+            const dead = hash(tree.x, tree.y, 331) < witherChance;
             props.push({
-                canvas: sprite.canvas,
+                canvas: dead ? witherCanvas(sprite.canvas) : sprite.canvas,
                 x: tree.x - sprite.ox,
                 y: tree.y - sprite.oy,
                 baseY: tree.y
             });
         }
-        // Sokak lambaları: üst kaldırımın kenarında durur
-        const lamp = lampSprite();
-        for (const lampX of CITY.lamps) {
+        // Sokak lambaları: üst kaldırımın kenarında, hepsi sönük. Bir kısmının
+        // kolu aşağı sarkmış (tek numaralı çeşit).
+        CITY.lamps.forEach((lampX, i) => {
+            const lamp = lampSprite(i % 2);
             props.push({
                 canvas: lamp.canvas,
                 x: lampX - lamp.ox,
                 y: CITY.topWalk.y + CITY.topWalk.h - 4 - lamp.oy,
                 baseY: CITY.topWalk.y + CITY.topWalk.h - 4
             });
+        });
+
+        // Yola bırakılmış araçlar: antrenör önlerinden ve arkalarından geçer
+        for (const wreck of WRECKS) {
+            const sprite = wreckSprite(wreck);
+            props.push({ canvas: sprite.canvas, x: sprite.x, y: sprite.y, baseY: sprite.baseY });
         }
 
         props.sort((a, b) => a.baseY - b.baseY);
         this.props = props;
+
+        // Havada süzülen kül: ekrana sabit, şehirden uzaklaştıkça seyrelir
+        this.ash = Array.from({ length: ASH_COUNT }, (_, i) => ({
+            x: hash(i, 0, 301) * VIEW.w,
+            y: hash(i, 1, 303) * VIEW.h,
+            vx: -0.10 - hash(i, 2, 307) * 0.22,
+            vy: 0.16 + hash(i, 3, 311) * 0.32,
+            size: hash(i, 4, 313) < 0.75 ? PX : PX * 2,
+            alpha: 0.16 + hash(i, 5, 317) * 0.30,
+            phase: hash(i, 6, 319) * Math.PI * 2
+        }));
     }
 
     start() {
@@ -97,7 +122,7 @@ export class AdventureScene {
         this.frame = 0;
         this.running = true;
         this.ctx.imageSmoothingEnabled = false;
-        playMusic('town');
+        playMusic('ruin');
 
         if (this.rafId) cancelAnimationFrame(this.rafId);
         const stepMs = 1000 / FRAME_RATE;
@@ -137,6 +162,22 @@ export class AdventureScene {
         this.movePlayer();
         this.checkForestEntry();
         this.updateCamera();
+        this.updateAsh();
+    }
+
+    // Kül sola-aşağı süzülür, ekranın dışına çıkınca karşı kenardan döner
+    updateAsh() {
+        for (const mote of this.ash) {
+            mote.x += mote.vx + Math.sin((this.frame + mote.phase * 40) * 0.03) * 0.18;
+            mote.y += mote.vy;
+            if (mote.y > VIEW.h) { mote.y = -PX * 2; mote.x = Math.random() * VIEW.w; }
+            if (mote.x < -PX * 2) mote.x = VIEW.w + PX;
+        }
+    }
+
+    // Şehirden uzaklaştıkça kül seyrelir: orman hâlâ temiz
+    get ashStrength() {
+        return Math.min(1, Math.max(0, 1 - (this.player.x - 640) / 760));
     }
 
     movePlayer() {
@@ -233,13 +274,30 @@ export class AdventureScene {
 
         ctx.restore();
 
-        // Ekrana sabit katman: mekan adı ve karanlıktan açılma perdesi
+        // Ekrana sabit katman: kül, mekan adı ve karanlıktan açılma perdesi
+        this.drawAsh();
         drawLocationTitle(ctx, LOCATION_NAME, this.titleAlpha, VIEW.w);
 
         if (this.intro > 0) {
             ctx.fillStyle = `rgba(2, 6, 23, ${this.intro / INTRO_FRAMES})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+    }
+
+    drawAsh() {
+        const strength = this.ashStrength;
+        if (strength <= 0.01) return;
+        const { ctx } = this;
+        ctx.fillStyle = '#c9c3b4';
+        for (const mote of this.ash) {
+            ctx.globalAlpha = mote.alpha * strength;
+            ctx.fillRect(
+                Math.round(mote.x / PX) * PX,
+                Math.round(mote.y / PX) * PX,
+                mote.size, mote.size
+            );
+        }
+        ctx.globalAlpha = 1;
     }
 
     drawProp(prop, left, right) {

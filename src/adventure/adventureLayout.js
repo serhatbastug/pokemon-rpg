@@ -50,6 +50,38 @@ export const CITY = {
 // Ağaç duvarında yalnızca burası açıktır; genişliği antrenörün sığacağı kadar.
 export const GAP = { x0: 900, x1: 1010, top: 300, bottom: 370 };
 
+// --- Harabe: yolu tıkayan enkaz ---
+// Şehir artık terk edilmiş. Yolda bırakılmış araçlar, çöken cephelerin
+// döküntüsü ve devrilmiş karantina bariyeri birer engeldir. Hiçbiri yolu
+// tamamen kapatmaz: her aracın üstünden ya da altından geçilebilir, yoksa
+// oyuncu şehirde sıkışır.
+export const WRECKS = [
+    { x: 120, y: 216, w: 128, h: 56, kind: 'sedan', tone: 0 },
+    { x: 430, y: 232, w: 148, h: 60, kind: 'van', tone: 1 },
+    { x: 648, y: 208, w: 132, h: 56, kind: 'burnt', tone: 2 }
+];
+
+// Cephelerden kaldırıma dökülen moloz
+export const RUBBLE = [
+    { x: 296, y: 160, w: 92, h: 32 },
+    { x: 556, y: 160, w: 72, h: 28 }
+];
+
+// Kanalizasyondan çıkılan açık rögar. Antrenör başlangıçta tam yanındadır:
+// oyuna, kapağı henüz itmiş gibi başlar. Delik engeldir, içine yürünmez.
+export const MANHOLE = { x: 688, y: 304, w: 44, h: 32 };
+
+// Devrilmiş karantina bariyeri: yaya geçidinin üstüne YATMIŞ, bu yüzden
+// kutusu geniş ve alçak. Asfaltın üstünde duruyor ki gri kaldırıma karışmasın.
+// Üstünden geçilmez, etrafından dolaşılır.
+export const BARRIER = { x: 300, y: 204, w: 112, h: 24 };
+
+export const OBSTACLES = [...WRECKS, ...RUBBLE, MANHOLE, BARRIER];
+
+function inObstacle(x, y) {
+    return OBSTACLES.some(o => x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h);
+}
+
 // --- Dar orman koridoru ---
 // Yürünebilir bant x boyunca kıvrılır ama hep dardır. Koridor bilerek ekranın
 // üst yarısında: ağaç tacı gövde dibinden YUKARI doğru uzadığı için, koridorun
@@ -74,6 +106,7 @@ export function corridorAt(x) {
 // Tek bir noktanın yürünebilirliği. Sahnenin bütün çarpışma mantığı budur.
 export function walkableAt(x, y) {
     if (x < 12 || x > WORLD.w - 12 || y < 0 || y > WORLD.h) return false;
+    if (inObstacle(x, y)) return false;
 
     if (x < GAP.x0) return y >= CITY.walk.top && y <= CITY.walk.bottom;
     if (x < FOREST.x0) return y >= GAP.top && y <= GAP.bottom;

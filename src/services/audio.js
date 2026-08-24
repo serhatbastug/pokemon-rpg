@@ -167,7 +167,9 @@ const TRACKS = {
     forest: { root: 196, scale: [0, 3, 5, 7, 10], tempo: 300, wave: 'triangle' },
     shadow: { root: 147, scale: [0, 2, 3, 7, 8], tempo: 360, wave: 'triangle' },
     boss: { root: 110, scale: [0, 1, 5, 6, 7], tempo: 200, wave: 'square' },
-    town: { root: 262, scale: [0, 4, 7, 9, 11], tempo: 330, wave: 'triangle' }
+    town: { root: 262, scale: [0, 4, 7, 9, 11], tempo: 330, wave: 'triangle' },
+    // Harabe şehir: ağır, boşluklu, uyumsuz. Notalar arası uzun sessizlik.
+    ruin: { root: 131, scale: [0, 1, 5, 6, 8], tempo: 620, wave: 'triangle' }
 };
 
 export function playMusic(name) {

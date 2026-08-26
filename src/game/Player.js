@@ -1,9 +1,9 @@
 import { castAbility } from './abilities.js';
-import { PHYSICS, PLAYER_SIZE } from '../config/settings.js';
+import { PHYSICS, PLAYER_SIZE, PAD_JUMP_BUTTON } from '../config/settings.js';
 
 // Arenadaki bir oyuncu: hareket, fizik, can, kalkan, durum etkileri ve yetenekler.
 export class Player {
-    constructor({ x, y, char, playerNum, color, controls, game }) {
+    constructor({ x, y, char, playerNum, color, controls, padSlot = null, game }) {
         this.x = x;
         this.y = y;
         this.width = PLAYER_SIZE.width;
@@ -12,6 +12,7 @@ export class Player {
         this.playerNum = playerNum;
         this.color = color;
         this.controls = controls;
+        this.padSlot = padSlot;   // bu oyuncunun kolu (yoksa klavye)
         this.game = game;
 
         this.maxHp = char.baseStats.hp;
@@ -69,24 +70,44 @@ export class Player {
         ctx.restore();
     }
 
+    // Bu oyuncunun kolunun sol analogu. Kolu yoksa nötr döner.
+    padStick() {
+        if (this.padSlot === null) return { x: 0, y: 0, magnitude: 0 };
+        return this.game.gamepad?.stickAt(this.padSlot) || { x: 0, y: 0, magnitude: 0 };
+    }
+
+    // Bu oyuncunun kolunda bir tuş basılı mı
+    padDown(button) {
+        if (this.padSlot === null) return false;
+        return !!this.game.gamepad?.isDownAt(this.padSlot, button);
+    }
+
     move() {
         if (this.frozen) return;
 
         const { input, canvas } = this.game;
         const moveSpeed = this.speed * this.speedMultiplier;
 
-        // Yatay hareket
-        if (input.isDown(this.controls.left)) {
-            this.x = Math.max(this.width/2, this.x - moveSpeed);
-        }
-        if (input.isDown(this.controls.right)) {
-            this.x = Math.min(canvas.width - this.width/2, this.x + moveSpeed);
+        // Yatay hareket: klavye tuşları ile kolun sol analogu aynı işi görür.
+        // Klavyede iki yön birden basılıysa birbirini götürür (eskisi gibi);
+        // kolda analog yarım itilirse karakter daha yavaş yürür.
+        let dx = 0;
+        if (input.isDown(this.controls.left)) dx -= 1;
+        if (input.isDown(this.controls.right)) dx += 1;
+        if (dx === 0) dx = this.padStick().x;
+
+        if (dx !== 0) {
+            this.x = Math.min(
+                canvas.width - this.width/2,
+                Math.max(this.width/2, this.x + dx * moveSpeed)
+            );
         }
 
         // Yerçekimi ve zıplama fiziği (uçmayı engeller)
         const groundY = canvas.height - this.height/2 - PHYSICS.groundOffset;
 
-        if (input.isDown(this.controls.up) && this.y >= groundY) {
+        const jumping = input.isDown(this.controls.up) || this.padDown(PAD_JUMP_BUTTON);
+        if (jumping && this.y >= groundY) {
             this.vy = PHYSICS.jumpVelocity;
         }
 

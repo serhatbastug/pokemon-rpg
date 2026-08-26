@@ -22,6 +22,8 @@ import { drawTrainer } from '../world/trainerSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { newCanvas, PX } from '../pixel/pixelDraw.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
+import { drawControlHint } from '../pixel/controlHint.js';
+import { ControlHint } from '../config/controls.js';
 import { Cutscene, shakeOffset } from './cutscene.js';
 import { drawFriend, drawSurvivor } from './people.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
@@ -61,6 +63,10 @@ export class SiegeScene {
 
         this.running = false;
         this.frame = 0;
+
+        // Oyunun ilk silah anı burada: virüslüler avluya sızmaya başlayınca
+        // ekranın üstünde "[KARE] İLE ATEŞ ET" beliriyor.
+        this.hint = new ControlHint();
 
         // Dublaj yok: balon harf harf yazilir, her harfte kisa bir "bit" cikar
         this.dialogue = new Dialogue({
@@ -212,6 +218,7 @@ export class SiegeScene {
             leg: 0,                    // tahliye yolunda kacinci ara nokta
             state: 'bekliyor'          // bekliyor -> sirada -> geciyor -> gecti
         }));
+        this.hint = new ControlHint();
         this.bullets = [];
         this.splats = [];
         this.bursts = [];
@@ -274,6 +281,8 @@ export class SiegeScene {
 
         this.gamepad?.poll();
         this.dialogue.step();
+        this.hint.step();
+        this.updateHint();
         if (!this.script.locked) this.movePlayer();
         this.updateBullets();
         this.updateIntruders();
@@ -386,10 +395,21 @@ export class SiegeScene {
         else player.dir = dx < 0 ? 'left' : 'right';
     }
 
+    // Silahı ilk kez burada kullanıyoruz. Öğretme, virüslüler tel örgüden
+    // içeri BİRAZ İLERLEYİNCE çıkıyor: kapıda beliren bir yazı henüz tehdit
+    // görünmeden okunuyor ve boşa gidiyor.
+    updateHint() {
+        if (!this.state.evacuating) return;
+        if (this.intruders.some(intruder => intruder.y < FENCE.y - 70)) {
+            this.hint.show('fire');
+        }
+    }
+
     // --- Silah ---
     fire() {
         if (!this.running || this.script.locked || this.cooldown > 0) return;
         this.cooldown = FIRE_COOLDOWN;
+        this.hint.dismiss('fire');
 
         const dir = this.player.dir;
         const vx = dir === 'left' ? -BULLET_SPEED : dir === 'right' ? BULLET_SPEED : 0;
@@ -509,6 +529,7 @@ export class SiegeScene {
         ctx.drawImage(this.buffer, clamp(shake.x, -12, 12), clamp(shake.y, -12, 12));
 
         drawLocationTitle(ctx, LOCATION_NAME, this.titleAlpha, VIEW.w);
+        drawControlHint(ctx, this.hint, VIEW.w);
 
         const dark = this.script.name === 'giris' ? 1 - this.script.progress : s.fadeOut;
         if (dark > 0) {

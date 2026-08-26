@@ -1,7 +1,12 @@
 // Karakter seçim ekranı: kart ızgarası, detay modalı ve P1/P2 seçim sırası.
+//
+// Ekran fareyle de kolla da kullanılabiliyor. Kol imleci ayrı bir yol açmıyor:
+// odaklı kartın click()'i çağrılıyor, yani kol da farenin gittiği yerden
+// gidiyor - iki ayrı seçim mantığı olsa biri diğerinden sapardı.
 export class CharacterSelect {
     constructor() {
         this.selectionTurn = 1; // 1 = P1 seçiyor, 2 = P2 seçiyor
+        this.focusIndex = -1;   // kol imleci (-1 = imleç yok)
         this.player1Selected = null;
         this.player2Selected = null;
 
@@ -110,6 +115,10 @@ export class CharacterSelect {
             this.startBtn.classList.remove('not-ready');
             const hint = document.getElementById('mode-hint');
             if (hint) hint.textContent = 'Her iki oyuncu da hazır — 2 kişilik oyna!';
+
+            // Düğme ızgaranın yukarısında kalıyor: aşağıdan karakter seçen
+            // oyuncu onu görmüyordu, elle kaydırmak zorundaydı.
+            this.startBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         this.closeModal();
@@ -118,6 +127,71 @@ export class CharacterSelect {
     closeModal() {
         this.overlay.classList.add('hidden');
         this.overlay.classList.remove('active');
+    }
+
+    // ---- Kol imleci ----
+
+    get cards() {
+        return [...this.grid.querySelectorAll('.char-card')];
+    }
+
+    get modalOpen() {
+        return !this.overlay.classList.contains('hidden');
+    }
+
+    focusCard(index) {
+        const cards = this.cards;
+        if (cards.length === 0) return;
+
+        const i = Math.max(0, Math.min(cards.length - 1, index));
+        for (const card of cards) card.classList.remove('pad-focus');
+        cards[i].classList.add('pad-focus');
+        cards[i].scrollIntoView({ block: 'nearest' });
+        this.focusIndex = i;
+    }
+
+    clearFocus() {
+        for (const card of this.cards) card.classList.remove('pad-focus');
+        this.focusIndex = -1;
+    }
+
+    // Izgaranın sütun sayısı ekran genişliğine göre değişiyor (CSS auto-fill),
+    // bu yüzden sabit bir sayı yazılamaz: ilk satırda kaç kart varsa o kadar.
+    columnCount() {
+        const cards = this.cards;
+        if (cards.length < 2) return 1;
+
+        const firstTop = cards[0].offsetTop;
+        let columns = 0;
+        while (columns < cards.length && cards[columns].offsetTop === firstTop) columns++;
+        return Math.max(1, columns);
+    }
+
+    // dx/dy: -1, 0, +1. Izgaranın kenarında imleç takılı kalır (başa sarmaz -
+    // sarsaydı aşağı basan oyuncu kendini listenin tepesinde bulurdu).
+    moveFocus(dx, dy) {
+        const cards = this.cards;
+        if (cards.length === 0) return;
+        if (this.focusIndex < 0) {
+            this.focusCard(0);
+            return;
+        }
+
+        const next = this.focusIndex + dx + dy * this.columnCount();
+        if (next < 0 || next >= cards.length) return;
+        this.focusCard(next);
+    }
+
+    // İmleçteki kartın detayını açar (farenin tıkladığı yolun aynısı)
+    openFocused() {
+        const card = this.cards[this.focusIndex];
+        if (card) card.click();
+        else this.focusCard(0);
+    }
+
+    // Detay penceresindeki "Oyuncu N Olarak Seç" düğmesine basar
+    confirmModal() {
+        this.overlay.querySelector('.select-hero-btn')?.click();
     }
 
     getSelection() {

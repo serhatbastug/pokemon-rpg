@@ -33,6 +33,23 @@ export const SIEGE_CALL = [
     { speaker: 'biz', text: 'HEY nereye gidiyors-' }
 ];
 
+// --- Kanalizasyon (prolog 3 ile 4 arasında) ---
+
+// Rögardan indik, koşu başlıyor
+export const SEWER_START = [
+    { speaker: 'saglikli-2', text: 'Bu tünel şehrin kenarına çıkıyor, sakın durmayın!' }
+];
+
+// Koşu sürerken
+export const SEWER_RUN = [
+    { speaker: 'biz', text: 'Arkamızdalar. Önünüze bakın ve koşun.' }
+];
+
+// Çıkış bacası göründüğünde
+export const SEWER_EXIT = [
+    { speaker: 'saglikli-1', text: 'Merdiven şurada, yukarı çıkıyoruz.' }
+];
+
 // --- Prolog 4: şehrin kenarı ---
 
 // Rögar kapağından çıkınca

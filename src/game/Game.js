@@ -1,15 +1,20 @@
 import { Player } from './Player.js';
 import { EffectsManager } from './effects.js';
 import { randomArena } from './arenas.js';
-import { PLAYERS, SCROLL_KEYS, FRAME_RATE } from '../config/settings.js';
+import { PLAYERS, SCROLL_KEYS, FRAME_RATE, PAD_ABILITY_BUTTONS } from '../config/settings.js';
 
 // Oyun motoru: oyun döngüsü, çarpışmalar ve tur durumu.
 // UI (ekran geçişleri) main.js'te; HUD güncellemeleri Hud sınıfında.
+//
+// Kontroller: her oyuncu ya klavyeden ya da kendi oyun kolundan oynar - ikisi
+// de her zaman açık. 1. oyuncu takılan ilk kolu, 2. oyuncu ikinciyi kullanır;
+// tek kol varsa 2. oyuncu klavyede kalır.
 export class Game {
-    constructor({ canvas, input, hud, onGameOver }) {
+    constructor({ canvas, input, gamepad = null, hud, onGameOver }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.input = input;
+        this.gamepad = gamepad;
         this.hud = hud;
         this.onGameOver = onGameOver;
 
@@ -22,6 +27,7 @@ export class Game {
         this.isGameOver = false;
 
         input.onKeyDown(e => this.handleKeyDown(e));
+        gamepad?.onSlotButtonDown((slot, button) => this.handlePadButton(slot, button));
     }
 
     get isRunning() {
@@ -44,6 +50,24 @@ export class Game {
         if (e.code !== 'Comma' && e.key === ',') this.p2.useAbility(1);
     }
 
+    // Kolda güç tuşuna basıldı. Hangi oyuncunun gücü olduğunu KOLUN YUVASI
+    // belirliyor: 0. yuva 1. oyuncunun, 1. yuva 2. oyuncunun.
+    handlePadButton(slot, button) {
+        if (!this.isRunning) return;
+
+        const index = PAD_ABILITY_BUTTONS[button];
+        if (index === undefined) return;
+
+        const player = this.playerByPadSlot(slot);
+        player?.useAbility(index);
+    }
+
+    playerByPadSlot(slot) {
+        if (this.p1?.padSlot === slot) return this.p1;
+        if (this.p2?.padSlot === slot) return this.p2;
+        return null;
+    }
+
     start(char1, char2) {
         this.isGameOver = false;
         this.projectiles = [];
@@ -56,6 +80,7 @@ export class Game {
             playerNum: 1,
             color: PLAYERS[1].color,
             controls: PLAYERS[1].moveKeys,
+            padSlot: PLAYERS[1].padSlot,
             game: this
         });
         this.p2 = new Player({
@@ -64,11 +89,13 @@ export class Game {
             playerNum: 2,
             color: PLAYERS[2].color,
             controls: PLAYERS[2].moveKeys,
+            padSlot: PLAYERS[2].padSlot,
             game: this
         });
 
         this.hud.setPlayers(this.p1, this.p2);
         this.hud.updateHealth(this.p1, this.p2);
+        this.hud.updateControlBadges(this.gamepad?.padCount || 0);
 
         // Piksel sanatı modu
         this.ctx.imageSmoothingEnabled = false;
@@ -82,6 +109,10 @@ export class Game {
         const loop = (now) => {
             if (this.isGameOver) return;
             this.rafId = requestAnimationFrame(loop);
+
+            // Kolların taranması kare başına bir kez: mantık geriden gelip
+            // birkaç adım birden koşsa da aynı basış iki kez sayılmasın.
+            this.gamepad?.poll();
 
             acc += Math.min(now - last, stepMs * 3);
             last = now;
@@ -139,6 +170,9 @@ export class Game {
         effects.drawFlash(ctx, canvas.width, canvas.height);
 
         this.hud.updateCooldowns(this.p1, this.p2);
+        // Kol tarayıcıya ancak bir tuşuna basılınca görünüyor; savaş başladıktan
+        // sonra uyanan kol da HUD'daki simgeleri değiştirebilmeli.
+        this.hud.updateControlBadges(this.gamepad?.padCount || 0);
     }
 
     updateProjectiles() {

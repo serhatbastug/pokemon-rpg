@@ -197,6 +197,27 @@ body.battle-active {
     transform: scaleX(1);
 }
 
+/* Kol imleci: fare yokken hangi kartın üzerinde olunduğu görünmeli.
+   :hover ile aynı kalkışı kullanıyor ki iki girdi aynı hissi versin. */
+.char-card.pad-focus {
+    transform: translateY(-5px);
+    border-color: var(--class-color);
+    box-shadow: 0 0 0 3px var(--class-color), 0 10px 25px rgba(0, 0, 0, 0.45);
+}
+
+.char-card.pad-focus::before {
+    transform: scaleX(1);
+}
+
+/* Kol takılıyken beliren öğretme satırı (seçim ekranı ve savaş sonu) */
+.pad-hint {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.6rem;
+    margin-bottom: 1.4rem;
+}
+
 /* Selected Character State */
 .char-card.selected-p1 {
     border-color: #3b82f6;
@@ -458,6 +479,26 @@ body.battle-active {
     padding: 0.1rem 0.25rem;
     border-radius: 3px;
     color: var(--text-secondary);
+}
+
+/* Oyun koluyla oynayan oyuncunun kapağı: KARE/ÜÇGEN/YUVARLAK simgesi.
+   Tuş adından kısa olduğu için biraz daha büyük ve daha okunur çiziliyor. */
+.key-badge.pad-badge {
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    line-height: 1;
+    padding: 0;
+    background: none;
+}
+
+/* L1 / R1 bir şekil değil yazı: aynı punto kutuya sığmıyor */
+.key-badge.pad-badge-text {
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
 }
 
 .cd-overlay {

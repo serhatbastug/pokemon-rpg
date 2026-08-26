@@ -36,6 +36,12 @@
             <canvas id="siegeCanvas" width="1000" height="560"></canvas>
         </section>
 
+        <!-- Kanalizasyon: prolog 3 ile 4 arasindaki otomatik kosu bolumu.
+             Rogardan inilir, sehrin kenarindaki bacadan cikilir. -->
+        <section id="sewer-screen" class="screen menu-screen hidden">
+            <canvas id="sewerCanvas" width="1000" height="560"></canvas>
+        </section>
+
         <!-- Header -->
         <header class="main-header hidden" id="main-header">
             <h1 class="game-title">POKÉ<span>RPG</span></h1>
@@ -55,6 +61,8 @@
                 <button id="start-battle-btn" class="start-battle-btn not-ready">2 KİŞİLİK OYNA</button>
             </div>
             <p id="mode-hint" class="mode-hint">Aşağıdan iki karakter seçin (P1 ve P2).</p>
+            <!-- Kol takılıyken beliren öğretme (metni padMenu.js yazar) -->
+            <p id="pad-hint" class="mode-hint pad-hint hidden"></p>
             <h2 class="section-title">Karakterinizi Seçin</h2>
             <div id="character-grid" class="character-grid">
                 <div class="loading-spinner">Pokemonlar çağrılıyor...</div>
@@ -181,6 +189,7 @@
                 <h2 class="gameover-title">SAVAŞ BİTTİ</h2>
                 <div id="winner-announcement" class="winner-announcement">Oyuncu 1 Kazandı!</div>
                 <button id="restart-btn" class="restart-btn">YENİDEN OYNA</button>
+                <p id="gameover-pad-hint" class="pad-hint hidden">Kolda <strong>ÇARPI</strong> ile yeniden oyna</p>
             </div>
         </section>
     </main>

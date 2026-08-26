@@ -1,6 +1,7 @@
 # PokeRPG — Gerçek Zamanlı Arena PvP
 
-2 kişilik, aynı klavyede oynanan gerçek zamanlı Pokemon arena savaş oyunu.
+2 kişilik, aynı ekranda oynanan gerçek zamanlı Pokemon arena savaş oyunu
+(klavyede ya da her oyuncu kendi PS5 koluyla).
 Saf HTML/CSS/JavaScript (ES modülleri) ile yazılmıştır; derleme adımı yoktur.
 Karakter verileri [PokeAPI](https://pokeapi.co)'den çekilir.
 
@@ -20,8 +21,8 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (369 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü ve macera sahnesi yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (89 test): ana menü sahnesi, macera sahnesi (kamera, orman girişi), oyun kolu, ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run check` | Veri ve saf mantık testleri (477 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü ve macera sahnesi yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (124 test): ana menü sahnesi, macera sahnesi (kamera, orman girişi), oyun kolu, ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -68,6 +69,9 @@ ipucundaki **F** simgesi yerine **üçgen** görünür. Eşleme `src/core/gamepa
 içinde; ham kol verisini yöne çeviren `readPad` saf fonksiyon olduğu için
 `npm run check` içinde test edilir.
 
+Menü ve prolog sahneleri tek kolla oynanır (ilk kol). İki kişilik arenada ise
+**her oyuncunun kendi kolu** vardır - [Kontroller](#kontroller) bölümüne bakın.
+
 ## Macera Modu — İlk Sahne (`src/adventure/`)
 
 Şehrin kenarından ormanın girişine. Dünya ekrandan geniştir (2400x560), kamera
@@ -96,12 +100,47 @@ altında yalnızca alçak bitki örtüsü vardır (`adventureLayout.js`).
 
 ## Kontroller
 
-| | Oyuncu 1 | Oyuncu 2 |
-|---|---|---|
-| Hareket | W A S D | Yön tuşları |
-| Yetenek 1 | F | Sağ Shift |
-| Yetenek 2 | Sol Shift | , (virgül) |
-| Yetenek 3 (Ulti) | Space | Enter |
+| | Oyuncu 1 | Oyuncu 2 | Kol (her ikisi) |
+|---|---|---|---|
+| Hareket | W A S D | Yön tuşları | Sol analog / D-pad |
+| Zıplama | W | Yukarı ok | **ÇARPI** |
+| Yetenek 1 | F | Sağ Shift | **KARE** |
+| Yetenek 2 | Sol Shift | , (virgül) | **L1** |
+| Yetenek 3 (Ulti) | Space | Enter | **R1** |
+
+Güçler omuz tuşlarında: zıplarken (ÇARPI) aynı anda güç basmak gerekiyor,
+ikisi de sağ başparmakta olsaydı çakışırdı.
+
+**İki kişilik arena, iki kolla:** her oyuncunun kendi DualSense'i olur.
+Takılan **ilk kol 1. oyuncuyu**, ikinci kol 2. oyuncuyu oynatır (kol sırası
+tarayıcının verdiği numaraya göre). Tek kol takılıysa 2. oyuncu klavyede
+kalır; klavye her zaman açık, kol takılıyken bile çalışır. Kolla oynayan
+oyuncunun HUD'undaki tuş kapaklarında Shift/Space yerine **□ L1 R1** görünür.
+
+Her kol ayrı bir *yuvada* takip edilir (`PadSlot`), yoksa iki kolun basılı
+tuşları birbirine karışırdı: 2. kolun KARE'si yalnızca 2. oyuncunun gücünü
+çalıştırır.
+
+**Menüler de kolla:** karakter seçimi ve "SAVAŞ BİTTİ" penceresi fare
+istemez (`src/ui/padMenu.js`):
+
+| | Kol |
+|---|---|
+| Kartlar arasında gez | Sol analog / D-pad |
+| Sayfayı kaydır | **Sağ analog** |
+| Karakteri aç, sonra seç | **ÇARPI** |
+| Pencereyi kapat / ana menü | **DAİRE** |
+| Savaşı başlat | **ÜÇGEN** |
+| Savaş sonu: yeniden oyna | **ÇARPI** |
+
+İki seçim de bitince "2 KİŞİLİK OYNA" düğmesi kendiliğinden ekrana kaydırılır -
+düğme ızgaranın yukarısında kalıyor, aşağıdan seçen oyuncu onu görmüyordu.
+
+Sırası gelen oyuncu kendi koluyla seçer (1. oyuncu ilk kolla, 2. oyuncu
+ikinciyle); o oyuncunun kolu yoksa hangi kol iterse imleç onunla gezer. Bu iki
+ekranda çizen bir sahne olmadığı için kolu tarayan da yoktur - `PadMenu` kendi
+küçük döngüsünü açar ve yalnızca bu ekranlar açıkken çalışır. Tuşlar gerçek
+düğmelerin `click()`'ini çağırır, yani kol farenin gittiği yerden gider.
 
 **Macera modu:** WASD hareket · K O Ş L P yetenek · **Space zıpla** · **Shift atıl** ·
 1-6 poke top fırlat/geri çağır · N Pokeball · F saha hamlesi / dükkan · E kütüphane
@@ -172,6 +211,7 @@ src/
     adventureArt.js     Asfalt, kaldırım, binalar, çit, patika, mekan adı kartı
   ui/
     characterSelect.js  Karakter seçim ekranı ve detay modalı
+    padMenu.js          Seçim ekranı ve savaş sonu penceresinde kolla gezinme
     startPrompt.js      Macera kapısının piksel onay penceresi
     library.js          Pokemon kütüphanesi (ekip, koleksiyon, jeton harcama)
     shop.js             Kecleon dükkanı ve çanta

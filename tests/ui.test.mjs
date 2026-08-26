@@ -112,8 +112,11 @@ async function main() {
     await page.goto(BASE_URL, { waitUntil: 'networkidle2' });
     check('Sayfa yuklendi', await page.title() === 'PokeRPG - Real-time Arena PvP', await page.title());
 
-    // Karakter kartları PokeAPI'den gelir
+    // Karakter kartları PokeAPI'den tek tek gelir: ilk kart göründü diye
+    // saymak erken - hepsi gelene kadar (ya da süre dolana kadar) beklenir
     await page.waitForSelector('.char-card', { timeout: 20000 });
+    await page.waitForFunction(() => document.querySelectorAll('.char-card').length === 9,
+        { timeout: 20000 }).catch(() => {});
     const cardCount = await page.$$eval('.char-card', els => els.length);
     check('9 karakter karti yuklendi', cardCount === 9, `${cardCount} kart`);
 
@@ -265,21 +268,134 @@ async function main() {
     check('Kolun cekilip cekilmedigi gosterilmiyor', closing.leverPulled === 0);
     await shot('00d3-kararma');
 
-    // Kararma bitince prolog 4 (şehrin kenarı) açılıyor
+    // --- Kanalizasyon: prolog 3 ile 4 arasindaki otomatik kosu ---
+    // Kararma bitince rogardan asagi iniliyor.
     await page.evaluate(() => {
         const s = window.__siege;
         for (let i = 0; i < 400 && s.running && s.script.running; i++) s.step();
+    });
+    await page.waitForFunction(() => window.__sewer && window.__sewer.running, { timeout: 8000 });
+    await wait(500);
+    const sewerOpen = await page.evaluate(() => ({
+        screen: !document.getElementById('sewer-screen').classList.contains('hidden'),
+        siegeStopped: !window.__siege.running,
+        runners: window.__sewer.runners.length,
+        lane: window.__sewer.player.lane
+    }));
+    check('Kararmadan sonra kanalizasyon aciliyor',
+        sewerOpen.screen && sewerOpen.siegeStopped, JSON.stringify(sewerOpen));
+    check('Kanalizasyonda onumuzde bes saglikli kosuyor', sewerOpen.runners === 5);
+
+    // Otomatik kosu: hicbir tusa dokunmadan ilerliyoruz
+    const autoRun = await page.evaluate(() => {
+        const s = window.__sewer;
+        const before = s.travelled;
+        for (let i = 0; i < 120; i++) s.step();
+        return { before, after: s.travelled };
+    });
+    check('Kosu tusa dokunmadan kendiliginden ilerliyor',
+        autoRun.after > autoRun.before + 300, JSON.stringify(autoRun));
+
+    // Geri gitme yok: S / analog geri hicbir sey yapmiyor
+    const noBack = await page.evaluate(() => {
+        const s = window.__sewer;
+        const real = s.input.isDown.bind(s.input);
+        s.input.isDown = (c) => c === 'KeyS' || c === 'ArrowDown' || real(c);
+        const before = s.travelled;
+        for (let i = 0; i < 60; i++) s.step();
+        s.input.isDown = real;
+        return { moved: s.travelled - before };
+    });
+    check('Geri tusu koseyi geri almiyor', noBack.moved > 200, JSON.stringify(noBack));
+
+    // D bir TAM serit degistiriyor
+    const laneMove = await page.evaluate(() => {
+        const s = window.__sewer;
+        const before = s.player.lane;
+        s.changeLane(1);
+        for (let i = 0; i < 20; i++) s.step();
+        return { before, after: s.player.lane, x: Math.round(s.player.x) };
+    });
+    check('Serit degistirme tam bir serit atiyor',
+        laneMove.after === laneMove.before + 1, JSON.stringify(laneMove));
+
+    // Ziplama ve kayma: gercek fizik
+    const jumped = await page.evaluate(() => {
+        const s = window.__sewer;
+        s.jump();
+        let peak = 0;
+        for (let i = 0; i < 60; i++) { s.step(); peak = Math.max(peak, s.player.height); }
+        return { peak: Math.round(peak), landed: s.player.height };
+    });
+    check('Ziplama yayi tepe yapip yere iniyor',
+        jumped.peak > 90 && jumped.landed === 0, JSON.stringify(jumped));
+
+    const slid = await page.evaluate(() => {
+        const s = window.__sewer;
+        s.slide();
+        s.step();
+        const during = s.player.pose;
+        for (let i = 0; i < 60; i++) s.step();
+        return { during, after: s.player.pose };
+    });
+    check('Kayma duruse geciyor ve sonra kosuya donuyor',
+        slid.during === 'kay' && slid.after === 'kosu', JSON.stringify(slid));
+
+    // Ogretmeler: ilk tas yaklasirken ZIPLA yazisi cikiyor
+    const hintShown = await page.evaluate(() => {
+        const s = window.__sewer;
+        // Yukaridaki adimlar parkurda ilerledigi icin ucu de gosterilmis
+        // olabiliyor; ogretme bir kez gosterildigini kendi tutuyor. Temiz bir
+        // sayacla ilk tasin oncesine donuluyor.
+        s.hint = new s.hint.constructor();
+        s.travelled = s.hintZ.jump - 400;
+        s.updateHints();
+        s.hint.step();
+        s.draw();
+        return { action: s.hint.action, visible: s.hint.visible };
+    });
+    check('Ilk tastan once ZIPLA ogretmesi cikiyor',
+        hintShown.action === 'jump' && hintShown.visible, JSON.stringify(hintShown));
+    await shot('00d4-kanalizasyon');
+
+    // Carpisma tokezletiyor ama oldurmuyor
+    const stumbled = await page.evaluate(() => {
+        const s = window.__sewer;
+        s.state.stumble = 0;
+        const obstacle = s.obstacles.filter(o => o.type === 'enkaz').pop();
+        obstacle.hit = false;
+        const before = s.state.crashes;
+        s.travelled = obstacle.z - 90;                 // engel tam onumuzde
+        s.player.lane = obstacle.lane;
+        s.player.x = s.player.toX = s.player.fromX = [-160, 0, 160][obstacle.lane];
+        s.player.pose = 'kosu';
+        s.player.height = 0;
+        s.checkHits();
+        return { stumble: s.state.stumble, gained: s.state.crashes - before, running: s.running };
+    });
+    check('Engele carpinca tokezliyoruz ama sahne surmeye devam ediyor',
+        stumbled.stumble > 0 && stumbled.gained === 1 && stumbled.running,
+        JSON.stringify(stumbled));
+
+    // Sonuna kadar kos: cikis bacasindan prolog 4 aciliyor
+    await page.evaluate(() => {
+        const s = window.__sewer;
+        s.state.stumble = 0;
+        for (let i = 0; i < 4000 && s.running && s.script.running; i++) {
+            if (s.script.name === 'kosu') s.travelled = Math.max(s.travelled, 11000);
+            s.step();
+        }
     });
     await page.waitForFunction(() => window.__adventure && window.__adventure.running, { timeout: 8000 });
     await wait(700);
     const advOpen = await page.evaluate(() => ({
         screen: !document.getElementById('adventure-screen').classList.contains('hidden'),
-        siegeStopped: !window.__siege.running,
+        sewerStopped: !window.__sewer.running,
         camera: Math.round(window.__adventure.camera.x),
         following: window.__adventure.cameraFollowing
     }));
-    check('Kararmadan sonra prolog 4 (sehrin kenari) aciliyor',
-        advOpen.screen && advOpen.siegeStopped && advOpen.camera === 0 && !advOpen.following,
+    check('Kanalizasyondan cikinca prolog 4 (sehrin kenari) aciliyor',
+        advOpen.screen && advOpen.sewerStopped && advOpen.camera === 0 && !advOpen.following,
         JSON.stringify(advOpen));
     await shot('00e-sehir-kenari');
 
@@ -469,7 +585,49 @@ async function main() {
     check('Portaldan gecince karakter secimi aciliyor', menuClosed);
     await shot('01-secim-ekrani');
 
-    // --- İki kişilik mod: seçim akışı ---
+    // --- Karakter seçimi kolla: imleç, ÇARPI ile aç, DAİRE ile kapat ---
+    await page.waitForFunction(() => document.querySelectorAll('.char-card').length > 2, { timeout: 20000 });
+    await wait(200);
+    const padHintOn = await page.evaluate(() => ({
+        hint: !document.getElementById('pad-hint').classList.contains('hidden'),
+        focus: window.__characterSelect.focusIndex
+    }));
+    check('Kol takiliyken secim ekraninda kol ogretmesi ve imlec var',
+        padHintOn.hint && padHintOn.focus === 0, JSON.stringify(padHintOn));
+
+    await page.evaluate(() => { window.__fakePad.axes[0] = 1; });
+    await wait(250);
+    await page.evaluate(() => { window.__fakePad.axes[0] = 0; });
+    const focusMoved = await page.evaluate(() => window.__characterSelect.focusIndex);
+    check('Sol analog imleci yanindaki karta tasiyor', focusMoved === 1, `index ${focusMoved}`);
+    await shot('01b-secim-kol-imleci');
+
+    await page.evaluate(() => { window.__fakePad.buttons[0].pressed = true; });
+    await wait(200);
+    await page.evaluate(() => { window.__fakePad.buttons[0].pressed = false; });
+    check('CARPI imlecteki karakterin detayini aciyor',
+        await page.evaluate(() => window.__characterSelect.modalOpen));
+
+    await page.evaluate(() => { window.__fakePad.buttons[1].pressed = true; });
+    await wait(200);
+    await page.evaluate(() => { window.__fakePad.buttons[1].pressed = false; });
+    check('DAIRE detay penceresini kapatiyor',
+        await page.evaluate(() => !window.__characterSelect.modalOpen));
+
+    // Sağ analog sayfayı kaydırır (ızgara ekrandan uzun)
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => { window.__fakePad.axes[3] = 1; });
+    await wait(400);
+    const scrolledDown = await page.evaluate(() => window.scrollY);
+    await page.evaluate(() => { window.__fakePad.axes[3] = -1; });
+    await wait(500);
+    const scrolledUp = await page.evaluate(() => window.scrollY);
+    await page.evaluate(() => { window.__fakePad.axes[3] = 0; });
+    check('Sag analog sayfayi kaydiriyor',
+        scrolledDown > 100 && scrolledUp < scrolledDown,
+        `asagi ${Math.round(scrolledDown)}px, sonra ${Math.round(scrolledUp)}px`);
+
+    // --- İki kişilik mod: seçim akışı (P1 fareyle, P2 kolla onaylanır) ---
     await page.click('.char-card');
     await page.waitForSelector('.select-hero-btn', { visible: true });
     await shot('02-karakter-detay');
@@ -480,12 +638,33 @@ async function main() {
     const cards = await page.$$('.char-card');
     await cards[1].click();
     await page.waitForSelector('.select-hero-btn', { visible: true });
-    await page.click('.select-hero-btn');
+    // Pencere açıkken ÇARPI "Oyuncu 2 Olarak Seç" düğmesine basar
+    await page.evaluate(() => { window.__fakePad.buttons[0].pressed = true; });
+    await wait(250);
+    await page.evaluate(() => { window.__fakePad.buttons[0].pressed = false; });
+    const p2Selected = await page.$eval('.p2-status-badge', el => el.classList.contains('selected'));
+    check('CARPI ile P2 secimi kaydedildi', p2Selected);
+
     const battleBtnReady = await page.$eval('#start-battle-btn', el => !el.classList.contains('not-ready'));
     check('P2 secilince 2 kisilik dugmesi aktiflesiyor', battleBtnReady);
 
-    // --- Savaş ekranı ---
-    await page.click('#start-battle-btn');
+    // Düğme ızgaranın yukarısında: iki seçim de bitince kendiliğinden görünür
+    // olmalı, oyuncu elle kaydırmak zorunda kalmasın
+    await wait(700);   // yumuşak kaydırma bitsin
+    const startBtnVisible = await page.evaluate(() => {
+        const box = document.getElementById('start-battle-btn').getBoundingClientRect();
+        return { top: Math.round(box.top), bottom: Math.round(box.bottom), h: window.innerHeight };
+    });
+    check('Iki secim bitince baslat dugmesi ekranda gorunuyor',
+        startBtnVisible.top >= 0 && startBtnVisible.bottom <= startBtnVisible.h,
+        JSON.stringify(startBtnVisible));
+
+    // --- Savaş ekranı (kolda ÜÇGEN savaşı başlatır) ---
+    await page.evaluate(() => { window.__fakePad.buttons[3].pressed = true; });
+    await wait(250);
+    await page.evaluate(() => { window.__fakePad.buttons[3].pressed = false; });
+    check('UCGEN savasi baslatiyor',
+        await page.$eval('#battle-screen', el => !el.classList.contains('hidden')));
     await wait(600);
     const battleVisible = await page.$eval('#battle-screen', el => !el.classList.contains('hidden'));
     check('Savas ekrani acildi', battleVisible);
@@ -501,6 +680,99 @@ async function main() {
 
     const battleFps = await measureFps(3000);
     check('Savas ekrani 50+ FPS', battleFps.fps >= 50, JSON.stringify(battleFps));
+
+    // --- İki kol: her oyuncu kendi DualSense'iyle ---
+    // İkinci sahte kol takılıyor: 1. kol 1. oyuncunun, 2. kol 2. oyuncunun.
+    await page.evaluate(() => {
+        window.__fakePad.index = 0;
+        window.__fakePad2 = {
+            index: 1,
+            axes: [0, 0, 0, 0],
+            buttons: Array.from({ length: 16 }, () => ({ pressed: false })),
+            connected: true
+        };
+        navigator.getGamepads = () => [window.__fakePad, window.__fakePad2];
+        window.dispatchEvent(new Event('gamepadconnected'));
+    });
+    // Yeni kolun analogu bir kez nötr okunmadan yön üretmiyor
+    await wait(300);
+    const padCount = await page.evaluate(() => window.__gamepad.padCount);
+    check('Iki kol iki yuva olarak taniniyor', padCount === 2, `padCount ${padCount}`);
+
+    const padBadges = await page.evaluate(() =>
+        [1, 2, 3].map(i => document.querySelector(`#p2-cd-${i} .key-badge`).textContent));
+    check('Kolla oynayanin HUD kapaklarinda kol simgesi var',
+        padBadges.join(' ') === '□ L1 R1', padBadges.join(' '));
+
+    // 2. kolun sol analogu yalnızca 2. oyuncuyu yürütmeli
+    const posBefore = await page.evaluate(() => ({ p1: window.__game.p1.x, p2: window.__game.p2.x }));
+    await page.evaluate(() => { window.__fakePad2.axes[0] = -1; });
+    await wait(400);
+    await page.evaluate(() => { window.__fakePad2.axes[0] = 0; });
+    const posAfter = await page.evaluate(() => ({ p1: window.__game.p1.x, p2: window.__game.p2.x }));
+    check('2. kolun analogu yalnizca 2. oyuncuyu yurutuyor',
+        posAfter.p2 < posBefore.p2 - 20 && Math.abs(posAfter.p1 - posBefore.p1) < 1,
+        `p1 ${Math.round(posBefore.p1)}->${Math.round(posAfter.p1)}, p2 ${Math.round(posBefore.p2)}->${Math.round(posAfter.p2)}`);
+
+    // ÇARPI zıplatır: karakter zeminden kalkar
+    await page.evaluate(() => { window.__fakePad2.buttons[0].pressed = true; });
+    await wait(200);
+    const padJumped = await page.evaluate(() => ({ y: window.__game.p2.y, vy: window.__game.p2.vy }));
+    await page.evaluate(() => { window.__fakePad2.buttons[0].pressed = false; });
+    check('CARPI ikinci oyuncuyu ziplatiyor', padJumped.y < 430, JSON.stringify(padJumped));
+    await wait(700);   // yere insin
+
+    // KARE / L1 / R1 = 1. / 2. / 3. güç (bekleme sayacı başlamalı)
+    await page.evaluate(() => { window.__fakePad2.buttons[2].pressed = true; });
+    await wait(150);
+    await page.evaluate(() => {
+        window.__fakePad2.buttons[2].pressed = false;
+        window.__fakePad2.buttons[4].pressed = true;      // L1
+    });
+    await wait(150);
+    await page.evaluate(() => {
+        window.__fakePad2.buttons[4].pressed = false;
+        window.__fakePad2.buttons[5].pressed = true;      // R1
+    });
+    await wait(150);
+    await page.evaluate(() => { window.__fakePad2.buttons[5].pressed = false; });
+    const padCds = await page.evaluate(() => ({
+        p1: [...window.__game.p1.cooldowns],
+        p2: [...window.__game.p2.cooldowns]
+    }));
+    check('KARE L1 R1 ikinci oyuncunun uc gucunu calistiriyor',
+        padCds.p2.every(cd => cd > 0), JSON.stringify(padCds.p2));
+    check('2. kolun tuslari 1. oyuncunun gucunu calistirmiyor',
+        padCds.p1.every(cd => cd === 0), JSON.stringify(padCds.p1));
+
+    // 1. kolun KARE'si 1. oyuncunun gücü
+    await page.evaluate(() => { window.__fakePad.buttons[2].pressed = true; });
+    await wait(150);
+    await page.evaluate(() => { window.__fakePad.buttons[2].pressed = false; });
+    const p1PadCd = await page.evaluate(() => window.__game.p1.cooldowns[0]);
+    check('1. kolun KARE tusu 1. oyuncunun gucunu calistiriyor', p1PadCd > 0, `cd ${p1PadCd}`);
+    await shot('03b-savas-iki-kol');
+
+    // --- Savaş sonu penceresi kolla: ÇARPI yeniden başlatır ---
+    await page.evaluate(() => { window.__game.p1.takeDamage(9999); });
+    await page.waitForFunction(
+        () => !document.getElementById('gameover-screen').classList.contains('hidden'),
+        { timeout: 8000 });
+    await wait(200);
+    check('Savas sonu penceresinde kol ogretmesi var',
+        await page.evaluate(() => !document.getElementById('gameover-pad-hint').classList.contains('hidden')));
+    await shot('03c-savas-bitti');
+
+    await page.evaluate(() => { window.__fakePad2.buttons[0].pressed = true; });
+    await wait(300);
+    await page.evaluate(() => { window.__fakePad2.buttons[0].pressed = false; });
+    const restarted = await page.evaluate(() => ({
+        kapandi: document.getElementById('gameover-screen').classList.contains('hidden'),
+        calisiyor: window.__game.isRunning,
+        can: window.__game.p1.hp
+    }));
+    check('CARPI savas sonunda yeniden baslatiyor',
+        restarted.kapandi && restarted.calisiyor && restarted.can > 0, JSON.stringify(restarted));
 
     // --- Macera moduna geç ---
     await page.reload({ waitUntil: 'networkidle2' });

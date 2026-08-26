@@ -8,24 +8,44 @@ import { InputManager } from './core/input.js';
 import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
-import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen, showSiegeScreen } from './ui/screens.js';
+import { PadMenu } from './ui/padMenu.js';
+import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen, showSiegeScreen, showSewerScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
 import { Overworld } from './world/Overworld.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
 import { SiegeScene } from './adventure/SiegeScene.js';
+import { SewerScene } from './adventure/SewerScene.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
 const input = new InputManager();
 
+// Oyun kolu (PS5 DualSense). Menüde ve prologda tek kol oynatır; iki kişilik
+// arenada her oyuncu kendi kolunu kullanır (bkz. core/gamepad.js yuvaları).
+const gamepad = new GamepadManager();
+
+// Karakter seçimi ve "SAVAŞ BİTTİ" penceresi kolla da kullanılabilsin: bu iki
+// ekranda çizen bir sahne olmadığı için kolu tarayan da yok, PadMenu kendi
+// küçük döngüsünü açıyor. Tuşlar gerçek düğmelere basıyor - fareyle aynı yol.
+const padMenu = new PadMenu({
+    gamepad,
+    characterSelect,
+    onStart: () => document.getElementById('start-battle-btn').click(),
+    onBack: () => document.getElementById('selection-back-btn').click(),
+    onRestart: () => document.getElementById('restart-btn').click()
+});
+
 const game = new Game({
     canvas: document.getElementById('battleCanvas'),
     input,
+    gamepad,
     hud,
     onGameOver: (winnerNum, winner) => {
         showGameOver(`Oyuncu ${winnerNum} (${winner.char.className}) Kazandı!`);
+        // Savaş döngüsü durdu; kolu artık PadMenu tarıyor (ÇARPI = yeniden oyna)
+        padMenu.start('gameover');
     }
 });
 
@@ -63,9 +83,8 @@ input.onKeyDown(e => {
 // Menü artık bir düğme listesi değil, antrenörün gezdiği bir sahne:
 // ortadaki macera kapısı F ile açılır, sağdaki portal iki kişilik moda çıkar.
 
-// Oyun kolu (PS5 DualSense): sol analog yürütür, ÜÇGEN = F.
-// Kolun durumu MenuScene döngüsünde her karede taranır.
-const gamepad = new GamepadManager();
+// Kolun durumu MenuScene döngüsünde her karede taranır (menüde sol analog
+// yürütür, ÜÇGEN = F); savaş sırasında taramayı Game döngüsü devralır.
 
 // Eski overworld (ana harita). Menüden erişilmiyor - macera modu sıfırdan
 // kuruluyor - ama motor duruyor ve UI testleri buradan giriyor.
@@ -77,6 +96,7 @@ async function enterOverworld() {
 
 function returnToMenu() {
     overworld.stop();
+    padMenu.stop();
     showMenuScreen();
     menu.start();
 }
@@ -92,9 +112,26 @@ const adventure = new AdventureScene({
     }
 });
 
-// Prolog 3: kuşatılan çalışma alanı. Sahnenin sonunda rögardan aşağı inilir.
-// Kanalizasyon bölümü henüz yazılmadı; şimdilik doğrudan şehir sahnesine
-// (prologun 4. bölümü) bağlanıyor - hikâyede zaten oradan çıkılıyor.
+// Kanalizasyon: prolog 3 ile 4 arasındaki otomatik koşu. Rögardan inilir,
+// şehrin kenarındaki bacadan çıkılır - prolog 4 tam oradan başlıyor.
+const sewer = new SewerScene({
+    canvas: document.getElementById('sewerCanvas'),
+    input,
+    gamepad,
+    onExit: () => {
+        sewer.stop();
+        showMenuScreen();
+        menu.start();
+    },
+    onFinish: () => {
+        sewer.stop();
+        showAdventureScreen();
+        adventure.start();
+    }
+});
+
+// Prolog 3: kuşatılan çalışma alanı. Sahnenin sonunda acil çıkış kapanır,
+// ekran kararır ve kanalizasyona inilir.
 const siege = new SiegeScene({
     canvas: document.getElementById('siegeCanvas'),
     input,
@@ -106,8 +143,8 @@ const siege = new SiegeScene({
     },
     onFinish: () => {
         siege.stop();
-        showAdventureScreen();
-        adventure.start();
+        showSewerScreen();
+        sewer.start();
     }
 });
 
@@ -141,6 +178,7 @@ const menu = new MenuScene({
     onVersusPortal: () => {
         menu.stop();
         showSelectionScreen();
+        padMenu.start('selection');
     }
 });
 
@@ -158,8 +196,18 @@ window.__shop = shop;
 window.__progress = progress;
 window.__menu = menu;
 window.__gamepad = gamepad;
+window.__padMenu = padMenu;
+window.__characterSelect = characterSelect;
 window.__adventure = adventure;
 window.__siege = siege;
+window.__sewer = sewer;
+// Kanalizasyona doğrudan giriş: testler ve ekran görüntüsü için, prologun
+// başından oynamak zorunda kalmadan
+window.__enterSewer = () => {
+    menu.stop();
+    showSewerScreen();
+    sewer.start();
+};
 window.__enterOverworld = enterOverworld;
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
@@ -170,12 +218,14 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
         return;
     }
 
+    padMenu.stop();   // taramayı savaş döngüsü devralıyor
     showBattleScreen();
     game.start(p1, p2);
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
     hideGameOver();
+    padMenu.stop();
     const { p1, p2 } = characterSelect.getSelection();
     game.start(p1, p2);
 });

@@ -1,3 +1,5 @@
+import { PLAYERS, PAD_ABILITY_LABELS, PAD_ABILITY_COLORS } from '../config/settings.js';
+
 // Savaş HUD'u: isimler, can barları ve yetenek bekleme süresi göstergeleri.
 export class Hud {
     constructor() {
@@ -13,6 +15,36 @@ export class Hud {
             1: [1, 2, 3].map(i => document.querySelector(`#p1-cd-${i} .cd-overlay`)),
             2: [1, 2, 3].map(i => document.querySelector(`#p2-cd-${i} .cd-overlay`))
         };
+
+        // Güç kutucuklarının üstündeki tuş kapakları. Oyuncu kolla oynuyorsa
+        // burada Shift/Space değil KARE/ÜÇGEN/YUVARLAK yazmalı.
+        this.keyBadges = {
+            1: [1, 2, 3].map(i => document.querySelector(`#p1-cd-${i} .key-badge`)),
+            2: [1, 2, 3].map(i => document.querySelector(`#p2-cd-${i} .key-badge`))
+        };
+        this.badgePadCount = null;   // en son hangi simgeler yazıldı
+    }
+
+    // padCount: takılı kol sayısı. 1. oyuncu ilk kolu, 2. oyuncu ikinciyi alır;
+    // kolu olmayan oyuncunun kapağında klavye tuşu yazmaya devam eder.
+    // Her karede çağrılıyor, bu yüzden yalnızca değişince DOM'a yazıyor.
+    updateControlBadges(padCount) {
+        if (padCount === this.badgePadCount) return;
+        this.badgePadCount = padCount;
+
+        for (const num of [1, 2]) {
+            const onPad = PLAYERS[num].padSlot < padCount;
+            const labels = onPad ? PAD_ABILITY_LABELS : PLAYERS[num].keyLabels;
+            const badges = this.keyBadges[num];
+            for (let i = 0; i < badges.length; i++) {
+                if (!badges[i]) continue;
+                badges[i].textContent = labels[i];
+                badges[i].classList.toggle('pad-badge', onPad);
+                // □ tek bir şekil, L1/R1 ise yazı: aynı punto ikisine de uymuyor
+                badges[i].classList.toggle('pad-badge-text', onPad && labels[i].length > 1);
+                badges[i].style.color = onPad ? PAD_ABILITY_COLORS[i] : '';
+            }
+        }
     }
 
     setPlayers(p1, p2) {

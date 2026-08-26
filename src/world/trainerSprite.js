@@ -135,12 +135,54 @@ const SIDE = [
     ]
 ];
 
-export const TRAINER_FRAMES = { down: DOWN, up: UP, side: SIDE };
+// Kayma duruşu (kanalizasyon). Kameraya sırtı dönük kayıyor: en yakın olan
+// şapka, en uzak olan ayaklar. Gövde ızgaranın alt yarısına iniyor ki
+// karakter gerçekten yere yatmış görünsün.
+const SLIDE = [
+    [
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '....yyyy....',
+        '...bbbbbb...',
+        '...bbbbbb...',
+        '..cccccccc..',
+        '.sccccccccs.',
+        '.sccccccccs.',
+        '..kcccccck..',
+        '...cccccc...'
+    ],
+    [
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '...yyy.yy...',
+        '...bbbbbb...',
+        '...bbbbbb...',
+        '..cccccccc..',
+        '.sccccccccs.',
+        '.sccccccccs.',
+        '..kcccccck..',
+        '...cccccc...'
+    ]
+];
+
+export const TRAINER_FRAMES = { down: DOWN, up: UP, side: SIDE, slide: SLIDE };
 
 // Antrenörü (x, y) merkezli çizer. dir: 'down' | 'up' | 'left' | 'right'
 export function drawTrainer(ctx, x, y, dir, moving, scale = 3) {
     const key = (dir === 'left' || dir === 'right') ? 'side' : dir;
-    const frames = TRAINER_FRAMES[key];
+    const frames = TRAINER_FRAMES[key] || TRAINER_FRAMES.down;
     const frame = frames[moving ? Math.floor(Date.now() / 160) % 2 : 0];
 
     const cols = frame[0].length;

@@ -183,7 +183,20 @@ export const Sfx = {
     beamFall: () => {
         noise({ duration: 0.7, volume: 0.45, filterFrom: 1400, filterTo: 120 });
         blip({ type: 'square', from: 200, to: 60, duration: 0.5, volume: 0.32 });
-    }
+    },
+
+    // --- Kanalizasyon ---
+    // Kayma: betonda sürtünen bir hışırtı, sonuna doğru sönen
+    slide: () => noise({ duration: 0.34, volume: 0.26, filterFrom: 1600, filterTo: 240 }),
+    // Engele çarpma: tökezleme. Ölüm yok, ceza ses ve sarsıntı.
+    stumble: () => {
+        noise({ duration: 0.3, volume: 0.34, filterFrom: 700, filterTo: 90 });
+        blip({ type: 'sawtooth', from: 180, to: 70, duration: 0.26, volume: 0.3 });
+    },
+    // Tavandan düşen damla: koridorun tek canlı sesi
+    drip: () => blip({ type: 'sine', from: 1250, to: 620, duration: 0.09, volume: 0.09 }),
+    // Ayak sesi: dar tünelde yankılanan tok vuruş
+    step: () => blip({ type: 'triangle', from: 150, to: 96, duration: 0.06, volume: 0.09 })
 };
 
 // --- Basit döngüsel müzik ---
@@ -196,7 +209,10 @@ const TRACKS = {
     // Harabe şehir: ağır, boşluklu, uyumsuz. Notalar arası uzun sessizlik.
     ruin: { root: 131, scale: [0, 1, 5, 6, 8], tempo: 620, wave: 'triangle' },
     // Kusatma: hizli, alcak, uyumsuz
-    siege: { root: 110, scale: [0, 1, 6, 7, 8], tempo: 190, wave: 'square' }
+    siege: { root: 110, scale: [0, 1, 6, 7, 8], tempo: 190, wave: 'square' },
+    // Kanalizasyon: kusatmadan da hizli ve daha alcak. Kosu durmuyor,
+    // muzik de durmamali; notalar dar araliktan cikmiyor - burasi kapali.
+    sewer: { root: 98, scale: [0, 1, 3, 6, 7], tempo: 150, wave: 'square' }
 };
 
 export function playMusic(name) {

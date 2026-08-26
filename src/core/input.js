@@ -1,4 +1,6 @@
 // Klavye durumu takibi. Oyun mantığı tuşları yalnızca bu sınıf üzerinden okur.
+import { setDevice } from './device.js';
+
 export class InputManager {
     constructor() {
         this.keys = {};
@@ -6,6 +8,7 @@ export class InputManager {
 
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
+            setDevice('keyboard');   // ekrandaki ipuçları klavye simgesine döner
             for (const handler of this.keydownHandlers) handler(e);
         });
 

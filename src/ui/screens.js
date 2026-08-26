@@ -1,7 +1,7 @@
 // Ekranlar arası geçişler. DOM sınıf değişiklikleri tek yerde toplanır.
 const el = (id) => document.getElementById(id);
 
-const SCREENS = ['menu-screen', 'siege-screen', 'adventure-screen', 'selection-screen', 'overworld-screen', 'battle-screen'];
+const SCREENS = ['menu-screen', 'siege-screen', 'sewer-screen', 'adventure-screen', 'selection-screen', 'overworld-screen', 'battle-screen'];
 
 function show(id, { header = false, lockScroll = true } = {}) {
     for (const screen of SCREENS) el(screen).classList.toggle('hidden', screen !== id);
@@ -17,6 +17,11 @@ export function showMenuScreen() {
 // Prolog 3: kuşatılan çalışma alanı (menü gibi tam ekran)
 export function showSiegeScreen() {
     show('siege-screen');
+}
+
+// Kanalizasyon: prolog 3 ile 4 arasındaki otomatik koşu bölümü
+export function showSewerScreen() {
+    show('sewer-screen');
 }
 
 // Macera modu: şehrin kenarından ormanın girişine (menü gibi tam ekran)

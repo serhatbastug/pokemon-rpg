@@ -441,25 +441,91 @@ check('kol: D-pad çaprazı normalize ediliyor',
     Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 0.001);
 
 // Takılı kalmış eksen koruması: nötre dönmemiş analog yön üretmemeli
-const { GamepadManager } = await import('../src/core/gamepad.js');
+const { GamepadManager, PadSlot } = await import('../src/core/gamepad.js');
 const stuckPad = pad([1, 0]);
-const fakeManager = Object.create(GamepadManager.prototype);
-fakeManager.state = { x: 0, y: 0, magnitude: 0, pressed: [] };
-fakeManager.held = new Set();
-fakeManager.handlers = [];
-fakeManager.connected = true;
-fakeManager.armed = false;
-fakeManager.firstPad = () => stuckPad;
-fakeManager.poll();
-check('kol: nötre dönmemiş eksen yön üretmiyor', fakeManager.stick().magnitude === 0);
-fakeManager.firstPad = () => pad([0, 0]);
-fakeManager.poll();
-fakeManager.firstPad = () => stuckPad;
-fakeManager.poll();
-check('kol: nötrü gördükten sonra analog çalışıyor', fakeManager.stick().magnitude === 1);
+const stuckSlot = new PadSlot();
+stuckSlot.apply(stuckPad);
+check('kol: nötre dönmemiş eksen yön üretmiyor', stuckSlot.state.magnitude === 0);
+stuckSlot.apply(pad([0, 0]));
+stuckSlot.apply(stuckPad);
+check('kol: nötrü gördükten sonra analog çalışıyor', stuckSlot.state.magnitude === 1);
+
+// İlk okuma basılma saymaz: kol yeni görüldüğünde basılı duran tuş,
+// oyuncu basmış gibi işlenmemeli
+const seedSlot = new PadSlot();
+check('kol: ilk okumadaki basılı tuş basılma saymıyor',
+    seedSlot.apply(pad([0, 0], [BUTTONS.cross])).length === 0);
+check('kol: bırakılıp yeniden basılan tuş basılma sayılıyor',
+    seedSlot.apply(pad([0, 0])).length === 0 &&
+    seedSlot.apply(pad([0, 0], [BUTTONS.cross])).includes('cross'));
 
 check('kol: ÜÇGEN standart eşlemede 3. tuş', BUTTONS.triangle === 3);
 check('kol: Çarpı standart eşlemede 0. tuş', BUTTONS.cross === 0);
+
+// ---- İki kol: her oyuncunun kendi kolu ----
+// İki kişilik arenada tuşlar karışmamalı: 1. kolun KARE'si 1. oyuncunun,
+// 2. kolun KARE'si 2. oyuncunun gücünü çalıştırır.
+const twoPads = [
+    { index: 0, ...pad([0, 0]) },
+    { index: 1, ...pad([0, 0]) }
+];
+const manager = Object.create(GamepadManager.prototype);
+manager.slots = [];
+manager.handlers = [];
+manager.slotHandlers = [];
+manager.connected = true;
+manager.allPads = () => twoPads;
+
+const padEvents = [];
+manager.onSlotButtonDown((slot, name) => padEvents.push(`${slot}:${name}`));
+const firstPadEvents = [];
+manager.onButtonDown(name => firstPadEvents.push(name));
+
+manager.poll();   // ilk tarama yalnızca kolları tanıtır
+check('kol: iki kol iki yuva açıyor', manager.padCount === 2);
+
+twoPads[1].buttons[BUTTONS.square].pressed = true;
+manager.poll();
+check('kol: basılan tuş yalnızca kendi yuvasına yazılıyor',
+    padEvents.length === 1 && padEvents[0] === '1:square', padEvents.join(','));
+check('kol: 2. kolun tuşu 1. kol dinleyicisini tetiklemiyor',
+    firstPadEvents.length === 0, firstPadEvents.join(','));
+check('kol: tuş yalnızca kendi kolunda basılı görünüyor',
+    manager.isDownAt(1, 'square') && !manager.isDownAt(0, 'square'));
+
+twoPads[0].axes[0] = 1;
+manager.poll();
+check('kol: yuvaların analogları ayrı okunuyor',
+    manager.stickAt(0).x > 0.99 && manager.stickAt(1).x === 0);
+check('kol: 1. yuva stick() ile aynı', manager.stick().x === manager.stickAt(0).x);
+
+// Kol çıkarılınca yuvası da gider; kalan kol 0. yuvaya kayar
+twoPads.pop();
+manager.poll();
+check('kol: çıkarılan kolun yuvası siliniyor', manager.padCount === 1);
+check('kol: olmayan yuva nötr okunuyor',
+    manager.stickAt(1).magnitude === 0 && !manager.isDownAt(1, 'square'));
+
+// Arena kol düzeni: KARE = 1. güç, L1 = 2. güç, R1 = 3. güç (ulti),
+// ÇARPI = zıpla. Her oyuncu kendi kolunda aynı düzeni kullanıyor.
+const { PAD_ABILITY_BUTTONS, PAD_JUMP_BUTTON, PAD_ABILITY_LABELS,
+    PLAYERS: ARENA_PLAYERS } = await import('../src/config/settings.js');
+check('arena kolu: KARE 1. gücü çalıştırıyor', PAD_ABILITY_BUTTONS.square === 0);
+check('arena kolu: L1 2. gücü çalıştırıyor', PAD_ABILITY_BUTTONS.l1 === 1);
+check('arena kolu: R1 ultiyi çalıştırıyor', PAD_ABILITY_BUTTONS.r1 === 2);
+check('arena kolu: ÇARPI zıplatıyor', PAD_JUMP_BUTTON === 'cross');
+check('arena kolu: her güce bir tuş', new Set(Object.values(PAD_ABILITY_BUTTONS)).size === 3);
+check('arena kolu: HUD simgeleri güç sırasıyla aynı',
+    PAD_ABILITY_LABELS.length === 3 && PAD_ABILITY_LABELS[PAD_ABILITY_BUTTONS.square] === '□',
+    PAD_ABILITY_LABELS.join(' '));
+// Kolda olmayan bir tuşa güç bağlanmış olmasın
+for (const name of Object.keys(PAD_ABILITY_BUTTONS)) {
+    check(`arena kolu: '${name}' kolda var olan bir tuş`, BUTTONS[name] !== undefined);
+}
+check('arena kolu: zıplama tuşu güçlerden biri değil',
+    PAD_ABILITY_BUTTONS[PAD_JUMP_BUTTON] === undefined);
+check('arena kolu: her oyuncuya bir kol',
+    ARENA_PLAYERS[1].padSlot === 0 && ARENA_PLAYERS[2].padSlot === 1);
 
 // ---- Sahne betiği (prolog) ----
 // Cutscene saf mantık: anlar sırayla geçmeli, kilit doğru anlarda açılmalı,
@@ -728,6 +794,201 @@ for (const [pose, frames] of Object.entries(FRIEND_FRAMES)) {
 check('arkadaş: bütün kareler 12x16 ızgarada', friendGridOk);
 check('arkadaş: tanımsız renk harfi yok', friendLetterOk);
 check('arkadaş: turuncu bant her duruşta görünüyor', bandMissing.length === 0, bandMissing.join(','));
+
+// ---- Kanalizasyon: otomatik koşu bölümü ----
+// Parkur elle yazıldığı için tek bir yanlış şerit bölümü geçilmez yapıyor.
+// Buradaki testler parkuru sahnenin GERÇEK fiziğiyle baştan sona oynuyor.
+const sewer = await import('../src/adventure/sewerLayout.js');
+
+check('kanalizasyon: üç şerit var ve hepsi ayrı yerde',
+    sewer.LANE_COUNT === 3 && new Set(sewer.LANES).size === 3, sewer.LANES.join(','));
+
+const courseSorted = sewer.COURSE.every((o, i) => i === 0 || o.z >= sewer.COURSE[i - 1].z);
+check('kanalizasyon: parkur z sırasında', courseSorted);
+
+const unknownType = sewer.COURSE.filter(o => !sewer.OBSTACLES[o.type]);
+check('kanalizasyon: her engelin tanımı var', unknownType.length === 0,
+    unknownType.map(o => o.type).join(','));
+
+const badLane = sewer.COURSE.filter(o => o.lane < 0 || o.lane >= sewer.LANE_COUNT);
+check('kanalizasyon: her engel geçerli şeritte', badLane.length === 0);
+
+const usedTypes = new Set(sewer.COURSE.map(o => o.type));
+check('kanalizasyon: dört engel türünün hepsi kullanılıyor',
+    sewer.OBSTACLE_TYPES.every(t => usedTypes.has(t)),
+    sewer.OBSTACLE_TYPES.filter(t => !usedTypes.has(t)).join(','));
+
+// Kayma ile zıplama BİRBİRİNİN AYNASI: kullanıcının istediği "kaymanın işe
+// yaradığı ama zıplamanın çarpmayla bittiği yer" borunun ta kendisi.
+const jumpPeak = (() => {
+    let h = 0, v = sewer.JUMP_V, peak = 0;
+    for (let i = 0; i < 200 && (h > 0 || i === 0); i++) { h += v; v -= sewer.GRAVITY; peak = Math.max(peak, h); }
+    return peak;
+})();
+check('kanalizasyon: taşı zıplayarak geçiyoruz', !sewer.blocksBody('tas', 'zipla', jumpPeak));
+check('kanalizasyon: taşı kayarak geçemiyoruz', sewer.blocksBody('tas', 'kay', 0));
+check('kanalizasyon: boruyu kayarak geçiyoruz', !sewer.blocksBody('boru', 'kay', 0));
+check('kanalizasyon: boruyu ZIPLAYARAK geçemiyoruz', sewer.blocksBody('boru', 'zipla', jumpPeak),
+    `tepe ${jumpPeak.toFixed(0)}`);
+check('kanalizasyon: çöküntü ne zıplayarak ne kayarak geçiliyor',
+    sewer.blocksBody('enkaz', 'zipla', jumpPeak) && sewer.blocksBody('enkaz', 'kay', 0));
+
+// Her sırada geçilebilir bir şerit var mı, ve o şerit TEK HAMLEYLE
+// ulaşılabilir mi? Üç şeritte iki geçilmez engel varsa boş şerit ortada
+// olmak zorunda: uçtaki oyuncunun tek komşusu da kapalıysa kurtuluş yok.
+const sewerRows = sewer.rows();
+const impassable = sewerRows.filter(r => !sewer.rowIsPassable(r)).map(r => r.z);
+check('kanalizasyon: her sırada geçilebilir bir şerit var', impassable.length === 0, impassable.join(','));
+
+const trappedLanes = [];
+for (const row of sewerRows) {
+    for (let lane = 0; lane < sewer.LANE_COUNT; lane++) {
+        if (!sewer.laneHasEscape(row, lane)) trappedLanes.push(`z=${row.z} şerit${lane}`);
+    }
+}
+check('kanalizasyon: hiçbir şerit kapana kısılmıyor', trappedLanes.length === 0, trappedLanes.join(', '));
+
+// Sıralar arası açıklık: en yavaş hamle (zıplama yayı) bitmeden bir
+// sonrakine varılmamalı, yoksa parkur havada geçirilen bir dizi kareye dönüp
+// oyuncunun elinden çıkıyor.
+const jumpFrames = Math.ceil((2 * sewer.JUMP_V) / sewer.GRAVITY);
+const tightGaps = [];
+for (let i = 1; i < sewerRows.length; i++) {
+    const gap = sewerRows[i].z - sewerRows[i - 1].z;
+    if (gap / sewer.MAX_SPEED < jumpFrames + 12) tightGaps.push(`${sewerRows[i - 1].z}->${sewerRows[i].z}`);
+}
+check('kanalizasyon: sıralar arasında hamleyi bitirecek kadar yer var',
+    tightGaps.length === 0, tightGaps.join(', '));
+
+// Öğretme sırası: önce zıplama, sonra kayma, sonra şerit. Her biri TEK
+// başına geliyor - ilk kez görülen tuş kalabalık bir sırada öğrenilmiyor.
+const firstOf = (predicate) => Math.min(...sewer.COURSE.filter(predicate).map(o => o.z));
+const firstJump = firstOf(o => sewer.OBSTACLES[o.type].clear === 'zipla');
+const firstSlide = firstOf(o => sewer.OBSTACLES[o.type].clear === 'kay');
+const firstLane = firstOf(o => sewer.OBSTACLES[o.type].clear === null);
+check('kanalizasyon: öğretme sırası zıpla -> kay -> şerit',
+    firstJump < firstSlide && firstSlide < firstLane,
+    `${firstJump} / ${firstSlide} / ${firstLane}`);
+
+const soloFirst = [firstJump, firstSlide, firstLane]
+    .filter(z => sewer.COURSE.filter(o => o.z === z).length !== 1);
+check('kanalizasyon: her hamlenin ilk örneği yalnız geliyor', soloFirst.length === 0, soloFirst.join(','));
+
+check('kanalizasyon: öğretme okunacak kadar önce çıkıyor',
+    sewer.HINT_LEAD / sewer.MAX_SPEED >= 60, `${Math.round(sewer.HINT_LEAD / sewer.MAX_SPEED)} kare`);
+
+// Parkuru baştan sona OYNA. planFor + applyMove + stepPerson sahnenin
+// kullandığı kodun aynısı; burada çarpmadan bitmiyorsa oyunda da bitmez.
+function playSewer(startLane) {
+    const obstacles = sewer.COURSE.map(o => ({ ...o, done: false }));
+    const player = sewer.newRunner(startLane);
+    let travelled = 0;
+    let handledZ = null;
+    let frames = 0;
+    const crashes = [];
+
+    while (travelled < sewer.EXIT_Z && frames < 6000) {
+        frames++;
+        const myZ = travelled + sewer.PLAYER_Z;
+        const row = sewerRows.find(r => r.z > myZ);
+        if (row && handledZ !== row.z) {
+            const move = sewer.planFor(row, player.lane);
+            if (move && row.z - myZ <= sewer.ACT_LEAD[move]) {
+                handledZ = row.z;
+                sewer.applyMove(player, move);
+            }
+        }
+        sewer.stepPerson(player);
+        travelled += sewer.speedAt(travelled);
+
+        for (const obstacle of obstacles) {
+            if (obstacle.done) continue;
+            const rel = obstacle.z - travelled;
+            if (rel > sewer.PLAYER_Z + 60) continue;
+            if (rel < -400) { obstacle.done = true; continue; }
+            if (sewer.hits(obstacle, { rel, x: player.x, pose: player.pose, height: player.height })) {
+                crashes.push(`${obstacle.type}@${obstacle.z}/ş${obstacle.lane}`);
+                obstacle.done = true;
+            }
+        }
+    }
+    return { frames, travelled, crashes };
+}
+
+for (const lane of [0, 1, 2]) {
+    const run = playSewer(lane);
+    check(`kanalizasyon: ${lane}. şeritten başlayan parkuru çarpmadan bitiriyor`,
+        run.crashes.length === 0 && run.travelled >= sewer.EXIT_Z,
+        run.crashes.join(', ') || `${run.frames} kare`);
+}
+
+// Bölüm ne kadar sürüyor? Prologun bir parçası: uzarsa koşu tek başına
+// prologdan uzun oluyor.
+const sewerFrames = playSewer(1).frames;
+check('kanalizasyon: bölüm 20-35 saniye sürüyor',
+    sewerFrames > 20 * 60 && sewerFrames < 35 * 60, `${(sewerFrames / 60).toFixed(1)} sn`);
+
+// Otomatik koşu: hız hiçbir zaman durmuyor ve makul aralıkta kalıyor
+check('kanalizasyon: koşu hızı hep ileri ve sınırlı',
+    sewer.speedAt(0) > 0 && sewer.speedAt(1e9) === sewer.MAX_SPEED &&
+    sewer.speedAt(sewer.EXIT_Z) <= sewer.MAX_SPEED);
+
+// ---- Kontrol öğretmeleri ----
+const controls = await import('../src/config/controls.js');
+const { missingGlyphs: missing } = await import('../src/pixel/pixelFont.js');
+
+const hintProblems = [];
+for (const [action, control] of Object.entries(controls.CONTROLS)) {
+    if (!control.key || !control.pad || !control.text) hintProblems.push(`${action}: eksik alan`);
+    const labels = Array.isArray(control.key) ? control.key : [control.key];
+    for (const text of [`İLE ${control.text}`, ...labels]) {
+        const gone = missing(text);
+        if (gone.length) hintProblems.push(`${action}: "${text}" -> ${gone.join('')}`);
+    }
+}
+check('öğretme: her kontrolün klavye ve kol karşılığı var, harfleri yazı tipinde',
+    hintProblems.length === 0, hintProblems.slice(0, 3).join(' | '));
+
+check('öğretme: kanalizasyonun üç hamlesi de tanımlı',
+    ['jump', 'slide', 'lane'].every(a => controls.CONTROLS[a]));
+check('öğretme: ateş etme tanımlı (prolog 3, ilk silah)', !!controls.CONTROLS.fire);
+
+// Öğretme bir kez gösterilir: aynı tuş her engelde tekrar yazılırsa sahnenin
+// önüne geçiyor.
+const hint = new controls.ControlHint();
+check('öğretme: ilk çağrı gösteriyor', hint.show('jump') === true && hint.visible);
+check('öğretme: aynı öğretme ikinci kez gösterilmiyor', hint.show('jump') === false);
+check('öğretme: tanımsız eylem gösterilmiyor', hint.show('yok-boyle-bir-sey') === false);
+
+for (let i = 0; i < controls.HINT_FADE_IN; i++) hint.step();
+check('öğretme: açılınca tam görünür', hint.alpha > 0.99, String(hint.alpha));
+
+hint.dismiss('jump');
+check('öğretme: yapılınca sönmeye başlıyor', hint.frames <= controls.HINT_FADE_OUT);
+for (let i = 0; i < controls.HINT_FADE_OUT + 2; i++) hint.step();
+check('öğretme: sönünce ekrandan kalkıyor', !hint.visible && hint.alpha === 0);
+
+const otherHint = new controls.ControlHint();
+otherHint.show('slide');
+otherHint.dismiss('jump');
+check('öğretme: başka eylemin dismiss()i ekrandakini söndürmüyor',
+    otherHint.frames > controls.HINT_FADE_OUT);
+
+// ---- Kol: sağ analog (kayma) ----
+// Kayma bir tuş değil eksen; readPad eşiği geçince sahte tuş üretiyor.
+const { RSTICK_TRIGGER } = await import('../src/core/gamepad.js');
+const padWithRight = (ry) => ({ axes: [0, 0, 0, ry], buttons: [] });
+
+check('kol: sağ analog nötrken kayma yok',
+    !readPad(padWithRight(0)).pressed.includes('rstickDown'));
+check('kol: sağ analog hafif eğikken kayma yok',
+    !readPad(padWithRight(RSTICK_TRIGGER - 0.1)).pressed.includes('rstickDown'));
+check('kol: sağ analog aşağı çekilince kayma tetikleniyor',
+    readPad(padWithRight(1)).pressed.includes('rstickDown'));
+check('kol: sağ analog YUKARI çekilince kayma tetiklenmiyor',
+    !readPad(padWithRight(-1)).pressed.includes('rstickDown'));
+check('kol: sağ analog sol analogun yönünü bozmuyor',
+    readPad(padWithRight(1)).magnitude === 0);
 
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);

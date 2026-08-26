@@ -175,7 +175,48 @@ const HUNCH = [
     ]
 ];
 
-export const FRIEND_FRAMES = { down: DOWN, up: UP, side: SIDE, hunch: HUNCH };
+// Kayma duruşu (kanalizasyon): sırtı dönük, yere yatmış. Turuncu bant
+// burada da duruyor - ipucu her duruşta görünmek zorunda.
+const SLIDE = [
+    [
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '....yyyy....',
+        '...bbbbbb...',
+        '...bbbbbb...',
+        '..llllllll..',
+        '.ooLllllLss.',
+        '.ssllllllss.',
+        '..kllllllk..',
+        '...hhhhhh...'
+    ],
+    [
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '............',
+        '...yyy.yy...',
+        '...bbbbbb...',
+        '...bbbbbb...',
+        '..llllllll..',
+        '.ooLllllLss.',
+        '.ssllllllss.',
+        '..kllllllk..',
+        '...hhhhhh...'
+    ]
+];
+
+export const FRIEND_FRAMES = { down: DOWN, up: UP, side: SIDE, hunch: HUNCH, slide: SLIDE };
 
 // İki rengi karıştır (piksel sanatında ara tonlar da ızgaraya oturmalı, bu
 // yüzden karışım sonucu doğrudan kullanılıyor, dither yok).

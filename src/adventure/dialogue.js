@@ -98,6 +98,8 @@ export class Dialogue {
 // Konuşana göre ses perdesi: herkes aynı perdede "bıt"larsa hepsi aynı
 // karakter gibi duyuluyor.
 export const VOICE_PITCH = {
+    // Profesör: kimliği hiç açılmıyor, en kalın perde onun
+    profesor: 0.72,
     biz: 1.0,
     arkadas: 0.8,
     'saglikli-0': 1.22,

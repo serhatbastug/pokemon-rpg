@@ -1,14 +1,18 @@
 import { Player } from './Player.js';
 import { EffectsManager } from './effects.js';
 import { randomArena } from './arenas.js';
-import { PLAYERS, SCROLL_KEYS, FRAME_RATE, PAD_ABILITY_BUTTONS } from '../config/settings.js';
+import { PLAYERS, SCROLL_KEYS, FRAME_RATE } from '../config/settings.js';
+import { introFor } from './fighterIntro.js';
 
-// Oyun motoru: oyun döngüsü, çarpışmalar ve tur durumu.
+// Oyun motoru: oyun döngüsü ve tur durumu.
 // UI (ekran geçişleri) main.js'te; HUD güncellemeleri Hud sınıfında.
 //
 // Kontroller: her oyuncu ya klavyeden ya da kendi oyun kolundan oynar - ikisi
 // de her zaman açık. 1. oyuncu takılan ilk kolu, 2. oyuncu ikinciyi kullanır;
 // tek kol varsa 2. oyuncu klavyede kalır.
+//
+// SALDIRI YOK: virüslerin güçleri henüz yazılmadı, bu turda arenada yalnızca
+// hareket ve zıplama var. Mermi sistemi (eski Pokemon hamleleri) kaldırıldı.
 export class Game {
     constructor({ canvas, input, gamepad = null, hud, onGameOver }) {
         this.canvas = canvas;
@@ -19,15 +23,16 @@ export class Game {
         this.onGameOver = onGameOver;
 
         this.effects = new EffectsManager();
-        this.projectiles = [];
         this.p1 = null;
         this.p2 = null;
         this.currentArena = null;
         this.rafId = null;
         this.isGameOver = false;
+        this.frame = 0;      // hareketli çizimler (elektrik) buradan besleniyor
+        this.intro = null;   // oynayan giriş animasyonu; varken tur başlamaz
+        this.introQueue = [];
 
         input.onKeyDown(e => this.handleKeyDown(e));
-        gamepad?.onSlotButtonDown((slot, button) => this.handlePadButton(slot, button));
     }
 
     get isRunning() {
@@ -36,30 +41,8 @@ export class Game {
 
     handleKeyDown(e) {
         if (!this.isRunning) return;
-
         // Oyun tuşları tarayıcıyı kaydırmasın
         if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
-
-        const p1Index = PLAYERS[1].abilityKeys[e.code];
-        if (p1Index !== undefined) this.p1.useAbility(p1Index);
-
-        const p2Index = PLAYERS[2].abilityKeys[e.code];
-        if (p2Index !== undefined) this.p2.useAbility(p2Index);
-
-        // Farklı klavye düzenlerinde virgül farklı fiziksel tuşta olabilir
-        if (e.code !== 'Comma' && e.key === ',') this.p2.useAbility(1);
-    }
-
-    // Kolda güç tuşuna basıldı. Hangi oyuncunun gücü olduğunu KOLUN YUVASI
-    // belirliyor: 0. yuva 1. oyuncunun, 1. yuva 2. oyuncunun.
-    handlePadButton(slot, button) {
-        if (!this.isRunning) return;
-
-        const index = PAD_ABILITY_BUTTONS[button];
-        if (index === undefined) return;
-
-        const player = this.playerByPadSlot(slot);
-        player?.useAbility(index);
     }
 
     playerByPadSlot(slot) {
@@ -68,15 +51,15 @@ export class Game {
         return null;
     }
 
-    start(char1, char2) {
+    start(fighter1, fighter2) {
         this.isGameOver = false;
-        this.projectiles = [];
         this.effects.reset();
         this.currentArena = randomArena();
+        this.frame = 0;
 
         this.p1 = new Player({
             ...PLAYERS[1].start,
-            char: char1,
+            fighter: fighter1,
             playerNum: 1,
             color: PLAYERS[1].color,
             controls: PLAYERS[1].moveKeys,
@@ -85,13 +68,19 @@ export class Game {
         });
         this.p2 = new Player({
             ...PLAYERS[2].start,
-            char: char2,
+            fighter: fighter2,
             playerNum: 2,
             color: PLAYERS[2].color,
             controls: PLAYERS[2].moveKeys,
             padSlot: PLAYERS[2].padSlot,
             game: this
         });
+
+        // Girişi olan dövüşçüler tur başında sırayla oynar: ÖNCE P1, SONRA P2.
+        this.introQueue = [this.p1, this.p2]
+            .map(p => introFor(p, this.canvas))
+            .filter(Boolean);
+        this.intro = this.introQueue.shift() || null;
 
         this.hud.setPlayers(this.p1, this.p2);
         this.hud.updateHealth(this.p1, this.p2);
@@ -141,22 +130,41 @@ export class Game {
         if (this.isGameOver) return;
 
         const { ctx, canvas, effects } = this;
+        this.frame++;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
+
+        // Giriş animasyonu: oynarken kimse hareket edemez, yalnızca sahne var.
+        // Kamera karaktere doğru yaklaşırken ARKA PLAN da aynı ölçekle büyüyor
+        // (karakterin ayakları sabit nokta). Yalnızca figürü büyütmek "kamera
+        // yaklaştı" değil "karakter şişti" gibi duruyordu.
+        if (this.intro) {
+            const cam = this.intro.camera();
+            ctx.save();
+            ctx.translate(cam.x, cam.y);
+            ctx.scale(cam.scale, cam.scale);
+            ctx.translate(-cam.x, -cam.y);
+            this.currentArena.drawBg(ctx, canvas.width, canvas.height);
+            ctx.restore();
+
+            this.intro.draw(ctx);
+            if (this.intro.step()) this.intro = this.introQueue.shift() || null;
+            return;
+        }
+
         this.currentArena.drawBg(ctx, canvas.width, canvas.height);
 
         this.p1.update();
         this.p2.update();
 
-        // Oyuncular her zaman birbirlerine dönük olsun
+        // Oyuncular her zaman birbirlerine dönük sayılır (sprite aynalanmıyor,
+        // ama güçler geldiğinde yön buradan okunacak)
         this.p1.dir = (this.p2.x >= this.p1.x) ? 1 : -1;
         this.p2.dir = (this.p1.x >= this.p2.x) ? 1 : -1;
 
         ctx.save();
         effects.applyShake(ctx);
-
-        this.updateProjectiles();
 
         effects.drawParticles(ctx);
         effects.drawDeathPixels(ctx);
@@ -169,65 +177,8 @@ export class Game {
 
         effects.drawFlash(ctx, canvas.width, canvas.height);
 
-        this.hud.updateCooldowns(this.p1, this.p2);
         // Kol tarayıcıya ancak bir tuşuna basılınca görünüyor; savaş başladıktan
         // sonra uyanan kol da HUD'daki simgeleri değiştirebilmeli.
         this.hud.updateControlBadges(this.gamepad?.padCount || 0);
-    }
-
-    updateProjectiles() {
-        const { ctx, effects } = this;
-
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const p = this.projectiles[i];
-            p.update(this);
-            p.draw(ctx);
-
-            // İsabet kontrolü
-            const target = p.owner === 1 ? this.p2 : this.p1;
-            const dist = Math.hypot(p.x - target.x, p.y - target.y);
-
-            if (dist < target.width/2 + p.radius) {
-                this.applyStatusEffect(p, target);
-
-                target.takeDamage(p.dmg);
-                effects.createExplosion(p.x, p.y, p.color);
-                this.projectiles.splice(i, 1);
-                continue;
-            }
-
-            if (p.duration <= 0) {
-                // Tohum bombası isabet etmese de zeminde patlar
-                if (p.type === 'seedbomb') effects.createExplosion(p.x, p.y, '#65a30d');
-                this.projectiles.splice(i, 1);
-            }
-        }
-    }
-
-    // İsabet anındaki özel durum etkileri (hipnoz, dondurma, zehir)
-    applyStatusEffect(projectile, target) {
-        const { effects } = this;
-
-        if (projectile.type === 'hypnosis') {
-            target.frozen = true;
-            effects.spawnText(target.x, target.y - 90, 'HİPNOZ!', '#a855f7', true);
-            setTimeout(() => target.frozen = false, 1500);
-        } else if (projectile.type === 'freeze') {
-            target.frozen = true;
-            effects.spawnText(target.x, target.y - 90, 'DONDU!', '#38bdf8', true);
-            setTimeout(() => target.frozen = false, 2000);
-        } else if (projectile.type === 'poison') {
-            let ticks = 0;
-            effects.spawnText(target.x, target.y - 90, 'ZEHİRLENDİ!', '#10b981', true);
-            const poisonInterval = setInterval(() => {
-                if (this.isGameOver) {
-                    clearInterval(poisonInterval);
-                    return;
-                }
-                target.takeDamage(3);
-                ticks++;
-                if (ticks >= 4) clearInterval(poisonInterval);
-            }, 1000);
-        }
     }
 }

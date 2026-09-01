@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Kol kontrolü</title>
+<style>
+    body { background:#12121a; color:#e8e8f0; font-family:monospace; font-size:15px; padding:24px; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    p { color:#9a9ab0; margin:4px 0 18px; }
+    .kutu { background:#1c1c28; border:1px solid #2e2e42; border-radius:6px; padding:14px; margin-bottom:14px; white-space:pre-wrap; }
+    .yok { color:#ff6b6b; }
+    .var { color:#6bff9a; }
+    .bas { color:#ffd76b; }
+</style>
+</head>
+<body>
+<h1>Oyun kolu kontrolü</h1>
+<p>Bu sayfa oyunun kodunu kullanmıyor: doğrudan tarayıcının Gamepad
+API'sini okuyor. Kola bir tuşa bas (Chrome kolu ancak o zaman gösterir).</p>
+<div class="kutu" id="olay">gamepadconnected olayı: <span class="yok">henüz gelmedi</span></div>
+<div class="kutu" id="liste">navigator.getGamepads(): okunuyor...</div>
+<script>
+let olayGeldi = false;
+window.addEventListener('gamepadconnected', (e) => {
+    olayGeldi = true;
+    document.getElementById('olay').innerHTML =
+        'gamepadconnected olayı: <span class="var">GELDİ</span> — ' + e.gamepad.id;
+});
+window.addEventListener('gamepaddisconnected', () => {
+    document.getElementById('olay').innerHTML =
+        'gamepadconnected olayı: <span class="yok">kol çıkarıldı</span>';
+});
+
+function satir(pad) {
+    if (!pad) return null;
+    const basili = pad.buttons
+        .map((b, i) => (b.pressed || b.value > 0.3) ? i : -1)
+        .filter(i => i >= 0);
+    const eksen = pad.axes.map(a => a.toFixed(2)).join('  ');
+    return [
+        'yuva ' + pad.index + '  ' + pad.id,
+        '  eşleme (mapping): ' + (pad.mapping || '(BOŞ - standart değil!)'),
+        '  bağlı: ' + pad.connected,
+        '  eksenler: ' + eksen,
+        '  basılı tuşlar: ' + (basili.length ? '<span class="bas">' + basili.join(', ') + '</span>' : '-')
+    ].join('\n');
+}
+
+function tick() {
+    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+    const canli = pads.filter(Boolean);
+    const kutu = document.getElementById('liste');
+    if (canli.length === 0) {
+        kutu.innerHTML = 'navigator.getGamepads(): <span class="yok">hiç kol görünmüyor</span>\n'
+            + '(dizi uzunluğu ' + pads.length + ', hepsi boş)\n\n'
+            + 'Kolun bir tuşuna bas. Hâlâ boşsa kolu Chrome görmüyor demektir:\n'
+            + 'Bluetooth/USB bağlantısı, Steam Input ya da DS4Windows araya girmiş olabilir.';
+    } else {
+        kutu.innerHTML = 'navigator.getGamepads(): <span class="var">' + canli.length
+            + ' kol</span>\n\n' + canli.map(satir).join('\n\n');
+    }
+    requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

@@ -1,22 +1,20 @@
 // Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
-import { CHARACTER_CLASSES } from './config/characters.js';
-import { loadCharacters } from './services/pokeapi.js';
-import { Progress } from './world/Progress.js';
-import { Library } from './ui/library.js';
-import { Shop } from './ui/shop.js';
+//
+// Oyunun iki parçası var: ana menü sahnesinden açılan PROLOG (çizgi roman)
+// ve sağdaki portaldan açılan İKİ KİŞİLİK ARENA. Eski Pokemon macera modu
+// (ana harita, yakalama, dükkan, kütüphane) tamamen kaldırıldı.
 import { InputManager } from './core/input.js';
 import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
 import { PadMenu } from './ui/padMenu.js';
-import { showBattleScreen, showGameOver, hideGameOver, showOverworldScreen, showSelectionScreen, showMenuScreen, showAdventureScreen, showSiegeScreen, showSewerScreen } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showSelectionScreen, showMenuScreen, showComicScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
-import { Overworld } from './world/Overworld.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
-import { AdventureScene } from './adventure/AdventureScene.js';
-import { SiegeScene } from './adventure/SiegeScene.js';
-import { SewerScene } from './adventure/SewerScene.js';
+import { ComicScene } from './comic/ComicScene.js';
+import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
+import { FIGHTERS } from './game/fighters.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -33,7 +31,7 @@ const padMenu = new PadMenu({
     gamepad,
     characterSelect,
     onStart: () => document.getElementById('start-battle-btn').click(),
-    onBack: () => document.getElementById('selection-back-btn').click(),
+    onBack: () => returnToMenu(),
     onRestart: () => document.getElementById('restart-btn').click()
 });
 
@@ -43,117 +41,44 @@ const game = new Game({
     gamepad,
     hud,
     onGameOver: (winnerNum, winner) => {
-        showGameOver(`Oyuncu ${winnerNum} (${winner.char.className}) Kazandı!`);
+        showGameOver(`Oyuncu ${winnerNum} (${winner.fighter.name}) Kazandı!`);
         // Savaş döngüsü durdu; kolu artık PadMenu tarıyor (ÇARPI = yeniden oyna)
         padMenu.start('gameover');
     }
 });
 
-// Macera modu ilerlemesi (seviye, deneyim, yakalananlar) localStorage'da tutulur
-const progress = new Progress();
-
-const overworld = new Overworld({
-    canvas: document.getElementById('worldCanvas'),
-    input,
-    progress,
-    onExit: () => returnToMenu(),
-    onOpenShop: () => shop.toggle(),
-    onMerchantLoaded: (name) => shop.setMerchantName(name)
-});
-
-// Kecleon'un dükkanı: tezgahın önünde F ile açılır
-const shop = new Shop({
-    progress,
-    onUseItem: (id) => overworld.useItem(id)
-});
-
-// Kütüphane: jetonları harcayıp Pokemon seviyesi yükseltme ve ekip düzenleme
-const library = new Library({
-    progress,
-    onLevelUp: (index) => overworld.onMemberLeveled(index),
-    onPartyChange: () => overworld.loadParty()
-});
-
-// E tuşu kütüphaneyi açar/kapatır (macera modundayken)
-input.onKeyDown(e => {
-    if (e.code === 'KeyE' && overworld.running) library.toggle();
-});
-
-// --- Ana menü sahnesi ---
-// Menü artık bir düğme listesi değil, antrenörün gezdiği bir sahne:
-// ortadaki macera kapısı F ile açılır, sağdaki portal iki kişilik moda çıkar.
-
-// Kolun durumu MenuScene döngüsünde her karede taranır (menüde sol analog
-// yürütür, ÜÇGEN = F); savaş sırasında taramayı Game döngüsü devralır.
-
-// Eski overworld (ana harita). Menüden erişilmiyor - macera modu sıfırdan
-// kuruluyor - ama motor duruyor ve UI testleri buradan giriyor.
-async function enterOverworld() {
-    menu.stop();
-    showOverworldScreen();
-    await overworld.start();
-}
-
 function returnToMenu() {
-    overworld.stop();
     padMenu.stop();
     showMenuScreen();
     menu.start();
 }
 
-const adventure = new AdventureScene({
-    canvas: document.getElementById('adventureCanvas'),
+// PROLOG: çizgi roman. Oyunun oynanan kısmı ormana girişte başlıyor; ondan
+// öncesi (laboratuvar, yayılma yolu, kuşatma, ormanın ağzı) kare kare
+// anlatılıyor. Prolog bitince şimdilik ana menüye dönülüyor - ormanın
+// kendisi sıradaki iş.
+const comic = new ComicScene({
+    canvas: document.getElementById('comicCanvas'),
     input,
     gamepad,
     onExit: () => {
-        adventure.stop();
-        showMenuScreen();
-        menu.start();
-    }
-});
-
-// Kanalizasyon: prolog 3 ile 4 arasındaki otomatik koşu. Rögardan inilir,
-// şehrin kenarındaki bacadan çıkılır - prolog 4 tam oradan başlıyor.
-const sewer = new SewerScene({
-    canvas: document.getElementById('sewerCanvas'),
-    input,
-    gamepad,
-    onExit: () => {
-        sewer.stop();
+        comic.stop();
         showMenuScreen();
         menu.start();
     },
     onFinish: () => {
-        sewer.stop();
-        showAdventureScreen();
-        adventure.start();
-    }
-});
-
-// Prolog 3: kuşatılan çalışma alanı. Sahnenin sonunda acil çıkış kapanır,
-// ekran kararır ve kanalizasyona inilir.
-const siege = new SiegeScene({
-    canvas: document.getElementById('siegeCanvas'),
-    input,
-    gamepad,
-    onExit: () => {
-        siege.stop();
+        comic.stop();
         showMenuScreen();
         menu.start();
-    },
-    onFinish: () => {
-        siege.stop();
-        showSewerScreen();
-        sewer.start();
     }
 });
 
 const startPrompt = new StartPrompt({
-    // EVET: ekran yavaşça kararır, sonra prologun 3. bölümü açılır
+    // EVET: ekran yavaşça kararır, sonra prolog çizgi romanı başlar
     onConfirm: () => menu.beginExit(() => {
         menu.stop();
-        showSiegeScreen();
-        siege.start();
+        showComicScreen();
+        comic.start();
     }),
     onCancel: () => menu.setPaused(false)
 });
@@ -165,6 +90,9 @@ gamepad.onButtonDown(button => {
     else if (button === 'circle') startPrompt.cancel();
 });
 
+// --- Ana menü sahnesi ---
+// Menü bir düğme listesi değil, antrenörün gezdiği bir sahne: ortadaki
+// macera kapısı F ile açılır, sağdaki portal iki kişilik moda çıkar.
 const menu = new MenuScene({
     canvas: document.getElementById('menuCanvas'),
     input,
@@ -186,29 +114,17 @@ showMenuScreen();
 menu.start();
 
 document.getElementById('selection-back-btn').addEventListener('click', returnToMenu);
-document.getElementById('overworld-back-btn').addEventListener('click', returnToMenu);
 
 // Otomatik UI testleri (tests/ui.test.mjs) oyun durumunu buradan okur
-window.__overworld = overworld;
 window.__game = game;
-window.__library = library;
-window.__shop = shop;
-window.__progress = progress;
 window.__menu = menu;
+window.__comic = comic;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;
 window.__characterSelect = characterSelect;
-window.__adventure = adventure;
-window.__siege = siege;
-window.__sewer = sewer;
-// Kanalizasyona doğrudan giriş: testler ve ekran görüntüsü için, prologun
-// başından oynamak zorunda kalmadan
-window.__enterSewer = () => {
-    menu.stop();
-    showSewerScreen();
-    sewer.start();
-};
-window.__enterOverworld = enterOverworld;
+// Giriş animasyonunun süresi: tools/intro-shots.mjs kareyi buradan sarıyor
+window.__introInfo = { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES };
+window.__fighters = { FIGHTERS };
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();
@@ -229,12 +145,3 @@ document.getElementById('restart-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();
     game.start(p1, p2);
 });
-
-// Karakterleri yükle; her biri hazır oldukça karta dönüşür
-loadCharacters(CHARACTER_CLASSES, character => characterSelect.addCharacter(character))
-    .then(characters => {
-        if (characters.length === 0) {
-            const spinner = document.querySelector('.loading-spinner');
-            if (spinner) spinner.textContent = 'Pokemonlar yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
-        }
-    });

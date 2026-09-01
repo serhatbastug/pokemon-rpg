@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PokeRPG - Real-time Arena PvP</title>
-    <!-- Pokeball favicon (gömülü SVG; ek istek yapılmaz) -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23f8fafc' stroke='%23111827' stroke-width='2'/%3E%3Cpath d='M1 16a15 15 0 0 1 30 0z' fill='%23dc2626'/%3E%3Crect x='1' y='14' width='30' height='4' fill='%23111827'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23f8fafc' stroke='%23111827' stroke-width='2'/%3E%3C/svg%3E">
+    <title>Virüs - Arena ve Prolog</title>
+    <!-- Favicon: yeşil virüs kütlesi (gömülü SVG; ek istek yapılmaz) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316260a'/%3E%3Crect x='8' y='6' width='16' height='20' fill='%234a7c1f'/%3E%3Crect x='10' y='4' width='12' height='4' fill='%234a7c1f'/%3E%3Crect x='6' y='12' width='4' height='12' fill='%232f5312'/%3E%3Crect x='22' y='12' width='4' height='12' fill='%232f5312'/%3E%3Crect x='11' y='10' width='4' height='3' fill='%23d9f65a'/%3E%3Crect x='18' y='11' width='3' height='3' fill='%23d9f65a'/%3E%3C/svg%3E">
     <!-- Google Fonts: Outfit & Space Grotesk -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,27 +24,15 @@
             <canvas id="menuCanvas" width="1000" height="560"></canvas>
         </section>
 
-        <!-- Macera modu: şehrin kenarından ormanın girişine. Menü gibi ekranı
-             tamamen kaplar; kamera antrenörü takip eder. -->
-        <section id="adventure-screen" class="screen menu-screen hidden">
-            <canvas id="adventureCanvas" width="1000" height="560"></canvas>
-        </section>
-
-        <!-- Prolog 3: kusatilan calisma alani. Macera kapisi buraya aciliyor;
-             sahnenin sonunda rogardan asagi inilip sehir sahnesine gecilir. -->
-        <section id="siege-screen" class="screen menu-screen hidden">
-            <canvas id="siegeCanvas" width="1000" height="560"></canvas>
-        </section>
-
-        <!-- Kanalizasyon: prolog 3 ile 4 arasindaki otomatik kosu bolumu.
-             Rogardan inilir, sehrin kenarindaki bacadan cikilir. -->
-        <section id="sewer-screen" class="screen menu-screen hidden">
-            <canvas id="sewerCanvas" width="1000" height="560"></canvas>
+        <!-- Prolog: cizgi roman. Macera kapisi buraya aciliyor; kareler
+             tek tek tam ekran geliyor, oyuncu F / CARPI ile ilerletiyor. -->
+        <section id="comic-screen" class="screen menu-screen hidden">
+            <canvas id="comicCanvas" width="1000" height="560"></canvas>
         </section>
 
         <!-- Header -->
         <header class="main-header hidden" id="main-header">
-            <h1 class="game-title">POKÉ<span>RPG</span></h1>
+            <h1 class="game-title">VİRÜS<span> ARENA</span></h1>
             <p class="game-subtitle">2 Kişilik Gerçek Zamanlı Arena Savaşı</p>
             <div id="selection-status" class="selection-status">
                 <span class="p1-status-badge">Oyuncu 1: Seçim Yapıyor...</span>
@@ -63,56 +51,12 @@
             <p id="mode-hint" class="mode-hint">Aşağıdan iki karakter seçin (P1 ve P2).</p>
             <!-- Kol takılıyken beliren öğretme (metni padMenu.js yazar) -->
             <p id="pad-hint" class="mode-hint pad-hint hidden"></p>
-            <h2 class="section-title">Karakterinizi Seçin</h2>
+            <h2 class="section-title">Dövüşçünüzü Seçin</h2>
             <div id="character-grid" class="character-grid">
-                <div class="loading-spinner">Pokemonlar çağrılıyor...</div>
             </div>
         </section>
 
-        <!-- Kecleon'un Dükkanı: jetonla eşya al, çantayı kullan -->
-        <section id="shop-overlay" class="detail-overlay hidden">
-            <div class="modal-card shop-modal">
-                <button id="shop-close" class="close-btn">&times;</button>
-                <h3 class="picker-title">Tüccar Kecleon</h3>
-                <p id="shop-speech" class="shop-speech"></p>
-                <p id="shop-tokens" class="picker-progress"></p>
-                <h4 class="lib-section">Satılık</h4>
-                <div id="shop-list" class="lib-list"></div>
-                <h4 class="lib-section">Çanta</h4>
-                <div id="shop-bag" class="lib-list"></div>
-            </div>
-        </section>
 
-        <!-- Pokemon Kütüphanesi: ekip, koleksiyon ve jeton harcama -->
-        <section id="library-overlay" class="detail-overlay hidden">
-            <div class="modal-card library-card">
-                <button id="library-close" class="close-btn">&times;</button>
-                <h3 class="picker-title">Pokemon Kütüphanesi</h3>
-                <p id="library-tokens" class="picker-progress"></p>
-                <div id="library-detail" class="lib-detail hidden"></div>
-                <h4 class="lib-section">Ekip</h4>
-                <div id="library-party" class="lib-list"></div>
-                <h4 class="lib-section">Koleksiyon</h4>
-                <div id="library-collection" class="lib-list"></div>
-                <h4 class="lib-section">Pokedex</h4>
-                <p id="library-dex-summary" class="picker-progress"></p>
-                <div id="library-dex" class="dex-grid"></div>
-            </div>
-        </section>
-
-        <!-- Overworld (Macera Modu Ana Haritası) -->
-        <section id="overworld-screen" class="screen hidden">
-            <div class="overworld-topbar">
-                <button id="overworld-back-btn" class="back-btn">&larr; Ana Menü</button>
-                <h2 id="overworld-title" class="overworld-title">Ana Harita</h2>
-                <span class="overworld-hint">WASD: hareket &middot; K O Ş: yetenek &middot; N: Pokeball &middot; 1-6: poke top &middot; F: saha hamlesi &middot; Space: zıpla &middot; Shift: atıl &middot; E: kütüphane &middot; ESC: çık</span>
-            </div>
-            <div class="canvas-container">
-                <canvas id="worldCanvas" width="1000" height="500"></canvas>
-            </div>
-        </section>
-
-        <!-- Battle Screen -->
         <section id="battle-screen" class="screen hidden">
             <!-- HUD -->
             <div class="battle-hud">
@@ -126,11 +70,7 @@
                         <div class="hp-bar-bg"><div id="p1-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
                         <span id="p1-hp-text" class="bar-text">100 / 100</span>
                     </div>
-                    <div class="skills-cooldown-hud" id="p1-cooldowns">
-                        <div class="skill-cd" id="p1-cd-1"><span class="key-badge">F</span><span class="cd-overlay"></span></div>
-                        <div class="skill-cd" id="p1-cd-2"><span class="key-badge">Shift</span><span class="cd-overlay"></span></div>
-                        <div class="skill-cd" id="p1-cd-3"><span class="key-badge">Space</span><span class="cd-overlay"></span></div>
-                    </div>
+                    <p id="p1-controls" class="hud-controls">W A S D</p>
                 </div>
 
                 <!-- Vs Emblem -->
@@ -146,11 +86,7 @@
                         <div class="hp-bar-bg"><div id="p2-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
                         <span id="p2-hp-text" class="bar-text">100 / 100</span>
                     </div>
-                    <div class="skills-cooldown-hud" id="p2-cooldowns">
-                        <div class="skill-cd" id="p2-cd-1"><span class="key-badge">Shift</span><span class="cd-overlay"></span></div>
-                        <div class="skill-cd" id="p2-cd-2"><span class="key-badge">,</span><span class="cd-overlay"></span></div>
-                        <div class="skill-cd" id="p2-cd-3"><span class="key-badge">Enter</span><span class="cd-overlay"></span></div>
-                    </div>
+                    <p id="p2-controls" class="hud-controls">← ↑ → ↓</p>
                 </div>
             </div>
 

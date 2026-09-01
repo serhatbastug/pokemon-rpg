@@ -1,41 +1,44 @@
-import { castAbility } from './abilities.js';
-import { PHYSICS, PLAYER_SIZE, PAD_JUMP_BUTTON } from '../config/settings.js';
+import { PHYSICS, PAD_JUMP_BUTTON } from '../config/settings.js';
+import { drawFighter, FIGHTER_SPRITES } from './fighterArt.js';
 
-// Arenadaki bir oyuncu: hareket, fizik, can, kalkan, durum etkileri ve yetenekler.
+// Arenadaki bir oyuncu: hareket, fizik, can ve durum etkileri.
+//
+// SALDIRI YOK: virüslerin güçleri henüz yazılmadı. takeDamage/ölüm yolu
+// duruyor çünkü güçler geldiğinde bağlanacak yer orası.
 export class Player {
-    constructor({ x, y, char, playerNum, color, controls, padSlot = null, game }) {
+    constructor({ x, y, fighter, playerNum, color, controls, padSlot = null, game }) {
         this.x = x;
         this.y = y;
-        this.width = PLAYER_SIZE.width;
-        this.height = PLAYER_SIZE.height;
-        this.char = char;
+        this.fighter = fighter;
         this.playerNum = playerNum;
         this.color = color;
         this.controls = controls;
         this.padSlot = padSlot;   // bu oyuncunun kolu (yoksa klavye)
         this.game = game;
 
-        this.maxHp = char.baseStats.hp;
+        // Çarpışma kutusu sprite'ın kendi ölçüsü: virüs anti-virüsten hem
+        // daha geniş hem daha kütleli, ikisini aynı kutuya sokmak yanlış olur.
+        const sprite = FIGHTER_SPRITES[fighter.id]?.();
+        this.width = sprite ? sprite.w * 0.55 : 80;
+        this.height = sprite ? sprite.h : 160;
+
+        this.maxHp = fighter.stats.hp;
         this.hp = this.maxHp;
-        this.speed = char.baseStats.speed;
-        this.dir = playerNum === 1 ? 1 : -1; // 1 = sağa, -1 = sola bakıyor
-        this.vy = 0; // dikey hız (yerçekimi ve zıplama için)
+        this.speed = fighter.stats.speed;
+        this.dir = playerNum === 1 ? 1 : -1;
+        this.vy = 0;
 
-        this.img = new Image();
-        this.img.src = char.battleSprite || char.sprite;
-
-        // Bekleme süreleri (kare cinsinden; yaklaşık 2s, 4s, 10s)
-        this.cooldowns = [0, 0, 0];
-        this.maxCooldowns = [120, 240, 600];
-        if (char.className === 'Okçu') this.maxCooldowns = [120, 200, 540];
-
-        // Dinamik güçlendirme/zayıflatma durumları
         this.invulnerable = false;
         this.frozen = false;
         this.damageMultiplier = 1.0;
         this.speedMultiplier = 1.0;
         this.flashFrames = 0;
         this.isDead = false;
+    }
+
+    // Ayakların değdiği çizgi: sprite ayak hizasından çiziliyor
+    get footY() {
+        return this.y + this.height / 2;
     }
 
     draw(ctx) {
@@ -47,25 +50,13 @@ export class Player {
         // Hasar alınca yanıp sönme
         if (this.flashFrames > 0) {
             this.flashFrames--;
-            if (this.flashFrames % 4 < 2) {
-                ctx.globalAlpha = 0.25;
-            }
+            if (this.flashFrames % 4 < 2) ctx.globalAlpha = 0.25;
         }
 
-        // Donma efekti
-        if (this.frozen) {
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#38bdf8';
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
-            ctx.fillRect(this.x - this.width/2 - 5, this.y - this.height/2 - 5, this.width + 10, this.height + 10);
-        }
-
-        // Sprite
-        ctx.translate(this.x, this.y);
-        if (this.dir === 1) {
-            ctx.scale(-1, 1);
-        }
-        ctx.drawImage(this.img, -this.width/2, -this.height/2, this.width, this.height);
+        // Sprite AYNALANMIYOR: iki karakterin de kimliği asimetrisinde
+        // (anti-virüsün kaplı yanı, virüsün yüksek omzu). Aynalayınca hangi
+        // yanın kaplı olduğu karaktere değil, rakibin yerine bağlı olurdu.
+        drawFighter(ctx, this.fighter.id, this.x, this.footY, this.game.frame);
 
         ctx.restore();
     }
@@ -89,8 +80,8 @@ export class Player {
         const moveSpeed = this.speed * this.speedMultiplier;
 
         // Yatay hareket: klavye tuşları ile kolun sol analogu aynı işi görür.
-        // Klavyede iki yön birden basılıysa birbirini götürür (eskisi gibi);
-        // kolda analog yarım itilirse karakter daha yavaş yürür.
+        // Klavyede iki yön birden basılıysa birbirini götürür; kolda analog
+        // yarım itilirse karakter daha yavaş yürür.
         let dx = 0;
         if (input.isDown(this.controls.left)) dx -= 1;
         if (input.isDown(this.controls.right)) dx += 1;
@@ -98,13 +89,13 @@ export class Player {
 
         if (dx !== 0) {
             this.x = Math.min(
-                canvas.width - this.width/2,
-                Math.max(this.width/2, this.x + dx * moveSpeed)
+                canvas.width - this.width / 2,
+                Math.max(this.width / 2, this.x + dx * moveSpeed)
             );
         }
 
-        // Yerçekimi ve zıplama fiziği (uçmayı engeller)
-        const groundY = canvas.height - this.height/2 - PHYSICS.groundOffset;
+        // Yerçekimi ve zıplama (uçmayı engeller)
+        const groundY = canvas.height - this.height / 2 - PHYSICS.groundOffset;
 
         const jumping = input.isDown(this.controls.up) || this.padDown(PAD_JUMP_BUTTON);
         if (jumping && this.y >= groundY) {
@@ -114,18 +105,10 @@ export class Player {
         this.vy += PHYSICS.gravity;
         this.y += this.vy;
 
-        // Yere çarpma kontrolü
         if (this.y >= groundY) {
             this.y = groundY;
             this.vy = 0;
         }
-    }
-
-    useAbility(index) {
-        if (this.frozen || this.cooldowns[index] > 0) return;
-
-        castAbility(this, index, this.game);
-        this.cooldowns[index] = this.maxCooldowns[index];
     }
 
     takeDamage(amount) {
@@ -137,18 +120,12 @@ export class Player {
         effects.triggerShake(8);
 
         const dmg = Math.ceil(amount);
-        let color = '#ff4444';
-        let txt = `-${dmg}`;
         const isCrit = amount > 20;
-
-        if (isCrit) {
-            txt = `KRİTİK! -${dmg}`;
-            color = '#fbbf24';
-            effects.triggerFlash('rgba(255, 255, 255, 0.25)', 4);
-        }
+        const txt = isCrit ? `KRİTİK! -${dmg}` : `-${dmg}`;
+        const color = isCrit ? '#fbbf24' : '#ff4444';
+        if (isCrit) effects.triggerFlash('rgba(255, 255, 255, 0.25)', 4);
 
         this.hp -= amount;
-
         effects.spawnText(this.x, this.y - 60, txt, color, isCrit);
 
         if (this.hp <= 0) {
@@ -170,21 +147,12 @@ export class Player {
         effects.triggerFlash('rgba(255,255,255,0.7)', 8);
 
         effects.spawnText(this.x, this.y - 80, 'K.O.!', '#ff0000', true);
-        effects.spawnDeathPixels(this.x, this.y, [this.color, '#ffffff', '#ffff00', '#ff8800']);
+        effects.spawnDeathPixels(this.x, this.y, [this.fighter.themeColor, '#ffffff', '#ffff00']);
 
-        // 1.5 saniye sonra oyun biter
-        setTimeout(() => {
-            this.game.endGame(winnerNum);
-        }, 1500);
+        setTimeout(() => this.game.endGame(winnerNum), 1500);
     }
 
     update() {
         this.move();
-
-        for (let i = 0; i < this.cooldowns.length; i++) {
-            if (this.cooldowns[i] > 0) {
-                this.cooldowns[i]--;
-            }
-        }
     }
 }

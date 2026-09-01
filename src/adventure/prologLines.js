@@ -7,6 +7,22 @@
 // Balon kesmeleri (aynı kişinin arka arkaya iki balonu) bilerek: uzun cümle
 // tek balonda okunmuyor.
 
+// --- Prolog 1: laboratuvar ---
+//
+// Bölümün tek konuşanı profesör ve kendi kendine konuşuyor. Adı, unvanı,
+// yüzü yok; yalnızca sesi ve bileğindeki turuncu saat var.
+
+// Karışım bitince, kağıda son bir kez bakarken
+export const LAB_RECIPE = [
+    { speaker: 'profesor', text: 'İşte, tarifteki ile aynı yaptım. Umarım bu işe yarar.' }
+];
+
+// Koldaki turuncu saate bakarken
+export const LAB_LATE = [
+    { speaker: 'profesor', text: 'Saat oldukça geç olmuş.' },
+    { speaker: 'profesor', text: 'Bugünlük bu kadar yeter, testleri daha sonra yaparım.' }
+];
+
 // --- Prolog 3: çalışma alanı ---
 
 // Virüslüler tel örgüye dayandığı an

@@ -2,3 +2,6 @@ node_modules/
 tests/screenshots/
 .DS_Store
 Thumbs.db
+
+# Araclarin urettigi referans kareler: gerektiginde yeniden uretiliyor
+tools/shots/

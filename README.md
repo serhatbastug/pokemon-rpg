@@ -1,9 +1,10 @@
-# PokeRPG — Gerçek Zamanlı Arena PvP
+# Virüs — Arena ve Prolog
 
-2 kişilik, aynı ekranda oynanan gerçek zamanlı Pokemon arena savaş oyunu
-(klavyede ya da her oyuncu kendi PS5 koluyla).
+Aynı ekranda oynanan 2 kişilik gerçek zamanlı arena (klavyede ya da her
+oyuncu kendi PS5 koluyla) ve hikâyeyi anlatan çizgi roman prologu.
 Saf HTML/CSS/JavaScript (ES modülleri) ile yazılmıştır; derleme adımı yoktur.
-Karakter verileri [PokeAPI](https://pokeapi.co)'den çekilir.
+Dış veri kaynağı yoktur: bütün karakterler ve sahneler elle çizilmiş piksel
+sanatıdır.
 
 ## Çalıştırma
 
@@ -21,8 +22,8 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (477 kontrol): harita geçerliliği, portal ulaşılabilirliği, ana menü ve macera sahnesi yerleşimi, gizli alanların yalnızca gizli çalıdan geçilmesi, spawn noktaları, sprite desenleri, yetenek/sprite/tip tutarlılığı, seviye ve saha hamlesi mantığı, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (124 test): ana menü sahnesi, macera sahnesi (kamera, orman girişi), oyun kolu, ekran geçişleri, savaş, harita gezinme, poke top fırlatma, yakalama, jetonlar, evrim, kayıt, rozetler, saha hamleleri, tüccar ve her ekranda FPS ölçümü. | ~2 dk |
+| `npm run check` | Veri ve saf mantık testleri (108 kontrol): ana menü yerleşimi (her iki kapıya da yürünebiliyor mu), arena kadrosu, prolog çizgi romanının senaryosu ve akışı, diyalog yürütücüsü, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (53 test): ana menü sahnesi, prolog çizgi romanı (kare ilerletme, balonlar), oyun kolu (iki kol, iki yuva), ekran geçişleri, dövüşçü seçimi, arena, giriş animasyonları (P1 → P2 sırası) ve FPS ölçümü. | ~1 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -40,12 +41,12 @@ açılır (`src/menu/`). Sahne tek ekrandır, kamera kaymaz:
 | Orta | "MACERA KAPISI" tabelalı taş kemer | Önüne gelip **F** / **ÜÇGEN**: "Oyuna başlamak istiyor musunuz?" penceresi açılır |
 | Sağ | "2 KİŞİLİK OYNA" tabelalı portal | Kemerin **altına yürüyün**: ekran yavaşça kararır, karakter seçimi açılır |
 
-EVET denince ekran yavaşça kararır ve **macera modunun ilk sahnesi** açılır
-(aşağıya bakın).
+EVET denince ekran yavaşça kararır ve **prologun çizgi romanı** açılır
+(aşağıya bakın). Oyunun oynanan kısmı prolog bitince, ormanda başlayacak.
 
-> Eski overworld (5 bölge portallı ana harita, jetonlar, dükkan) menüden
-> erişilmiyor: macera modu sıfırdan kuruluyor. Motoru duruyor ve UI
-> testlerinde çalışıyor (`window.__enterOverworld`).
+> Eski Pokemon macera modu (portallı ana harita, yakalama, jetonlar, dükkan,
+> kütüphane) tamamen kaldırıldı. Macera kapısı prologun çizgi romanını açıyor;
+> oynanan kısım ormanda başlayacak.
 
 Sahne ekranı tamamen kaplar (canvas 1000x560, object-fit: contain).
 Ev, ağaç gövdeleri ve kemer ayakları engeldir; yerleşimin tutarlılığı (her iki
@@ -72,31 +73,53 @@ içinde; ham kol verisini yöne çeviren `readPad` saf fonksiyon olduğu için
 Menü ve prolog sahneleri tek kolla oynanır (ilk kol). İki kişilik arenada ise
 **her oyuncunun kendi kolu** vardır - [Kontroller](#kontroller) bölümüne bakın.
 
-## Macera Modu — İlk Sahne (`src/adventure/`)
+## Prolog — Çizgi Roman (`src/comic/`)
 
-Şehrin kenarından ormanın girişine. Dünya ekrandan geniştir (2400x560), kamera
-antrenörü takip eder:
+Prolog **oynanmıyor**: oyuncunun eline kontrol ormana girdiğinde geçiyor,
+ondan öncesi kare kare anlatılıyor. Her kare tam ekran gelir, öncekinin
+üstünü örter; oyuncu **F / SPACE / ENTER**, kolda **ÇARPI** ile ilerletir.
+**ESC / DAİRE** prologu bırakır.
+
+Dört bölüm, 29 kare:
+
+| Bölüm | Kare | Ne anlatılıyor |
+|---|---|---|
+| 1. LABORATUVAR | 6 | Gece, deney 44, şişenin rafa konması, ışıkların sönmesi, camın çatlaması. **Tek kelime konuşulmuyor** - yalnızca anlatıcı kutuları. |
+| 2. ÇALIŞMA ALANI | 7 | Temiz çıkan tahliller, hücrenin İÇİNDEKİ virüs, duvardaki haritaya iğnelenen vakalar, ortaya çıkan hat (su şebekesi), aşı kuyruğu. |
+| 3. KUŞATMA | 7 | Avludaki altı kişi, örgüye dayanan kalabalık, kaçış planı, yarıktan giriş, **inen çelik kapı** ve yarım kalan cümle. |
+| 4. ORMANIN AĞZI | 9 | Tünelde koşu, rögardan çıkış, ormanın ağzında duran beş kişi, yeşillenme, vuruş, ormana tek başına giriş. |
+
+Kurallar:
+
+- **Profesörün yüzü hiçbir karede görünmez.** Tek işaret kolundaki turuncu
+  bant; aynı bant 3. bölümde arkadaşın kolundadır. Kimse söylemez.
+- **Arkadaşın dönüşümü gösterilmez**: ne ısırılma, ne dönüşüm, ne kolun
+  çekilip çekilmediği. Ayıran şey kapının kendisi.
+- Önemli anlar **kısa hareketle** anlatılır (şişenin rafa konması, kapının
+  inmesi, yeşillenme, vuruş): her bölümde en az bir hareketli kare vardır.
+- Konuşmalar `prologLines.js`'te tek yerde durur; balon harf harf yazılır ve
+  her birkaç harfte konuşana göre perdesi değişen bir "bıt" sesi çıkar.
+
+Dosyalar:
 
 ```
-0 ------------------- 900 --- 1010 ------------------------- 2400
-|      ŞEHİR           |boşluk|     DAR ORMAN KORİDORU        |
-| binalar, asfalt yol, |      | yüksek ağaçlar, kıvrılan      |
-| kaldırım, yaya geçidi|      | ince patika                   |
+src/comic/
+  comicScript.js      Senaryo: kareler, anlatıcı kutuları, balonlar - DOM'suz
+  ComicPlayer.js      Akış: kare sırası, hareket, balon, ilerletme - DOM'suz
+  ComicScene.js       Canvas, girdi, ses, döngü
+  comicArt.js         Sayfa: çerçeve, anlatıcı kutusu, başlık kartı, çizim haritası
+  comicKit.js         Karelerin paylaştığı çizim araçları (kol, cam kap, ışık)
+  art/chapter1..4.js  Kare çizimleri, bölüm bölüm
 ```
 
-- Antrenör şehirde, **ormanın girişine yakın** bir noktada başlar.
-- Ağaç duvarında yalnızca **antrenörün sığabileceği bir boşluk** açıktır
-  (70 piksel); iki yanı alçak ağaçlarla çerçevelenir.
-- Boşluktan geçilene kadar **kamera sabittir**; geçilince ekran antrenörle
-  birlikte sağa kayar.
-- Ormana girince **FISILTILI ORMAN GİRİŞİ** yazısı belirip kaybolur, müzik
-  şehirden ormana geçer.
-- Koridor bilerek dardır (110 piksel; şehir bandı 280 piksel).
-- **ESC** (kolda DAİRE) ana menüye döner.
+Kareleri gözle görmek için: `node tools/comic-shots.mjs` (tümü),
+`node tools/comic-shots.mjs lab-raf 0.9` (tek kare, hareketin belli bir anı).
+Görüntüler `tools/shots/` altına düşer, sunucunun açık olması gerekir.
 
-Bir çizim kuralı: ağaç tacı gövde dibinden **yukarı** doğru uzar, bu yüzden
-yürünen bandın altına uzun ağaç dikilemez - yolu tamamen örter. Koridorun
-altında yalnızca alçak bitki örtüsü vardır (`adventureLayout.js`).
+> Prologun eski **oynanabilir** sahneleri (kuşatma, kanalizasyon koşusu,
+> şehrin kenarı) çizgi romana dönüştüğü için kaldırıldı; kodları git
+> geçmişinde duruyor (son hâli `376ae07`).
+
 
 ## Kontroller
 
@@ -104,22 +127,18 @@ altında yalnızca alçak bitki örtüsü vardır (`adventureLayout.js`).
 |---|---|---|---|
 | Hareket | W A S D | Yön tuşları | Sol analog / D-pad |
 | Zıplama | W | Yukarı ok | **ÇARPI** |
-| Yetenek 1 | F | Sağ Shift | **KARE** |
-| Yetenek 2 | Sol Shift | , (virgül) | **L1** |
-| Yetenek 3 (Ulti) | Space | Enter | **R1** |
 
-Güçler omuz tuşlarında: zıplarken (ÇARPI) aynı anda güç basmak gerekiyor,
-ikisi de sağ başparmakta olsaydı çakışırdı.
+Saldırı tuşu yok: virüslerin güçleri henüz yazılmadı, arenada şimdilik
+hareket ve zıplama var.
 
 **İki kişilik arena, iki kolla:** her oyuncunun kendi DualSense'i olur.
 Takılan **ilk kol 1. oyuncuyu**, ikinci kol 2. oyuncuyu oynatır (kol sırası
 tarayıcının verdiği numaraya göre). Tek kol takılıysa 2. oyuncu klavyede
 kalır; klavye her zaman açık, kol takılıyken bile çalışır. Kolla oynayan
-oyuncunun HUD'undaki tuş kapaklarında Shift/Space yerine **□ L1 R1** görünür.
+oyuncunun HUD'unda klavye tuşları yerine **Sol analog · ÇARPI** yazar.
 
 Her kol ayrı bir *yuvada* takip edilir (`PadSlot`), yoksa iki kolun basılı
-tuşları birbirine karışırdı: 2. kolun KARE'si yalnızca 2. oyuncunun gücünü
-çalıştırır.
+tuşları birbirine karışırdı: 2. kolun analogu yalnızca 2. oyuncuyu yürütür.
 
 **Menüler de kolla:** karakter seçimi ve "SAVAŞ BİTTİ" penceresi fare
 istemez (`src/ui/padMenu.js`):
@@ -128,7 +147,7 @@ istemez (`src/ui/padMenu.js`):
 |---|---|
 | Kartlar arasında gez | Sol analog / D-pad |
 | Sayfayı kaydır | **Sağ analog** |
-| Karakteri aç, sonra seç | **ÇARPI** |
+| Dövüşçüyü aç, sonra seç | **ÇARPI** |
 | Pencereyi kapat / ana menü | **DAİRE** |
 | Savaşı başlat | **ÜÇGEN** |
 | Savaş sonu: yeniden oyna | **ÇARPI** |
@@ -142,8 +161,6 @@ ekranda çizen bir sahne olmadığı için kolu tarayan da yoktur - `PadMenu` ke
 küçük döngüsünü açar ve yalnızca bu ekranlar açıkken çalışır. Tuşlar gerçek
 düğmelerin `click()`'ini çağırır, yani kol farenin gittiği yerden gider.
 
-**Macera modu:** WASD hareket · K O Ş L P yetenek · **Space zıpla** · **Shift atıl** ·
-1-6 poke top fırlat/geri çağır · N Pokeball · F saha hamlesi / dükkan · E kütüphane
 
 ## Proje Yapısı
 
@@ -153,178 +170,126 @@ style.css               Tüm stiller
 src/
   main.js               Giriş noktası; modülleri kurup birbirine bağlar
   config/
-    characters.js       Karakter sınıfları ve Pokemon ID eşleşmeleri
     settings.js         Fizik sabitleri, tuş atamaları, oyuncu ayarları
-    balance.js          Oynanış denge ayarları (menzil, süre, hasar sabitleri)
-    fieldMoves.js       Rozetler ve saha hamleleri (Cut / Rock Smash / Surf)
-    shopItems.js        Kecleon dükkanının eşyaları (toplar, iksirler)
-    trainers.js         Haritalardaki NPC antrenörler
-    progression.js      Seviye/XP eğrisi ve stat formülleri
-    playableCharacters.js  Oynanabilir karakterlerin resmi hamle setleri
-    regions.js          Macera modu bölgeleri (5 bölge, portal renkleri)
-    worldMap.js         Ana harita karo verisi ve portal konumları
+    controls.js         Kontrol öğretmeleri (hangi tuş neyi yapıyor)
   core/
     input.js            Klavye durumu takibi (InputManager)
     gamepad.js          Oyun kolu (PS5 DualSense): analog yön ve tuş eşlemesi
   services/
-    pokeapi.js          PokeAPI erişim katmanı
-    apiCache.js         API yanıtları için bellek + localStorage önbelleği
-    typeChart.js        Tip etkililik tablosu (PokeAPI kaynaklı)
-    moveAbilities.js    Gerçek hamle verisinden yetenek üretimi
     audio.js            Web Audio ile üretilen ses efektleri ve müzik
   game/
-    Game.js             Oyun motoru: döngü, çarpışmalar, tur durumu
+    Game.js             Oyun motoru: döngü ve tur durumu
     Player.js           Oyuncu: hareket, fizik, can, durum etkileri
-    Projectile.js       Mermiler ve çizim stilleri
-    abilities.js        Sınıf bazlı yetenek tanımları
+    fighters.js         Arena kadrosu (VİRÜS, ANTİ-VİRÜS, ELECTRO-VİRÜS)
+    fighterArt.js       Dövüşçülerin piksel çizimleri ve elektrik efekti
+    fighterIntro.js     Giriş animasyonları (adam -> virüs), P1 ve P2 sırayla
     arenas.js           Pixel art arena arka planları
     effects.js          Parçacıklar, sarsıntı, flaş, uçan yazılar
-    projectileSprites.js Kare kare pixel art mermi sprite desenleri
   world/
-    Overworld.js        Macera motoru: yaşam döngüsü, harita yükleme, girdi
-    ActivePokemon.js    Sahadaki Pokemon: statlar, hasar, tutuş davranışı
-    Enemy.js            Düşman Pokemon: AI, saldırı, durum
-    Progress.js         Ekip, koleksiyon, jeton, rozet ve localStorage kaydı
     trainerSprite.js    Elle çizilmiş antrenör piksel sprite'ı
-    systems/            Overworld davranışları (prototipe karıştırılır)
-      PartyControls.js  Ekip, poke top fırlatma/geri çağırma, eşya kullanımı
-      Navigation.js     Yürünebilirlik, kamera, portallar, akış alanı (BFS)
-      CombatSystem.js   Yetenekler, mermiler, hasar, yakalama, jetonlar
-      TrainerCombat.js  Antrenörün canı, zıplama/atılım ve durum etkileri
-      AutoBattle.js     Sahadaki Pokemonun kendi kendine savaşması
-      TrainerBattles.js NPC antrenör savaşları
-    scenes/Scenes.js    Boss uyanışı, zafer ve evrim sahneleri
-    render/
-      TerrainRenderer.js  Karo desenleri ve zemin pişirme
-      WorldRenderer.js    Portallar, tüccar, oyuncu, efektler ve HUD
   pixel/
     pixelDraw.js        Ortak piksel araçları: PX ızgarası, blok, gürültü
     trees.js            Ağaç sprite'ları (small..huge), sahneler arası paylaşılır
     pixelFont.js        5x7 piksel bitmap yazı tipi (tabelalar, mekan adı)
+    speech.js           Konuşma balonu çizimi
+    screenText.js       Ekran yazısı yardımcıları
+    controlHint.js      Ekranın üstündeki kontrol öğretmesi
+    weaponFx.js         Parçalayıcı silahın görsel etkileri
   menu/
     MenuScene.js        Ana menü sahnesi: yürüyüş, çarpışma, kapı ve portal
     menuLayout.js       Sahne yerleşimi (ev, kemerler, patikalar, ağaçlar) - DOM'suz
     menuArt.js          Sahnenin piksel çizimleri (zemin, ev, taş kemerler)
   adventure/
-    AdventureScene.js   Macera ilk sahnesi: kamera takibi, orman girişi, mekan adı
-    adventureLayout.js  Şehir + koridor yerleşimi ve yürünebilirlik - DOM'suz
-    adventureArt.js     Asfalt, kaldırım, binalar, çit, patika, mekan adı kartı
+    people.js           Arkadaş ve sağlıklıların sprite'ları (turuncu bant, yeşillenme)
+    prologLines.js      Prologun konuşmaları - tek yerde
+    dialogue.js         Balon yürütücüsü: harf harf yazı, 'bıt' sesi
+  comic/
+    comicScript.js      Prologun çizgi roman senaryosu - DOM'suz
+    ComicPlayer.js      Kare akışı - DOM'suz
+    ComicScene.js       Canvas, girdi, ses
+    comicArt.js         Sayfa çerçevesi, anlatıcı kutusu, başlık kartı
+    comicKit.js         Karelerin paylaştığı çizim araçları
+    art/                Kare çizimleri (bölüm bölüm)
   ui/
-    characterSelect.js  Karakter seçim ekranı ve detay modalı
+    characterSelect.js  Dövüşçü seçim ekranı ve detay penceresi
     padMenu.js          Seçim ekranı ve savaş sonu penceresinde kolla gezinme
     startPrompt.js      Macera kapısının piksel onay penceresi
-    library.js          Pokemon kütüphanesi (ekip, koleksiyon, jeton harcama)
-    shop.js             Kecleon dükkanı ve çanta
-    hud.js              Can barları ve cooldown göstergeleri
+    hud.js              Can barları ve kontrol yazısı
     screens.js          Ekranlar arası geçişler
+tools/
+  comic-shots.mjs       Çizgi roman karelerinin PNG'sini alır
+  fighter-shots.mjs     Arena dövüşçülerinin PNG'sini alır
+  intro-shots.mjs       Giriş animasyonlarının karelerini alır
+  fighters.html         Dövüşçü önizleme sayfası
 ```
 
-## Macera Modu (geliştirme aşamasında)
+## Arena Kadrosu
 
-Undertale tarzı, kuşbakışı tek kişilik mod. Plan: 5 bölge x 3 mekan x 5 Pokemon
-(3 yaygın + 1 boss + 1 gizli) = 75 karakter. Yetenekler o Pokemonun resmi
-hamlelerinden seçilir. Maceraya Bulbasaur (#1) ile başlanır.
+Eski Pokemon kadrosu (PokeAPI'den çekilen dokuz sınıf, poke top fırlatma,
+yakalama, jetonlar, dükkan, kütüphane, ana harita) **tamamen kaldırıldı**.
+Yerine hikâyenin kendi yaratıkları geldi:
 
-**1. Bölge (Vahşi Orman) tamamlandı** — üç mekanın da haritası, Pokemonları ve
-boss savaşı hazır; her mekan farklı bir harita tarzında:
-
-| Mekan | Tarz | Yaygınlar | Gizli | Boss |
-|---|---|---|---|---|
-| Fısıltılı Orman Girişi | labirent (40x20) | Pinsir, Ursaring, Trevenant | Scolipede | Golisopod |
-| Gölgeli Derinlikler | organik mağara (46x22) | Scyther, Carnivine, Krookodile | Umbreon | Hawlucha |
-| Kadim Ağaç Meydanı | tapınak meydanı (48x24) | Gyarados, Hydreigon, Slaking | Snorlax | **Zarude** (bölge bossu) |
-
-Her mekanda: gizli çalının ardında keşfedilene kadar görünmeyen gizli oda,
-uyuyan ve uyanınca arenayı parçalayan boss, bossu yenince rozet ve zafer sahnesi.
-
-### Antrenör, ekip ve ilerleme
-
-- **Antrenör:** Haritada gezdirdiğiniz karakter bir antrenördür (elle çizilmiş
-  piksel sprite). Saldırıyı Pokemonunuz yapar ama **antrenör de hasar alır** —
-  hayatta kalmak sizin işiniz: **Space** ile zıplayıp mermileri altınızdan
-  geçirir, **Shift** ile atılıp tam dokunulmazlıkla sıyrılırsınız.
-- **Otomatik savaş:** Sahadaki Pokemon kendi kendine savaşır — hedef seçer,
-  tip üstünlüğüne göre hamlesini belirler, canı azalınca iyileşir. K/O/Ş/L/P
-  ile istediğiniz an siz de müdahale edebilirsiniz.
-- **Poke top fırlatma:** Pokemonlar peşinizden gelmez. **1-6** tuşlarıyla o
-  ekip üyesinin topunu baktığınız yöne fırlatırsınız; Pokemon orada açılır ve
-  o noktayı tutarak savaşır. Aynı tuşa tekrar basmak onu topuna geri çağırır.
-  Antrenör çok uzaklaşırsa Pokemon kendiliğinden döner.
-- **6 kişilik ekip:** Sahadaki Pokemon bayılırsa sıradaki gelir; hepsi
-  bayılırsa mekan girişine dönülür.
-- **Yakalama:** Yalnızca yabani (yaygın/gizli) Pokemonlar yakalanır. **Bosslar
-  yakalanmaz, yenilir** — mekanı tamamlamanın yolu onları alt etmektir.
-  Her yakalama bir **Poke Ball** harcar; toplar Kecleon'dan satın alınır.
-- **Yetenek jetonu:** Yenilen her düşman haritaya altın jeton düşürür; antrenör
-  yaklaşınca toplanır. Jetonlar kütüphanede istenen Pokemona yatırılıp seviye
-  yükseltilir — XP grindi yok, gelişimi siz yönlendirirsiniz.
-- **Pokemon kütüphanesi (E):** Ekip ve koleksiyon burada yönetilir, jetonlar
-  burada harcanır.
-- **Tip etkililiği:** Her Pokemonun iyi ve kötü yönü tip tablosundan gelir
-  (PokeAPI'den indirilir). Grass hamleniz Water'a 2x vurur, Fire size 2x vurur.
-- **Yetenekler:** Elle yazılmış set yoksa, yakalanan Pokemonun yetenekleri
-  **gerçek hamle verisinden** üretilir (güç → hasar, tip → sprite). Böylece
-  "sadece resmi hamleler" kuralı veriyle garanti edilir.
-- **Evrim:** Zincir PokeAPI'den alınır. Jetonla 16. seviyeye çıkardığınızda
-  Bulbasaur → Ivysaur, 32'de Venusaur olur; klasik evrim sahnesi oynar ve yeni
-  resmi hamle açılır: **L Leech Seed** (16), **P Petal Blizzard** (32).
-- **Kayıt:** Ekip, koleksiyon, jetonlar ve rozetler localStorage'a yazılır.
-
-### Rozetler ve saha hamleleri
-
-Her mekanın bossunu yenmek bir rozet ve onunla bir **saha hamlesi** açar:
-
-| Rozet | Mekan / Boss | Saha hamlesi | Etkisi |
-|---|---|---|---|
-| Yaprak Rozeti | Fısıltılı Orman Girişi / Golisopod | **Cut** (F) | Çalıları keser |
-| Gölge Rozeti | Gölgeli Derinlikler / Hawlucha | **Rock Smash** (F) | Kayaları kırar |
-| Kadim Rozet | Kadim Ağaç Meydanı / Zarude | **Surf** | Suyun üstünden geçilir |
-
-Ana harita bu hamleler düşünülerek genişletildi (28x14): doğudaki su kanalı
-Surf ile geçilen bir adaya, güneydeki kaya ve çalı duvarları Rock Smash ve Cut
-ile açılan gizli köşelere çıkar. Yani eski haritalar sonradan tekrar ziyaret
-edilmeye değer hâle gelir.
-
-### Tüccar Kecleon
-
-Bölge merkezindeki tezgahın önünde **F** ile dükkan açılır. Para birimi yetenek
-jetonudur — yani her jeton için "Pokemon seviyesi mi, eşya mı?" kararı verirsiniz.
-
-| Eşya | Fiyat | Etkisi |
+| Dövüşçü | Ne | Görünüş |
 |---|---|---|
-| Poke Ball (5 adet) | 4 jeton | Yakalama için gerekli |
-| Potion | 10 jeton | Sahadaki Pokemonun canının yarısını yeniler |
-| Revive | 25 jeton | Bayılmış bir üyeyi yarı canla kaldırır |
-| Ekip Toniği | 45 jeton | Tüm ekibi tamamen iyileştirir |
+| **VİRÜS** | Yeşil virüsün bir insana tamamen geçmiş, tam gelişmiş hâli | Gövdenin tamamı erimiş: boyun ve ayak yok, altta birikinti; kafa insan kafası değil (öne uzamış, üç göz, çene yerine iplik iplik açılan bir yarık); kollar parçalı ve pençeli |
+| **ANTİ-VİRÜS** | Tanışılan ilk farklı virüs; mercan renkli, kabuklu | Taşıyıcısını tamamen kaplamıyor: yalnız gövdenin **sağ** yanını, belin üstünü sarmış (bel hizasında seyrelen lekelerle biter). **OMUZDAN** yukarı uzanan girintili çıkıntılı borunun ucunda kendi küçük kafası var (belli belirsiz iki göz, bir ağız). Sağ ayağını saran lekeler. Açıkta kalan yüz yarısında kaş, göz, burun ve ağız çizilidir |
+| **ELECTRO-VİRÜS** | Sonradan tanışılan ikinci virüs; sarı-lacivert (ağırlık lacivert) | Taşıyıcısını **tamamen** kaplamış. Dik saçlar, yanan gözler, kabuğun altından geçen sarı damarlar; elleri sarımsı ve bir tık büyük, bacakları biraz kalın. Etrafındaki ve gövdesindeki elektrik **her karede yeniden çizilir** - sprite'a gömülü değildir |
 
-Çanta da aynı ekranda: alınan eşyalar oradan kullanılır. Oyuna 8 Poke Ball ile
-başlanır, bitince Kecleon'a uğramak gerekir.
+Çizimler `src/game/fighterArt.js` içinde, elle, PX = 4 ızgarasında yapılır ve
+bir kez çizilip saklanır. Kartta gösterilen sprite arenaya çıkan sprite'ın ta
+kendisidir. Tek istisna elektro-virüsün kıvılcımları: onlar sprite'ın parçası
+değil, `drawElectroSparks` ile her karede yeniden çizilir.
 
-### Ses, durum etkileri ve diğerleri
+### Giriş animasyonları
 
-- **Ses:** Tüm efektler ve müzik Web Audio ile koddan üretilir (ses dosyası yok):
-  vuruş, süper etkili, yakalama, seviye, evrim fanfarı, boss uyanışı ve her
-  haritaya göre değişen chiptune melodi.
-- **Durum etkileri:** Zehir ve yanık zamanla can götürür, felç yavaşlatır.
-  Zehir/ateş/elektrik tipli saldırılar ihtimalle bulaştırır; Kecleon'dan alınan
-  **Panzehir** temizler.
-- **Yakalama artık şansa bağlı:** Poke Ball / Great Ball / Ultra Ball farklı
-  başarı oranlarına sahip; kurtulan Pokemon topu kırıp tekrar savaşır.
-  Gizli Pokemonlar belirgin şekilde zor yakalanır.
-- **NPC antrenör savaşları:** Her mekanda görüş alanına girince meydan okuyan
-  bir antrenör var; ekibindeki Pokemonları sırayla gönderir, yenince jeton verir.
-- **Pokedex:** Kütüphanede görülen/yakalanan takibi (bosslar ayrı: yakalanmaz, yenilir). Bir Pokemona tıklayınca
-  **karakter bilgisi** açılır: istatistikler, hamleleri ve tipleriyle birlikte
-  **hangi tiplere zayıf, hangilerine dayanıklı, hamlelerinin neye üstün olduğu**.
-- **Bölge ölçeklendirmesi:** Düşmanların canı ve hasarı bölgeye göre artar
-  (config/balance.js), böylece yeni bölgeler gerçekten zorlaşır.
-- **Hit-stop:** Ağır vuruşlarda oyun birkaç kare donar, darbe ağırlaşır.
+Üçünün de iskeleti aynı (`src/game/fighterIntro.js`): arenada sıradan bir
+adam durur, **kamera ona doğru yaklaşır** ve sahne kararır, adam bir şey
+yapar, sonra virüse dönüşür. Karakter yerinden kıpırdamaz; yakınlaşmanın
+sabit noktası onun ayaklarıdır ve arka plan da aynı ölçekle büyür - yalnızca
+figürü büyütmek "kamera yaklaştı" değil "karakter şişti" gibi duruyordu. Üç adam da **ayrı kişilerdir** (ayrı paletler).
+**Birden fazla oyuncunun girişi varsa sırayla oynarlar: önce P1, sonra P2.**
+Animasyonlar bitene kadar kimse hareket edemez.
 
-Sırada: 2. bölge (Ateş Dağı).
+| | **VİRÜS** (~4,5 sn) | **ANTİ-VİRÜS** (~4 sn) | **ELECTRO-VİRÜS** (~4,3 sn) |
+|---|---|---|---|
+| Adam | Siyah saçlı, bordo ceketli | Açık kahve saçlı, haki tulumlu | Koyu saçlı, gri-mavi |
+| Hareket | Elini kaldırıp **kendi eline bakar**; yeşil elden yukarı yürür | **Sağ** bacağını kendine çeker, hızla yere vurur | **Sol** elini havaya kaldırır; ucunda **yeşil virüs** belirir, ele **şimşek** çakar |
+| Dönüşüm | **Çöküş:** adam olduğu yere erir, yerde bir birikinti kalır, oradan çok daha iri bir kütle yükselir; **gözleri en son yanar** | Kaplama **aşağıdan** (vuran ayaktan) yukarı çıkar | Kaplama **yukarıdan** (kalkan elden) aşağı iner |
+
+Kaplanma sırasında karakter kafasını **kendi sağına** hafifçe yatırır, dönüşüm
+tamamlanınca kafasını geri alır.
+
+Anti-virüs ve elektroda adam ile virüs hâli **aynı iskeletten** çizilir
+(`paintCarrier` / `paintFigure`); dönüşümün hizalanması buna bağlıdır.
+Virüste böyle bir şart yok: taşıyıcı geriye kalmıyor, gidiyor - o yüzden
+adam yok olurken virüs ayrı bir çizim olarak aşağıdan büyür.
+
+Karelerini gözle görmek için:
+
+```
+node tools/intro-shots.mjs virus              # altı an
+node tools/intro-shots.mjs antivirus 0.46     # tek an (0..1)
+```
+
+**Sprite'lar aynalanmıyor.** İki karakterin de kimliği asimetrisinde: anti-virüsün
+hangi yanının kaplı olduğu karaktere ait bir şey, rakibin nerede durduğuna bağlı
+değil. `Player.dir` yine hesaplanıyor (güçler geldiğinde yön oradan okunacak)
+ama çizimi etkilemiyor.
+
+**Saldırı henüz yok.** Karakterler kuruldu; güçler sonra yazılacak. Arenada
+şimdilik hareket, zıplama, can barı ve K.O. yolu var.
+
+Çizimi gözle görmek için:
+
+```
+node tools/fighter-shots.mjs            # ikisi yan yana
+node tools/fighter-shots.mjs antivirus  # tek dövüşçü, büyütülmüş
+```
 
 ## Yeni İçerik Ekleme
 
-- **Yeni karakter sınıfı:** `src/config/characters.js` dizisine kayıt ekleyin,
-  `src/game/abilities.js` içindeki switch'e yeteneklerini yazın.
+- **Yeni dövüşçü:** `src/game/fighterArt.js` içine çizimini yazıp
+  `FIGHTER_SPRITES`'a ekleyin, sonra `src/game/fighters.js` kadrosuna kayıt
+  girin. `npm run check` ikisinin eşleştiğini doğrular.
 - **Yeni arena:** `src/game/arenas.js` dizisine `{ name, drawBg }` ekleyin.
 - **Tuş değişikliği:** `src/config/settings.js` içindeki `PLAYERS` nesnesini düzenleyin.

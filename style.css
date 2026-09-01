@@ -257,7 +257,7 @@ body.battle-active {
     border-radius: 10px;
 }
 
-/* Pokemon image container */
+/* Dövüşçü önizleme kutusu */
 .char-image-container {
     width: 120px;
     height: 120px;
@@ -280,15 +280,15 @@ body.battle-active {
     z-index: -1;
 }
 
-.char-img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
+.char-image-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
     transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.char-card:hover .char-img {
-    transform: scale(1.1) rotate(2deg);
+.char-card:hover .char-image-container canvas {
+    transform: scale(1.08);
 }
 
 .char-class {
@@ -305,14 +305,6 @@ body.battle-active {
     font-size: 1.3rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
-}
-
-.poke-tag {
-    font-size: 0.75rem;
-    background: rgba(255, 255, 255, 0.08);
-    padding: 0.1rem 0.5rem;
-    border-radius: 30px;
-    color: var(--text-secondary);
 }
 
 /* Mod seçim düğmeleri (ekranın en üstünde) */
@@ -446,69 +438,21 @@ body.battle-active {
     padding: 0 2rem;
 }
 
-/* Skills Cooldown HUD */
-.skills-cooldown-hud {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.p2-hud .skills-cooldown-hud {
-    justify-content: flex-end;
-}
-
-.skill-cd {
-    width: 50px;
-    height: 50px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-glass);
-    border-radius: 10px;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.key-badge {
-    position: absolute;
-    bottom: 2px;
-    right: 3px;
-    font-size: 0.6rem;
-    font-weight: 700;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 0.1rem 0.25rem;
-    border-radius: 3px;
+/* HUD: bu oyuncunun hangi kontrolle oynadigi */
+.hud-controls {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
     color: var(--text-secondary);
+    margin-top: 0.4rem;
 }
 
-/* Oyun koluyla oynayan oyuncunun kapağı: KARE/ÜÇGEN/YUVARLAK simgesi.
-   Tuş adından kısa olduğu için biraz daha büyük ve daha okunur çiziliyor. */
-.key-badge.pad-badge {
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.6rem;
-    line-height: 1;
-    padding: 0;
-    background: none;
+.p2-hud .hud-controls {
+    text-align: right;
 }
 
-/* L1 / R1 bir şekil değil yazı: aynı punto kutuya sığmıyor */
-.key-badge.pad-badge-text {
-    font-size: 0.9rem;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-}
-
-.cd-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 0;
-    background: rgba(0, 0, 0, 0.7);
-    transition: height 0.1s linear;
+.hud-controls.pad-badge-text {
+    color: #f0a8de;
+    font-weight: 700;
 }
 
 /* Canvas Arena Container */
@@ -584,9 +528,7 @@ canvas {
     transform: scale(1);
 }
 
-/* Kaydırılabilir kartlarda kapatma düğmesi üstte sabit kalsın */
-.library-card .close-btn,
-.shop-modal .close-btn {
+.close-btn {
     position: sticky;
     float: right;
     top: 0;
@@ -613,10 +555,12 @@ canvas {
     margin-bottom: 1.5rem;
 }
 
-.detail-pfp {
-    width: 100px;
-    height: 100px;
-    object-fit: contain;
+.detail-pfp-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 100px;
+    min-height: 100px;
     background: rgba(255, 255, 255, 0.02);
     border-radius: 16px;
     padding: 0.5rem;
@@ -808,163 +752,9 @@ canvas {
     margin-top: 1rem;
 }
 
-/* Pokemon kütüphanesi ve karakter seçimi */
+/* Piksel pencereler ve dövüşçü seçimi */
 .picker-card {
     max-width: 620px;
-}
-
-.library-card {
-    max-width: 780px;
-}
-
-.lib-section {
-    font-family: var(--font-header);
-    font-size: 1rem;
-    margin: 1.25rem 0 0.6rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.lib-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 0.9rem;
-}
-
-.lib-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 2px solid var(--border-glass);
-    border-radius: 14px;
-    padding: 0.7rem 0.5rem;
-    text-align: center;
-}
-
-.lib-card.active {
-    border-color: #4ade80;
-    box-shadow: 0 0 14px rgba(74, 222, 128, 0.22);
-}
-
-.lib-img-slot {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.lib-img {
-    width: 64px;
-    height: 64px;
-    object-fit: contain;
-    image-rendering: pixelated;
-}
-
-.lib-name {
-    font-weight: 700;
-    text-transform: capitalize;
-}
-
-.lib-level {
-    font-size: 0.78rem;
-    color: #facc15;
-    margin-bottom: 0.5rem;
-}
-
-.lib-btn {
-    width: 100%;
-    padding: 0.45rem;
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #052e16;
-    background: #4ade80;
-    border: none;
-    border-radius: 9px;
-    cursor: pointer;
-    transition: filter 0.2s;
-}
-
-.lib-btn:hover {
-    filter: brightness(1.1);
-}
-
-.lib-btn.disabled {
-    background: #334155;
-    color: #94a3b8;
-    cursor: not-allowed;
-}
-
-.lib-remove {
-    width: 100%;
-    margin-top: 0.35rem;
-    padding: 0.35rem;
-    font-size: 0.7rem;
-    color: #fca5a5;
-    background: transparent;
-    border: 1px solid rgba(239, 68, 68, 0.35);
-    border-radius: 9px;
-    cursor: pointer;
-}
-
-.lib-tag {
-    margin-top: 0.35rem;
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-}
-
-.lib-empty {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-/* Kecleon'un dükkanı */
-.shop-modal {
-    max-width: 720px;
-}
-
-.shop-speech {
-    padding: 0.7rem 1rem;
-    margin-bottom: 0.9rem;
-    background: rgba(74, 222, 128, 0.08);
-    border-left: 3px solid #4ade80;
-    border-radius: 8px;
-    font-style: italic;
-    color: var(--text-primary);
-    min-height: 2.4rem;
-}
-
-.shop-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 2px solid var(--border-glass);
-    border-radius: 14px;
-    padding: 0.75rem 0.6rem;
-    text-align: center;
-}
-
-.shop-icon {
-    width: 26px;
-    height: 26px;
-    margin: 0 auto 0.5rem;
-    border-radius: 6px;
-    box-shadow: 0 0 12px currentColor;
-}
-
-.shop-name {
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-}
-
-.shop-desc {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-    line-height: 1.35;
-    margin-bottom: 0.4rem;
-}
-
-.shop-owned {
-    font-size: 0.72rem;
-    color: #facc15;
-    margin-bottom: 0.5rem;
 }
 
 .picker-title {
@@ -1055,27 +845,6 @@ canvas {
     background: rgba(239, 68, 68, 0.2);
 }
 
-.overworld-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.overworld-title {
-    font-family: var(--font-header);
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    color: var(--text-primary);
-}
-
-.overworld-hint {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
 .back-btn {
     padding: 0.6rem 1.2rem;
     font-family: var(--font-header);
@@ -1095,206 +864,6 @@ canvas {
 }
 
 /* Pokedex ızgarası */
-.dex-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-    gap: 0.6rem;
-}
-
-.dex-cell {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-glass);
-    border-radius: 10px;
-    padding: 0.4rem 0.25rem;
-    text-align: center;
-}
-
-.dex-cell.caught {
-    border-color: #4ade80;
-}
-
-.dex-cell.seen .dex-img {
-    filter: brightness(0) saturate(0) opacity(0.55);
-}
-
-.dex-img-slot {
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.dex-img {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-    image-rendering: pixelated;
-}
-
-.dex-name {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: capitalize;
-}
-
-.dex-tag {
-    font-size: 0.62rem;
-    color: var(--text-secondary);
-}
-
-/* Kütüphane: karakter bilgi paneli */
-.lib-detail {
-    position: relative;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-glass);
-    border-radius: 16px;
-    padding: 1.1rem 1.2rem;
-    margin-bottom: 1.2rem;
-}
-
-.detail-close {
-    position: absolute;
-    top: 0.4rem;
-    right: 0.7rem;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 1.5rem;
-    cursor: pointer;
-}
-
-.detail-top {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.detail-sprite {
-    width: 84px;
-    height: 84px;
-    object-fit: contain;
-    image-rendering: pixelated;
-}
-
-.detail-name {
-    font-family: var(--font-header);
-    font-size: 1.25rem;
-    text-transform: capitalize;
-}
-
-.detail-id {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-.detail-level {
-    color: #facc15;
-    font-size: 0.8rem;
-    margin-bottom: 0.35rem;
-}
-
-.detail-cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 1.4rem;
-}
-
-.detail-heading {
-    font-family: var(--font-header);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary);
-    margin: 0.85rem 0 0.45rem;
-}
-
-.detail-heading:first-child {
-    margin-top: 0;
-}
-
-.detail-heading.danger { color: #f87171; }
-.detail-heading.safe { color: #38bdf8; }
-.detail-heading.good { color: #4ade80; }
-
-.chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-}
-
-.type-chip {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: #0b1020;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
-}
-
-.type-chip.small {
-    font-size: 0.62rem;
-    padding: 0.05rem 0.4rem;
-}
-
-.stat-line {
-    display: grid;
-    grid-template-columns: 62px 1fr 32px;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-    margin-bottom: 0.3rem;
-}
-
-.stat-track {
-    height: 7px;
-    background: #1e293b;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.stat-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #38bdf8, #4ade80);
-}
-
-.stat-val {
-    text-align: right;
-    color: var(--text-secondary);
-}
-
-.move-list {
-    list-style: none;
-    font-size: 0.78rem;
-    line-height: 1.7;
-}
-
-.move-list b {
-    display: inline-block;
-    min-width: 18px;
-    color: #facc15;
-}
-
-/* Bilgi açılan kartlar tıklanabilir görünsün */
-.lib-img-slot, .lib-name, .dex-cell {
-    cursor: pointer;
-}
-
-/* Pokedex: boss girdileri yakalanabilirlerden ayrılır */
-.dex-cell.boss {
-    border-color: #f97316;
-}
-
-.dex-cell.defeated {
-    border-color: #fbbf24;
-}
-
-.dex-cell.boss .dex-tag,
-.dex-cell.defeated .dex-tag {
-    color: #fbbf24;
-}
-
 /* ---- Ana menü sahnesi ---- */
 /* Menü gezilebilir bir piksel sahne ve TÜM ekranı kaplar: sayfa kabuğunun
    (app-container) genişlik sınırını aşması için position: fixed.

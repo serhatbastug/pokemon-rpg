@@ -1,14 +1,6 @@
 // Veri ve saf mantık testleri: tarayıcı gerektirmez, bir saniyede biter.
-// Haritaların, sprite desenlerinin ve yapılandırmaların tutarlılığını doğrular.
-// Çalıştırma: npm run check
-import { MAPS, extractPortals, SOLID_TILES, TILE_SIZE } from '../src/config/worldMap.js';
-import { REGIONS } from '../src/config/regions.js';
-import { PROJECTILE_SPRITES } from '../src/game/projectileSprites.js';
-import { PLAYABLE, abilityOverride, withKeys } from '../src/config/playableCharacters.js';
-import { SPECIES_ATTACKS } from '../src/world/Enemy.js';
-import { levelUpCost, maxHpFor, damageMultiplierFor, PARTY_SIZE } from '../src/config/progression.js';
-import { FIELD_MOVES, fieldMoveForTile, hasSurf } from '../src/config/fieldMoves.js';
-import { SHOP_ITEMS, itemById } from '../src/config/shopItems.js';
+// Menü sahnesinin, kol okumasının, diyaloğun ve çizgi romanın tutarlılığını
+// doğrular. Çalıştırma: npm run check
 
 let passed = 0;
 const failures = [];
@@ -23,243 +15,58 @@ function check(name, condition, detail = '') {
     console.log(`KALDI  ${line}`);
 }
 
-// Bir haritada başlangıçtan yürünerek ulaşılabilen karolar
-function reachable(map, treatHiddenSolid = false) {
-    const grid = map.grid;
-    const solid = (c, r) => {
-        const tile = grid[r]?.[c] ?? 'T';
-        return SOLID_TILES.has(tile) || (treatHiddenSolid && tile === 'H');
-    };
-    const seen = new Set([`${map.start.col},${map.start.row}`]);
-    const queue = [[map.start.col, map.start.row]];
-    while (queue.length) {
-        const [c, r] = queue.shift();
-        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const nc = c + dc, nr = r + dr, key = `${nc},${nr}`;
-            if (seen.has(key) || solid(nc, nr)) continue;
-            seen.add(key);
-            queue.push([nc, nr]);
-        }
-    }
-    return seen;
-}
+// ---- Arena kadrosu ----
+// Kadro artık ağdan gelmiyor: iki dövüşçü de elle çizilmiş. Kartta gösterilen
+// sprite ile arenaya çıkan sprite aynı olmalı, yoksa seçtiğinden başkası çıkar.
+const { FIGHTERS, fighterById } = await import('../src/game/fighters.js');
+const { FIGHTER_SPRITES } = await import('../src/game/fighterArt.js');
 
-// ---- Haritalar ----
-const BASE_TILES = new Set(['.', 'p', 'f', 'g', 's', 'h', 'H', 'T', 'W', 'R', 'M', 'b', 'A']);
+check('kadroda üç dövüşçü var', FIGHTERS.length === 3, FIGHTERS.map(f => f.id).join(','));
+check('kadro virüs, anti-virüs ve elektro-virüs',
+    FIGHTERS.map(f => f.id).join(',') === 'virus,antivirus,electro');
+check('dövüşçü kimlikleri benzersiz', new Set(FIGHTERS.map(f => f.id)).size === FIGHTERS.length);
+check('her dövüşçünün çizimi var',
+    FIGHTERS.every(f => typeof FIGHTER_SPRITES[f.id] === 'function'),
+    Object.keys(FIGHTER_SPRITES).join(','));
+check('çizimi olup kadroda olmayan dövüşçü yok',
+    Object.keys(FIGHTER_SPRITES).every(id => FIGHTERS.some(f => f.id === id)));
+check('her dövüşçünün canı ve hızı pozitif',
+    FIGHTERS.every(f => f.stats.hp > 0 && f.stats.speed > 0));
+check('virüs anti-virüsten dayanıklı, anti-virüs daha hızlı',
+    fighterById('virus').stats.hp > fighterById('antivirus').stats.hp &&
+    fighterById('antivirus').stats.speed > fighterById('virus').stats.speed);
+// Elektro ortada duruyor: ne en dayanıklı ne en hızlı
+const eStats = fighterById('electro').stats;
+check('elektro-virüs can ve hızda ortada',
+    eStats.hp < fighterById('virus').stats.hp && eStats.hp > fighterById('antivirus').stats.hp &&
+    eStats.speed > fighterById('virus').stats.speed && eStats.speed < fighterById('antivirus').stats.speed,
+    JSON.stringify(eStats));
 
-for (const [id, map] of Object.entries(MAPS)) {
-    const grid = map.grid;
-    const width = grid[0].length;
-    const valid = new Set([...BASE_TILES, ...Object.keys(map.portalDefs)]);
-
-    check(`${id}: satırlar eşit uzunlukta`,
-        grid.every(row => row.length === width),
-        grid.map((r, i) => (r.length !== width ? `satır ${i}: ${r.length}` : null)).filter(Boolean).join(', '));
-
-    const badTiles = [...new Set(grid.join('').split('').filter(ch => !valid.has(ch)))];
-    check(`${id}: geçersiz karo yok`, badTiles.length === 0, badTiles.join(''));
-
-    check(`${id}: başlangıç engel karosunda değil`, !SOLID_TILES.has(grid[map.start.row][map.start.col]));
-    // Ölünce başlangıca doğulur; orası portalsa oyuncu anında haritadan atılır
-    check(`${id}: başlangıç portal karosunda değil`, !map.portalDefs[grid[map.start.row][map.start.col]]);
-
-    const seen = reachable(map);
-    const portals = extractPortals(map);
-    for (const portal of portals) {
-        check(`${id}: "${portal.label}" portalına ulaşılabiliyor`, seen.has(`${portal.col},${portal.row}`));
-        if (portal.target) {
-            check(`${id} -> ${portal.target}: hedef harita var`, !!MAPS[portal.target]);
-            check(`${id} -> ${portal.target}: geri dönüş portalı var`,
-                !!MAPS[portal.target] && extractPortals(MAPS[portal.target]).some(back => back.target === id));
-        }
-    }
-
-    for (const spawn of map.spawns || []) {
-        check(`${id}: #${spawn.id} yürünebilir karoda`, !SOLID_TILES.has(grid[spawn.row][spawn.col]),
-            `(${spawn.col},${spawn.row})`);
-        check(`${id}: #${spawn.id} spawn noktasına ulaşılabiliyor`, seen.has(`${spawn.col},${spawn.row}`),
-            `(${spawn.col},${spawn.row})`);
-    }
-
-    if (map.secretArea) {
-        const area = map.secretArea;
-        check(`${id}: gizli alan harita içinde`, area.col1 < width && area.row1 < grid.length);
-
-        // Gizli çalı kapalıyken oda ulaşılamaz olmalı (asıl gizlilik garantisi)
-        const withoutBush = reachable(map, true);
-        let leaked = 0;
-        for (let r = area.row0; r <= area.row1; r++) {
-            for (let c = area.col0; c <= area.col1; c++) if (withoutBush.has(`${c},${r}`)) leaked++;
-        }
-        check(`${id}: gizli alan yalnızca gizli çalıdan geçiliyor`, leaked === 0, `${leaked} karo sızıyor`);
-
-        for (const spawn of (map.spawns || []).filter(s => s.kind === 'hidden')) {
-            check(`${id}: gizli Pokemon gizli alanın içinde`,
-                spawn.col >= area.col0 && spawn.col <= area.col1 &&
-                spawn.row >= area.row0 && spawn.row <= area.row1);
-        }
-    }
-
-    if (map.bossArena) {
-        const arena = map.bossArena;
-        check(`${id}: boss areni harita içinde`, arena.col1 < width && arena.row1 < grid.length);
-        const boss = (map.spawns || []).find(s => s.kind === 'boss' || s.kind === 'regionBoss');
-        if (boss) {
-            check(`${id}: boss areninin içinde`,
-                boss.col >= arena.col0 && boss.col <= arena.col1 &&
-                boss.row >= arena.row0 && boss.row <= arena.row1);
-        }
-    }
-}
-
-// ---- Bölge planı haritalarla tutarlı mı ----
-for (const region of Object.values(REGIONS)) {
-    for (const location of region.locations) {
-        const map = MAPS[location.id];
-        if (!map) continue; // haritası henüz yapılmamış mekan
-
-        const spawnIds = new Set((map.spawns || []).map(s => s.id));
-        const planned = [...location.pokemon.commons, location.pokemon.hidden, location.pokemon.boss];
-        const missing = planned.filter(id => !spawnIds.has(id));
-        check(`${location.name}: planlanan Pokemonların hepsi haritada`, missing.length === 0,
-            missing.length ? `eksik: ${missing.join(', ')}` : '');
-
-        const commonTypes = new Set((map.spawns || []).filter(s => s.kind === 'common').map(s => s.id));
-        check(`${location.name}: 3 tür yaygın Pokemon var`, commonTypes.size === 3, `${commonTypes.size} tür`);
-    }
-}
-
-// ---- Sprite desenleri ----
-for (const [name, def] of Object.entries(PROJECTILE_SPRITES)) {
-    const heights = def.frames.map(f => f.length);
-    check(`sprite ${name}: kareler aynı yükseklikte`, new Set(heights).size === 1, heights.join('/'));
-
-    def.frames.forEach((frame, fi) => {
-        const width = frame[0].length;
-        check(`sprite ${name}[${fi}]: satırlar eşit uzunlukta`, frame.every(row => row.length === width));
-        const unknown = [...new Set(frame.join('').split('').filter(ch => ch !== '.' && !def.colors[ch]))];
-        check(`sprite ${name}[${fi}]: tanımsız renk karakteri yok`, unknown.length === 0, unknown.join(''));
-    });
-}
-
-// ---- Yetenekler sprite ve tip verisiyle tutarlı mı ----
-for (const [id, entry] of Object.entries(PLAYABLE)) {
-    for (const ability of entry.abilities) {
-        check(`#${id} ${ability.name}: hamle tipi tanımlı`, !!ability.moveType);
-        if (ability.kind === 'projectile') {
-            check(`#${id} ${ability.name}: sprite tanımlı`, !!PROJECTILE_SPRITES[ability.type], ability.type);
-        }
-    }
-    check(`#${id}: en fazla 5 yetenek (tuş sayısı kadar)`, entry.abilities.length <= 5);
-}
-
-for (const [id, attack] of Object.entries(SPECIES_ATTACKS)) {
-    check(`düşman #${id} ${attack.name}: sprite tanımlı`, !!PROJECTILE_SPRITES[attack.type], attack.type);
-    check(`düşman #${id} ${attack.name}: hamle tipi tanımlı`, !!attack.moveType);
-}
-
-// ---- Saf mantık ----
-check('levelUpCost seviye ilerledikçe artıyor',
-    levelUpCost(1) < levelUpCost(20) && levelUpCost(20) < levelUpCost(45));
-check('maxHpFor seviyeyle artıyor', maxHpFor(45, 5) < maxHpFor(45, 20));
-check('maxHpFor temel canla artıyor', maxHpFor(45, 5) < maxHpFor(105, 5));
-check('damageMultiplierFor saldırıyla artıyor', damageMultiplierFor(49, 5) < damageMultiplierFor(120, 5));
-check('ekip boyutu 6', PARTY_SIZE === 6);
-
-// Yetenekler seviyeye göre açılıyor
-check('Bulbasaur 5. seviyede 3 yeteneğe sahip', abilityOverride(1, 5).length === 3);
-check('Bulbasaur 16. seviyede 4 yeteneğe sahip', abilityOverride(1, 16).length === 4);
-check('Bulbasaur 32. seviyede 5 yeteneğe sahip', abilityOverride(1, 32).length === 5);
-check('tanımsız Pokemon için elle yazılmış set yok', abilityOverride(9999, 50) === null);
-
-const keyed = withKeys(abilityOverride(1, 32));
-check('yeteneklere K O Ş L P tuşları sırayla atanıyor',
-    keyed.map(a => a.key).join('') === 'KOŞLP', keyed.map(a => a.key).join(''));
-
-// Saha hamleleri rozete bağlı
-check('rozetsizken Cut çalışmıyor', fieldMoveForTile('h', []) === null);
-check('rozetle Cut çalışıyor', fieldMoveForTile('h', ['loc-1-1'])?.name === 'Cut');
-check('Rock Smash kaya karosuna bağlı', fieldMoveForTile('R', ['loc-1-2'])?.name === 'Rock Smash');
-check('Surf pasif: F ile kullanılmaz', fieldMoveForTile('W', ['loc-1-3']) === null);
-check('Surf rozeti tanınıyor', hasSurf(['loc-1-3']) && !hasSurf([]));
-check('her saha hamlesinin rozeti gerçek bir mekana bağlı',
-    FIELD_MOVES.every(move => !!MAPS[move.badge]),
-    FIELD_MOVES.filter(m => !MAPS[m.badge]).map(m => m.badge).join(', '));
-
-// Dükkan
-check('eşya kimlikleri benzersiz', new Set(SHOP_ITEMS.map(i => i.id)).size === SHOP_ITEMS.length);
-check('tüm eşya fiyatları pozitif', SHOP_ITEMS.every(i => i.price > 0));
-check('itemById bilinmeyen kimlik için null', itemById('yok-boyle-bir-sey') === null);
-check('karo boyutu 50', TILE_SIZE === 50);
-
-// ---- İlerleme mantığı (Progress) ----
-// Progress localStorage kullanır; node için basit bir taklit yeterli.
-globalThis.localStorage = {
-    store: new Map(),
-    getItem(key) { return this.store.has(key) ? this.store.get(key) : null; },
-    setItem(key, value) { this.store.set(key, String(value)); },
-    removeItem(key) { this.store.delete(key); },
-    key(i) { return [...this.store.keys()][i] ?? null; },
-    get length() { return this.store.size; }
-};
-
-const { Progress } = await import('../src/world/Progress.js');
-const progress = new Progress();
-progress.clear();
-
-// Aynı türden ikinci yakalama koleksiyonu şişirmemeli
-const first = progress.addCapture(127, 'Pinsir');
-const second = progress.addCapture(127, 'Pinsir');
-check('ilk yakalama koleksiyona ekleniyor', first.added === true && first.joinedParty === true);
-check('aynı türden ikinci yakalama tekrar eklenmiyor',
-    second.duplicate === true && progress.collection.filter(e => e.id === 127).length === 1,
-    `${progress.collection.length} koleksiyon girdisi`);
-check('aynı tür ekibe ikinci kez katılmıyor',
-    progress.party.filter(m => m.id === 127).length === 1);
-
-// Yakalanan Pokemon Pokedex'te "yakalandı" olmalı
-check('yakalanan Pokemon Pokedex\'te yakalandı olarak işaretli',
-    progress.dex[127]?.caught === true);
-
-// Bosslar Pokedex'te ayrı: yakalanmaz, yenilir
-progress.markSeen(768, 'Golisopod', false, 'boss');
-check('boss görüldüğünde yakalanmadı olarak işaretli',
-    progress.dex[768]?.caught === false && progress.dex[768]?.kind === 'boss');
-progress.markDefeated(768, 'Golisopod', 'boss');
-check('boss yenildiğinde yenildi olarak işaretleniyor',
-    progress.dex[768]?.defeated === true && progress.dex[768]?.caught === false);
-
-// Eski kayıtlarda Pokedex boş olabilir: ekip ve koleksiyonla uyumlanmalı
-progress.dex = {};
-progress.reconcileDex();
-check('Pokedex ekip ve koleksiyonla uyumlanıyor',
-    progress.dex[1]?.caught === true && progress.dex[127]?.caught === true,
-    Object.keys(progress.dex).join(', '));
-
-// Yükleme sırasında eski kayıttaki tekrarlar temizlenmeli
-progress.collection.push({ id: 127, name: 'Pinsir' }); // eski kayıttan gelen tekrar
-progress.save();
-const reloaded = new Progress();
-check('kayıt yüklenirken koleksiyondaki tekrarlar temizleniyor',
-    reloaded.collection.filter(e => e.id === 127).length === 1,
-    `${reloaded.collection.length} girdi`);
-
-// En iyi top seçimi
-progress.items = { 'poke-ball': 2, 'ultra-ball': 1 };
-check('elde varken en güçlü top kullanılıyor', progress.bestBall()?.id === 'ultra-ball');
-progress.items = { 'poke-ball': 2 };
-check('ultra yoksa poke ball kullanılıyor', progress.bestBall()?.id === 'poke-ball');
-progress.items = {};
-check('hiç top yoksa null dönüyor', progress.bestBall() === null);
-
-progress.clear();
-
+// Giriş animasyonları: anti-virüs ve elektro-virüsün var, virüsün yok
+const intro = await import('../src/game/fighterIntro.js');
+check('kadronun üçünün de giriş animasyonu var',
+    FIGHTERS.every(f => f.intro), FIGHTERS.filter(f => !f.intro).map(f => f.id).join(','));
+check('her giriş anahtarının karşılığı var',
+    FIGHTERS.filter(f => f.intro).every(f => intro.INTROS[f.intro]),
+    Object.keys(intro.INTROS).join(','));
+check('karşılığı olup kadroda kullanılmayan giriş yok',
+    Object.keys(intro.INTROS).every(k => FIGHTERS.some(f => f.intro === k)));
+check('her dövüşçünün girişi kendi anahtarını taşıyor',
+    FIGHTERS.every(f => f.intro === f.id), FIGHTERS.map(f => `${f.id}:${f.intro}`).join(' '));
+const introFrames = [intro.INTRO_FRAMES, intro.ANTIVIRUS_INTRO_FRAMES, intro.VIRUS_INTRO_FRAMES];
+check('giriş animasyonları 3-6 saniye arası',
+    introFrames.every(n => n >= 180 && n <= 360), introFrames.join(' / '));
+check('bilinmeyen dövüşçü için null', fighterById('yok-boyle-biri') === null);
 // ---- Ana menü sahnesi ----
 // Menü gezilebilir bir sahne olduğu için yerleşimin iki şeyi garanti etmesi
 // gerekir: antrenör başladığı yerde sıkışmamalı ve her iki kapıya da
 // yürüyerek ulaşabilmeli. Bunu sahne üzerinde kaba bir BFS ile ölçüyoruz.
 const menu = await import('../src/menu/menuLayout.js');
 const { missingGlyphs } = await import('../src/pixel/pixelFont.js');
+// Dövüşçü ADLARI piksel fontla da yazılabilmeli (açıklamalar yalnızca HTML'de
+// duruyor, onlar için bu şart yok).
+check('dövüşçü adlarında eksik harf yok',
+    FIGHTERS.flatMap(f => missingGlyphs(f.name)).length === 0);
 
 check('menü: başlangıç noktası boş', !menu.blocked(menu.START.x, menu.START.y));
 check('menü: macera kemerinin içinden geçilemiyor', menu.blocked(500, 150));
@@ -316,94 +123,6 @@ while (queue.length) {
 check('menü: macera kapısının önüne yürüyerek ulaşılıyor', reachedGate);
 check('menü: iki kişilik portala yürüyerek girilebiliyor', reachedDoor);
 check('menü: gezilebilir alan makul büyüklükte', seenCells.size > 900, `${seenCells.size} kare`);
-
-// ---- Macera modu: şehir kenarı + orman girişi ----
-// Sahnenin iki güvencesi var: antrenör başladığı yerde sıkışmamalı ve
-// şehirden ormanın sonuna kadar yürüyerek gidebilmeli.
-const adv = await import('../src/adventure/adventureLayout.js');
-
-check('macera: başlangıç noktası boş', !adv.blocked(adv.START.x, adv.START.y));
-check('macera: şehirde binaların içine girilemiyor', adv.blocked(400, 100));
-check('macera: yolda yürünüyor', !adv.blocked(400, 250));
-check('macera: ağaç duvarından geçilemiyor', adv.blocked(950, 200));
-check('macera: boşluktan geçiliyor', !adv.blocked(950, (adv.GAP.top + adv.GAP.bottom) / 2));
-check('macera: dünyanın dışına çıkılamıyor', adv.blocked(adv.WORLD.w - 4, 335));
-
-// Orman koridoru dar mı? (şehir bandının yarısından ince olmalı)
-const corridorHeight = adv.FOREST.halfHeight * 2;
-const cityHeight = adv.CITY.walk.bottom - adv.CITY.walk.top;
-check('macera: orman koridoru şehirden dar', corridorHeight < cityHeight / 2,
-    `koridor ${corridorHeight}px, şehir ${cityHeight}px`);
-check('macera: boşluk antrenörün sığacağı kadar',
-    adv.GAP.bottom - adv.GAP.top >= adv.PLAYER_BOX.h * 2 && adv.GAP.bottom - adv.GAP.top <= 90,
-    `${adv.GAP.bottom - adv.GAP.top}px`);
-
-// Koridorun her noktasında yürünebilir bir orta çizgi var mı?
-let corridorOk = true;
-for (let x = adv.FOREST.x0 + 20; x < adv.WORLD.w - 20; x += 20) {
-    if (adv.blocked(x, adv.corridorAt(x).center)) corridorOk = false;
-}
-check('macera: koridorun ortası boyunca yürünebiliyor', corridorOk);
-
-// Hiçbir ağacın dibi yürünen alana taşmamalı
-const advBlockers = adv.TREES.filter(tree => {
-    const base = adv.treeBase(tree);
-    for (let px = base.x; px <= base.x + base.w; px += 4) {
-        for (let py = base.y; py <= base.y + base.h; py += 4) {
-            if (adv.walkableAt(px, py)) return true;
-        }
-    }
-    return false;
-});
-check('macera: ağaçlar yolu kapatmıyor', advBlockers.length === 0, `${advBlockers.length} ağaç`);
-
-// Şehirden ormanın sonuna yürünerek gidilebiliyor mu?
-const advStep = 8;
-const advSeen = new Set();
-const advQueue = [[Math.round(adv.START.x / advStep) * advStep, Math.round(adv.START.y / advStep) * advStep]];
-advSeen.add(advQueue[0].join(','));
-let advMaxX = 0;
-let reachedGapCell = false;
-while (advQueue.length) {
-    const [x, y] = advQueue.shift();
-    if (x > advMaxX) advMaxX = x;
-    if (adv.inGap(x, y)) reachedGapCell = true;
-    for (const [dx, dy] of [[advStep, 0], [-advStep, 0], [0, advStep], [0, -advStep]]) {
-        const nx = x + dx;
-        const ny = y + dy;
-        const key = `${nx},${ny}`;
-        if (advSeen.has(key) || adv.blocked(nx, ny)) continue;
-        advSeen.add(key);
-        advQueue.push([nx, ny]);
-    }
-}
-check('macera: ormanın boşluğuna yürüyerek ulaşılıyor', reachedGapCell);
-check('macera: koridorun sonuna kadar yürünebiliyor', advMaxX > adv.WORLD.w - 60,
-    `en uzak x ${advMaxX} / ${adv.WORLD.w}`);
-
-// Yanımızdaki beş sağlıklı: prolog 3'ten gelen sayı burada da tutmalı.
-// Hem çıktıkları yer hem ormanın ağzında durdukları yer boş olmalı, yoksa
-// içlerinden biri duvara gömülü duruyor ya da hiç vurulamıyor.
-check('macera: yanımızda tam beş sağlıklı var',
-    adv.COMPANION_COUNT === 5 &&
-    adv.COMPANION_STARTS.length === 5 &&
-    adv.COMPANION_STAND.length === 5);
-
-const badCompanionSpots = [
-    ...adv.COMPANION_STARTS.map((p, i) => (adv.blocked(p.x, p.y) ? `çıkış#${i}` : null)),
-    ...adv.COMPANION_STAND.map((p, i) => (adv.blocked(p.x, p.y) ? `duruş#${i}` : null))
-].filter(Boolean);
-check('macera: sağlıklıların çıkış ve duruş yerleri boş',
-    badCompanionSpots.length === 0, badCompanionSpots.join(','));
-
-// Ormanın ağzı boşluktan ÖNCE olmalı: yeşillenme ve vuruş şehir tarafında
-// geçiyor, dar koridorda değil.
-check('macera: ormanın ağzı boşluktan önce', adv.FOREST_MOUTH_X < adv.GAP.x0,
-    `${adv.FOREST_MOUTH_X} / ${adv.GAP.x0}`);
-
-// Mekan adının her harfi piksel yazı tipinde var mı?
-const advMissing = missingGlyphs(adv.LOCATION_NAME);
-check(`macera: "${adv.LOCATION_NAME}" yazısı çizilebiliyor`, advMissing.length === 0, advMissing.join(','));
 
 // ---- Oyun kolu (PS5 DualSense) ----
 // readPad saf bir fonksiyon: ham kol anlık görüntüsünü yöne çevirir.
@@ -506,204 +225,13 @@ check('kol: çıkarılan kolun yuvası siliniyor', manager.padCount === 1);
 check('kol: olmayan yuva nötr okunuyor',
     manager.stickAt(1).magnitude === 0 && !manager.isDownAt(1, 'square'));
 
-// Arena kol düzeni: KARE = 1. güç, L1 = 2. güç, R1 = 3. güç (ulti),
-// ÇARPI = zıpla. Her oyuncu kendi kolunda aynı düzeni kullanıyor.
-const { PAD_ABILITY_BUTTONS, PAD_JUMP_BUTTON, PAD_ABILITY_LABELS,
-    PLAYERS: ARENA_PLAYERS } = await import('../src/config/settings.js');
-check('arena kolu: KARE 1. gücü çalıştırıyor', PAD_ABILITY_BUTTONS.square === 0);
-check('arena kolu: L1 2. gücü çalıştırıyor', PAD_ABILITY_BUTTONS.l1 === 1);
-check('arena kolu: R1 ultiyi çalıştırıyor', PAD_ABILITY_BUTTONS.r1 === 2);
+// Arena kol düzeni: ÇARPI zıplatır, sol analog yürütür. Güç tuşları YOK -
+// virüslerin yetenekleri henüz yazılmadı.
+const { PAD_JUMP_BUTTON, PLAYERS: ARENA_PLAYERS } = await import('../src/config/settings.js');
 check('arena kolu: ÇARPI zıplatıyor', PAD_JUMP_BUTTON === 'cross');
-check('arena kolu: her güce bir tuş', new Set(Object.values(PAD_ABILITY_BUTTONS)).size === 3);
-check('arena kolu: HUD simgeleri güç sırasıyla aynı',
-    PAD_ABILITY_LABELS.length === 3 && PAD_ABILITY_LABELS[PAD_ABILITY_BUTTONS.square] === '□',
-    PAD_ABILITY_LABELS.join(' '));
-// Kolda olmayan bir tuşa güç bağlanmış olmasın
-for (const name of Object.keys(PAD_ABILITY_BUTTONS)) {
-    check(`arena kolu: '${name}' kolda var olan bir tuş`, BUTTONS[name] !== undefined);
-}
-check('arena kolu: zıplama tuşu güçlerden biri değil',
-    PAD_ABILITY_BUTTONS[PAD_JUMP_BUTTON] === undefined);
+check('arena kolu: zıplama tuşu kolda var olan bir tuş', BUTTONS[PAD_JUMP_BUTTON] !== undefined);
 check('arena kolu: her oyuncuya bir kol',
     ARENA_PLAYERS[1].padSlot === 0 && ARENA_PLAYERS[2].padSlot === 1);
-
-// ---- Sahne betiği (prolog) ----
-// Cutscene saf mantık: anlar sırayla geçmeli, kilit doğru anlarda açılmalı,
-// koşullu an sonsuza kadar takılmamalı.
-const { Cutscene, shakeOffset, flash } = await import('../src/adventure/cutscene.js');
-
-const log = [];
-const scene = new Cutscene([
-    { name: 'bekle', frames: 3, onEnter: () => log.push('bekle') },
-    { name: 'yuru', frames: 2, lock: false, onEnter: () => log.push('yuru') },
-    { name: 'ani', onEnter: () => log.push('ani') },        // süresiz: tek karede biter
-    { name: 'son', frames: 2, onEnter: () => log.push('son') }
-]).start();
-
-check('sahne: ilk an girişte başlıyor', scene.name === 'bekle' && log.length === 1);
-check('sahne: varsayılan olarak kontrol kilitli', scene.locked);
-for (let i = 0; i < 3; i++) scene.step();
-check('sahne: süre dolunca sonraki ana geçiyor', scene.name === 'yuru', String(scene.name));
-check('sahne: lock:false olan anda oyuncu hareket edebiliyor', !scene.locked);
-// 'ani' süresiz olduğu için 'yuru' bitince tek karede yutulup 'son'a geçilmeli
-for (let i = 0; i < 2; i++) scene.step();
-check('sahne: süresiz an tek karede yutuluyor', scene.name === 'son' && log.join(',') === 'bekle,yuru,ani,son',
-    log.join(','));
-for (let i = 0; i < 2; i++) scene.step();
-check('sahne: son andan sonra bitiyor', scene.finished && !scene.running);
-check('sahne: bittikten sonra kilit kalkıyor', !scene.locked);
-
-// Koşullu an: koşul gerçekleşince geçmeli
-const condState = { vardi: false };
-const condScene = new Cutscene([
-    { name: 'yuru', frames: 0, until: (s) => s.vardi },
-    { name: 'bitti', frames: 1 }
-], condState).start();
-for (let i = 0; i < 50; i++) condScene.step();
-check('sahne: koşul gerçekleşmeden koşullu anda bekliyor', condScene.name === 'yuru');
-condState.vardi = true;
-condScene.step();
-check('sahne: koşul gerçekleşince geçiyor', condScene.name === 'bitti', String(condScene.name));
-
-// Koşul hiç gerçekleşmezse süre üst sınırı devreye girmeli (sahne kilitlenmesin)
-const stuck = new Cutscene([
-    { name: 'bekle', frames: 5, until: () => false },
-    { name: 'bitti', frames: 1 }
-]).start();
-for (let i = 0; i < 5; i++) stuck.step();
-check('sahne: koşul gelmezse süre üst sınırı kurtarıyor', stuck.name === 'bitti', String(stuck.name));
-
-check('sahne: ilerleme 0..1 arasında', (() => {
-    const s = new Cutscene([{ name: 'a', frames: 4 }]).start();
-    if (s.progress !== 0) return false;
-    s.step(); s.step();
-    return s.progress === 0.5;
-})());
-
-check('sahne: sarsıntı sıfır güçte kaymıyor',
-    shakeOffset(17, 0).x === 0 && shakeOffset(17, 0).y === 0);
-check('sahne: sarsıntı sınırların içinde', (() => {
-    for (let f = 0; f < 200; f++) {
-        const o = shakeOffset(f, 6);
-        if (Math.abs(o.x) > 6 || Math.abs(o.y) > 4) return false;
-    }
-    return true;
-})());
-check('sahne: parlama uçlarda sönük, tepede parlak',
-    flash(0) === 0 && flash(1) === 0 && flash(0.12) > 0.99);
-
-// ---- Prolog 3: kuşatılan çalışma alanı ----
-// Avlu içerisidir; çıkış üstteki acil çıkış kapısı. Sahnenin güvenceleri:
-// beş sağlıklının da başladığı yer boş olmalı, hepsi kapıya yürüyebilmeli,
-// ve kol kapıya yakın olmalı (arkadaş oraya "geri hamle" yapıyor).
-const siege = await import('../src/adventure/siegeLayout.js');
-
-check('kuşatma: bizim hariç tam beş sağlıklı var',
-    siege.SURVIVOR_COUNT === 5 && siege.SURVIVOR_STARTS.length === 5,
-    `${siege.SURVIVOR_STARTS.length} kişi`);
-check('kuşatma: bina cephesine girilemiyor', siege.blocked(500, 80));
-check('kuşatma: tel örgünün dışına çıkılamıyor', siege.blocked(500, 500));
-check('kuşatma: jeneratörün içinden geçilemiyor', siege.blocked(138, 278));
-check('kuşatma: kuleye girilemiyor', siege.blocked(878, 230));
-check('kuşatma: anten direğine girilemiyor', siege.blocked(264, 200));
-check('kuşatma: kapının önünde durulabiliyor',
-    !siege.blocked(siege.DOOR_STAND.x, siege.DOOR_STAND.y));
-check('kuşatma: kolun önünde durulabiliyor',
-    !siege.blocked(siege.LEVER_STAND.x, siege.LEVER_STAND.y));
-check('kuşatma: sıra noktası boş', !siege.blocked(siege.QUEUE_POINT.x, siege.QUEUE_POINT.y));
-
-// Kol kapıya YAKIN olmalı: arkadaş oraya geri dönüyor, uzaksa hamle anlamsız
-const leverGap = Math.abs(siege.LEVER_STAND.x - siege.DOOR_STAND.x);
-check('kuşatma: kol acil çıkışa yakın', leverGap < 200, `${leverGap}px`);
-
-// Sağlıklıların hepsi başladığı yerde sıkışmadan durabiliyor mu?
-const stuckSurvivors = siege.SURVIVOR_STARTS.filter(p => siege.blocked(p.x, p.y));
-check('kuşatma: sağlıklıların başlangıçları boş', stuckSurvivors.length === 0,
-    JSON.stringify(stuckSurvivors));
-
-// Avluda yürünerek kapıya ulaşılıyor mu? (herkes için tek tek)
-function siegeReach(from) {
-    const step = 8;
-    const seen = new Set();
-    const start = [Math.round(from.x / step) * step, Math.round(from.y / step) * step];
-    const queue = [start];
-    seen.add(start.join(','));
-    while (queue.length) {
-        const [x, y] = queue.shift();
-        for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
-            const nx = x + dx;
-            const ny = y + dy;
-            const key = `${nx},${ny}`;
-            if (seen.has(key) || siege.blocked(nx, ny)) continue;
-            seen.add(key);
-            queue.push([nx, ny]);
-        }
-    }
-    return seen;
-}
-
-const nearKey = (set, px, py, step = 8) => {
-    for (let dx = -step; dx <= step; dx += step) {
-        for (let dy = -step; dy <= step; dy += step) {
-            const kx = Math.round((px + dx) / step) * step;
-            const ky = Math.round((py + dy) / step) * step;
-            if (set.has(`${kx},${ky}`)) return true;
-        }
-    }
-    return false;
-};
-
-let allReachDoor = true;
-for (const start of siege.SURVIVOR_STARTS) {
-    if (!nearKey(siegeReach(start), siege.DOOR_STAND.x, siege.DOOR_STAND.y)) allReachDoor = false;
-}
-check('kuşatma: beş sağlıklı da kapıya yürüyebiliyor', allReachDoor);
-
-// Elle yazılan tahliye yolları gerçekten temiz mi? Sağlıklılarda yol bulma
-// yok; bir ara nokta duvara denk gelirse o kişi orada takılıp kalıyor ve
-// kapıdan beş değil dört kişi geçiyor.
-check('kuşatma: her sağlıklının bir tahliye yolu var',
-    siege.SURVIVOR_PATHS.length === siege.SURVIVOR_STARTS.length);
-
-const badPathSteps = [];
-siege.SURVIVOR_PATHS.forEach((path, i) => {
-    let from = siege.SURVIVOR_STARTS[i];
-    for (const to of path) {
-        const dist = Math.hypot(to.x - from.x, to.y - from.y);
-        const steps = Math.max(1, Math.ceil(dist / 4));
-        for (let s = 0; s <= steps; s++) {
-            const x = from.x + (to.x - from.x) * (s / steps);
-            const y = from.y + (to.y - from.y) * (s / steps);
-            // Son ara nokta kapı önü sırası; oradan sonrası kapı boşluğu
-            if (siege.blocked(x, y)) badPathSteps.push(`#${i} (${Math.round(x)},${Math.round(y)})`);
-        }
-        from = to;
-    }
-});
-check('kuşatma: tahliye yollarının her adımı yürünebilir',
-    badPathSteps.length === 0, badPathSteps.slice(0, 4).join(' '));
-
-// Arkadaşın geri hamlesi de elle yazılı bir yol: takılırsa kola hiç varamaz
-// ve sahne "kola doğru gidiyor" anlatısını kaybeder.
-const badReturn = [];
-let rFrom = { x: siege.DOOR_STAND.x + 50, y: siege.DOOR_STAND.y };
-for (const to of siege.FRIEND_RETURN_PATH) {
-    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - rFrom.x, to.y - rFrom.y) / 4));
-    for (let i = 0; i <= steps; i++) {
-        const x = rFrom.x + (to.x - rFrom.x) * (i / steps);
-        const y = rFrom.y + (to.y - rFrom.y) * (i / steps);
-        if (siege.blocked(x, y)) badReturn.push(`(${Math.round(x)},${Math.round(y)})`);
-    }
-    rFrom = to;
-}
-check('kuşatma: arkadaşın kola dönüş yolu açık', badReturn.length === 0, badReturn.slice(0, 4).join(' '));
-
-const yardCells = siegeReach(siege.SURVIVOR_STARTS[0]);
-check('kuşatma: avlu makul büyüklükte', yardCells.size > 2000, `${yardCells.size} kare`);
-check('kuşatma: virüslülerin girdiği yarık avluya açılıyor',
-    nearKey(yardCells, siege.BREACH_CENTER, siege.FENCE.y - 20));
-check(`kuşatma: "${siege.LOCATION_NAME}" yazısı çizilebiliyor`,
-    missingGlyphs(siege.LOCATION_NAME).length === 0);
 
 // ---- Diyalog ----
 // Dublaj yok: yazı harf harf açılıyor, her birkaç harfte "bıt" sesi çıkıyor.
@@ -795,144 +323,6 @@ check('arkadaş: bütün kareler 12x16 ızgarada', friendGridOk);
 check('arkadaş: tanımsız renk harfi yok', friendLetterOk);
 check('arkadaş: turuncu bant her duruşta görünüyor', bandMissing.length === 0, bandMissing.join(','));
 
-// ---- Kanalizasyon: otomatik koşu bölümü ----
-// Parkur elle yazıldığı için tek bir yanlış şerit bölümü geçilmez yapıyor.
-// Buradaki testler parkuru sahnenin GERÇEK fiziğiyle baştan sona oynuyor.
-const sewer = await import('../src/adventure/sewerLayout.js');
-
-check('kanalizasyon: üç şerit var ve hepsi ayrı yerde',
-    sewer.LANE_COUNT === 3 && new Set(sewer.LANES).size === 3, sewer.LANES.join(','));
-
-const courseSorted = sewer.COURSE.every((o, i) => i === 0 || o.z >= sewer.COURSE[i - 1].z);
-check('kanalizasyon: parkur z sırasında', courseSorted);
-
-const unknownType = sewer.COURSE.filter(o => !sewer.OBSTACLES[o.type]);
-check('kanalizasyon: her engelin tanımı var', unknownType.length === 0,
-    unknownType.map(o => o.type).join(','));
-
-const badLane = sewer.COURSE.filter(o => o.lane < 0 || o.lane >= sewer.LANE_COUNT);
-check('kanalizasyon: her engel geçerli şeritte', badLane.length === 0);
-
-const usedTypes = new Set(sewer.COURSE.map(o => o.type));
-check('kanalizasyon: dört engel türünün hepsi kullanılıyor',
-    sewer.OBSTACLE_TYPES.every(t => usedTypes.has(t)),
-    sewer.OBSTACLE_TYPES.filter(t => !usedTypes.has(t)).join(','));
-
-// Kayma ile zıplama BİRBİRİNİN AYNASI: kullanıcının istediği "kaymanın işe
-// yaradığı ama zıplamanın çarpmayla bittiği yer" borunun ta kendisi.
-const jumpPeak = (() => {
-    let h = 0, v = sewer.JUMP_V, peak = 0;
-    for (let i = 0; i < 200 && (h > 0 || i === 0); i++) { h += v; v -= sewer.GRAVITY; peak = Math.max(peak, h); }
-    return peak;
-})();
-check('kanalizasyon: taşı zıplayarak geçiyoruz', !sewer.blocksBody('tas', 'zipla', jumpPeak));
-check('kanalizasyon: taşı kayarak geçemiyoruz', sewer.blocksBody('tas', 'kay', 0));
-check('kanalizasyon: boruyu kayarak geçiyoruz', !sewer.blocksBody('boru', 'kay', 0));
-check('kanalizasyon: boruyu ZIPLAYARAK geçemiyoruz', sewer.blocksBody('boru', 'zipla', jumpPeak),
-    `tepe ${jumpPeak.toFixed(0)}`);
-check('kanalizasyon: çöküntü ne zıplayarak ne kayarak geçiliyor',
-    sewer.blocksBody('enkaz', 'zipla', jumpPeak) && sewer.blocksBody('enkaz', 'kay', 0));
-
-// Her sırada geçilebilir bir şerit var mı, ve o şerit TEK HAMLEYLE
-// ulaşılabilir mi? Üç şeritte iki geçilmez engel varsa boş şerit ortada
-// olmak zorunda: uçtaki oyuncunun tek komşusu da kapalıysa kurtuluş yok.
-const sewerRows = sewer.rows();
-const impassable = sewerRows.filter(r => !sewer.rowIsPassable(r)).map(r => r.z);
-check('kanalizasyon: her sırada geçilebilir bir şerit var', impassable.length === 0, impassable.join(','));
-
-const trappedLanes = [];
-for (const row of sewerRows) {
-    for (let lane = 0; lane < sewer.LANE_COUNT; lane++) {
-        if (!sewer.laneHasEscape(row, lane)) trappedLanes.push(`z=${row.z} şerit${lane}`);
-    }
-}
-check('kanalizasyon: hiçbir şerit kapana kısılmıyor', trappedLanes.length === 0, trappedLanes.join(', '));
-
-// Sıralar arası açıklık: en yavaş hamle (zıplama yayı) bitmeden bir
-// sonrakine varılmamalı, yoksa parkur havada geçirilen bir dizi kareye dönüp
-// oyuncunun elinden çıkıyor.
-const jumpFrames = Math.ceil((2 * sewer.JUMP_V) / sewer.GRAVITY);
-const tightGaps = [];
-for (let i = 1; i < sewerRows.length; i++) {
-    const gap = sewerRows[i].z - sewerRows[i - 1].z;
-    if (gap / sewer.MAX_SPEED < jumpFrames + 12) tightGaps.push(`${sewerRows[i - 1].z}->${sewerRows[i].z}`);
-}
-check('kanalizasyon: sıralar arasında hamleyi bitirecek kadar yer var',
-    tightGaps.length === 0, tightGaps.join(', '));
-
-// Öğretme sırası: önce zıplama, sonra kayma, sonra şerit. Her biri TEK
-// başına geliyor - ilk kez görülen tuş kalabalık bir sırada öğrenilmiyor.
-const firstOf = (predicate) => Math.min(...sewer.COURSE.filter(predicate).map(o => o.z));
-const firstJump = firstOf(o => sewer.OBSTACLES[o.type].clear === 'zipla');
-const firstSlide = firstOf(o => sewer.OBSTACLES[o.type].clear === 'kay');
-const firstLane = firstOf(o => sewer.OBSTACLES[o.type].clear === null);
-check('kanalizasyon: öğretme sırası zıpla -> kay -> şerit',
-    firstJump < firstSlide && firstSlide < firstLane,
-    `${firstJump} / ${firstSlide} / ${firstLane}`);
-
-const soloFirst = [firstJump, firstSlide, firstLane]
-    .filter(z => sewer.COURSE.filter(o => o.z === z).length !== 1);
-check('kanalizasyon: her hamlenin ilk örneği yalnız geliyor', soloFirst.length === 0, soloFirst.join(','));
-
-check('kanalizasyon: öğretme okunacak kadar önce çıkıyor',
-    sewer.HINT_LEAD / sewer.MAX_SPEED >= 60, `${Math.round(sewer.HINT_LEAD / sewer.MAX_SPEED)} kare`);
-
-// Parkuru baştan sona OYNA. planFor + applyMove + stepPerson sahnenin
-// kullandığı kodun aynısı; burada çarpmadan bitmiyorsa oyunda da bitmez.
-function playSewer(startLane) {
-    const obstacles = sewer.COURSE.map(o => ({ ...o, done: false }));
-    const player = sewer.newRunner(startLane);
-    let travelled = 0;
-    let handledZ = null;
-    let frames = 0;
-    const crashes = [];
-
-    while (travelled < sewer.EXIT_Z && frames < 6000) {
-        frames++;
-        const myZ = travelled + sewer.PLAYER_Z;
-        const row = sewerRows.find(r => r.z > myZ);
-        if (row && handledZ !== row.z) {
-            const move = sewer.planFor(row, player.lane);
-            if (move && row.z - myZ <= sewer.ACT_LEAD[move]) {
-                handledZ = row.z;
-                sewer.applyMove(player, move);
-            }
-        }
-        sewer.stepPerson(player);
-        travelled += sewer.speedAt(travelled);
-
-        for (const obstacle of obstacles) {
-            if (obstacle.done) continue;
-            const rel = obstacle.z - travelled;
-            if (rel > sewer.PLAYER_Z + 60) continue;
-            if (rel < -400) { obstacle.done = true; continue; }
-            if (sewer.hits(obstacle, { rel, x: player.x, pose: player.pose, height: player.height })) {
-                crashes.push(`${obstacle.type}@${obstacle.z}/ş${obstacle.lane}`);
-                obstacle.done = true;
-            }
-        }
-    }
-    return { frames, travelled, crashes };
-}
-
-for (const lane of [0, 1, 2]) {
-    const run = playSewer(lane);
-    check(`kanalizasyon: ${lane}. şeritten başlayan parkuru çarpmadan bitiriyor`,
-        run.crashes.length === 0 && run.travelled >= sewer.EXIT_Z,
-        run.crashes.join(', ') || `${run.frames} kare`);
-}
-
-// Bölüm ne kadar sürüyor? Prologun bir parçası: uzarsa koşu tek başına
-// prologdan uzun oluyor.
-const sewerFrames = playSewer(1).frames;
-check('kanalizasyon: bölüm 20-35 saniye sürüyor',
-    sewerFrames > 20 * 60 && sewerFrames < 35 * 60, `${(sewerFrames / 60).toFixed(1)} sn`);
-
-// Otomatik koşu: hız hiçbir zaman durmuyor ve makul aralıkta kalıyor
-check('kanalizasyon: koşu hızı hep ileri ve sınırlı',
-    sewer.speedAt(0) > 0 && sewer.speedAt(1e9) === sewer.MAX_SPEED &&
-    sewer.speedAt(sewer.EXIT_Z) <= sewer.MAX_SPEED);
-
 // ---- Kontrol öğretmeleri ----
 const controls = await import('../src/config/controls.js');
 const { missingGlyphs: missing } = await import('../src/pixel/pixelFont.js');
@@ -989,6 +379,92 @@ check('kol: sağ analog YUKARI çekilince kayma tetiklenmiyor',
     !readPad(padWithRight(-1)).pressed.includes('rstickDown'));
 check('kol: sağ analog sol analogun yönünü bozmuyor',
     readPad(padWithRight(1)).magnitude === 0);
+
+// ---- Prologun çizgi romanı ----
+// Prolog oynanmıyor, kare kare anlatılıyor. Senaryonun güvenceleri: her
+// bölümde yeterince kare olmalı, her karenin bir çizimi olmalı, her konuşanın
+// sesi tanımlı olmalı ve ekrandaki her harf yazı tipinde bulunmalı.
+const comic = await import('../src/comic/comicScript.js');
+const { ComicPlayer, IN_FRAMES } = await import('../src/comic/ComicPlayer.js');
+
+check('çizgi roman: kare kimlikleri benzersiz',
+    new Set(comic.PANELS.map(p => p.id)).size === comic.PANELS.length);
+
+check('çizgi roman: dört bölümün de kareleri var',
+    comic.CHAPTERS.every(c => comic.panelsOfChapter(c.n).length >= 5),
+    comic.CHAPTERS.map(c => comic.panelsOfChapter(c.n).length).join(','));
+
+check('çizgi roman: her bölüm bir başlık kartıyla açılıyor',
+    comic.CHAPTERS.every(c => comic.panelsOfChapter(c.n)[0].art === 'title'));
+
+// Yazılmış bölümde en az bir HAREKETLİ kare olmalı: önemli anlar hareketle
+// anlatılıyor (dökme, saate bakış, camın çatlaması, doğuş, tırmanış).
+check('çizgi roman: yazılmış bölümde hareketli kare var',
+    comic.CHAPTERS.filter(c => !c.still).every(c => comic.panelsOfChapter(c.n).some(p => p.motion > 0)),
+    comic.CHAPTERS.map(c => comic.panelsOfChapter(c.n).filter(p => p.motion > 0).length).join(','));
+
+// Bekleyen bölümlerde HİÇBİR ŞEY oynamamalı: sırayla yeniden tarif edilip
+// çizilecekler, o güne kadar duruk duruyorlar.
+check('çizgi roman: bekleyen bölümlerde hareket yok',
+    comic.CHAPTERS.filter(c => c.still).every(c => comic.panelsOfChapter(c.n).every(p => !p.motion)),
+    comic.CHAPTERS.filter(c => c.still).map(c => c.n).join(','));
+
+// Tek çekim: devam eden kareler siyahtan açılmıyor. İlk kare devam OLAMAZ.
+check('çizgi roman: ilk kare devam karesi değil', !comic.PANELS[0].cont);
+check('çizgi roman: devam kareleri kendi bölümünün içinde',
+    comic.PANELS.every((p, i) => !p.cont || (i > 0 && comic.PANELS[i - 1].chapter === p.chapter)));
+
+const comicText = [
+    ...comic.PANELS.filter(p => p.caption).map(p => p.caption),
+    ...comic.PANELS.flatMap(p => (p.lines || []).map(l => l.text)),
+    ...comic.CHAPTERS.flatMap(c => [c.title, c.subtitle].filter(Boolean))
+];
+const comicMissing = comicText.flatMap(t => missingGlyphs(t));
+check('çizgi roman: bütün yazılar piksel yazı tipinde çizilebiliyor',
+    comicMissing.length === 0, comicMissing.join(''));
+
+const comicSpeakers = [...new Set(comic.PANELS.flatMap(p => (p.lines || []).map(l => l.speaker)))];
+check('çizgi roman: her konuşanın ses perdesi tanımlı',
+    comicSpeakers.every(s => VOICE_PITCH[s]), comicSpeakers.join(','));
+
+check('çizgi roman: her balonun karede bir yeri var',
+    comic.PANELS.flatMap(p => p.lines || []).every(l => Array.isArray(l.at) && l.at.length === 2));
+
+// Yürütücü: kareler sırayla geçmeli, balon bitmeden kare atlanmamalı
+const player = new ComicPlayer(comic.PANELS).start();
+check('çizgi roman: ilk kare başlıkla açılıyor', player.panel.id === comic.PANELS[0].id);
+
+// Hareketli kare: F önce hareketi sonuna sarar, kareyi ATLAMAZ
+const motionIndex = comic.PANELS.findIndex(p => p.motion > 0);
+player.enter(motionIndex);
+const motionId = player.panel.id;
+player.advance();
+check('çizgi roman: F hareketli kareyi atlamıyor, sonuna sarıyor',
+    player.panel.id === motionId && player.motionT === 1);
+player.advance();
+check('çizgi roman: hareket bitince F sonraki kareye geçiyor', player.panel.id !== motionId);
+
+// Balonlu kare: F önce yazıyı tamamlar
+const talkIndex = comic.PANELS.findIndex(p => p.lines && p.lines.length > 1);
+player.enter(talkIndex);
+const talkId = player.panel.id;
+for (let i = 0; i < 6; i++) player.step();
+player.advance();
+check('çizgi roman: F önce balonu tamamlıyor',
+    player.panel.id === talkId && player.dialogue.finishedTyping);
+
+// Kare açılırken sönüm: ilk karede siyah, IN_FRAMES sonra tam görünür
+player.enter(1);
+check('çizgi roman: kare siyahtan açılıyor', player.alpha === 0);
+for (let i = 0; i < IN_FRAMES; i++) player.step();
+check('çizgi roman: açılma sönümü bitiyor', player.alpha === 1);
+
+// Son kareden sonra biter (sonsuz döngü yok)
+player.enter(comic.PANELS.length - 1);
+player.frame = 99999;
+player.advance();
+check('çizgi roman: son kareden sonra bitiyor', player.finished && !player.running);
+
 
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);

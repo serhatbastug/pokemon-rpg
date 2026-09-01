@@ -1,6 +1,9 @@
-import { PLAYERS, PAD_ABILITY_LABELS, PAD_ABILITY_COLORS } from '../config/settings.js';
+import { PLAYERS, PAD_CONTROL_LABEL } from '../config/settings.js';
 
-// Savaş HUD'u: isimler, can barları ve yetenek bekleme süresi göstergeleri.
+// Savaş HUD'u: isimler, can barları ve hangi kontrolle oynandığı.
+//
+// Yetenek bekleme göstergeleri kaldırıldı: virüslerin güçleri henüz yok.
+// Güçler yazılınca buraya geri gelecek.
 export class Hud {
     constructor() {
         this.p1Name = document.getElementById('p1-name');
@@ -10,46 +13,32 @@ export class Hud {
         this.p1HpText = document.getElementById('p1-hp-text');
         this.p2HpText = document.getElementById('p2-hp-text');
 
-        // Yetenek indeksine göre cooldown kaplamaları (oyuncu numarası -> [overlay, overlay, overlay])
-        this.cdOverlays = {
-            1: [1, 2, 3].map(i => document.querySelector(`#p1-cd-${i} .cd-overlay`)),
-            2: [1, 2, 3].map(i => document.querySelector(`#p2-cd-${i} .cd-overlay`))
+        this.controls = {
+            1: document.getElementById('p1-controls'),
+            2: document.getElementById('p2-controls')
         };
-
-        // Güç kutucuklarının üstündeki tuş kapakları. Oyuncu kolla oynuyorsa
-        // burada Shift/Space değil KARE/ÜÇGEN/YUVARLAK yazmalı.
-        this.keyBadges = {
-            1: [1, 2, 3].map(i => document.querySelector(`#p1-cd-${i} .key-badge`)),
-            2: [1, 2, 3].map(i => document.querySelector(`#p2-cd-${i} .key-badge`))
-        };
-        this.badgePadCount = null;   // en son hangi simgeler yazıldı
+        this.badgePadCount = null;   // en son hangi kontrol yazıldı
     }
 
     // padCount: takılı kol sayısı. 1. oyuncu ilk kolu, 2. oyuncu ikinciyi alır;
-    // kolu olmayan oyuncunun kapağında klavye tuşu yazmaya devam eder.
+    // kolu olmayan oyuncuda klavye tuşları yazmaya devam eder.
     // Her karede çağrılıyor, bu yüzden yalnızca değişince DOM'a yazıyor.
     updateControlBadges(padCount) {
         if (padCount === this.badgePadCount) return;
         this.badgePadCount = padCount;
 
         for (const num of [1, 2]) {
+            const el = this.controls[num];
+            if (!el) continue;
             const onPad = PLAYERS[num].padSlot < padCount;
-            const labels = onPad ? PAD_ABILITY_LABELS : PLAYERS[num].keyLabels;
-            const badges = this.keyBadges[num];
-            for (let i = 0; i < badges.length; i++) {
-                if (!badges[i]) continue;
-                badges[i].textContent = labels[i];
-                badges[i].classList.toggle('pad-badge', onPad);
-                // □ tek bir şekil, L1/R1 ise yazı: aynı punto ikisine de uymuyor
-                badges[i].classList.toggle('pad-badge-text', onPad && labels[i].length > 1);
-                badges[i].style.color = onPad ? PAD_ABILITY_COLORS[i] : '';
-            }
+            el.textContent = onPad ? PAD_CONTROL_LABEL : PLAYERS[num].keyLabel;
+            el.classList.toggle('pad-badge-text', onPad);
         }
     }
 
     setPlayers(p1, p2) {
-        this.p1Name.textContent = `${p1.char.className} (${p1.char.name})`;
-        this.p2Name.textContent = `${p2.char.className} (${p2.char.name})`;
+        this.p1Name.textContent = p1.fighter.name;
+        this.p2Name.textContent = p2.fighter.name;
     }
 
     updateHealth(p1, p2) {
@@ -58,16 +47,5 @@ export class Hud {
 
         this.p2HpBar.style.width = `${(p2.hp / p2.maxHp) * 100}%`;
         this.p2HpText.textContent = `${Math.ceil(p2.hp)} / ${p2.maxHp}`;
-    }
-
-    updateCooldowns(p1, p2) {
-        for (const player of [p1, p2]) {
-            const overlays = this.cdOverlays[player.playerNum];
-            for (let i = 0; i < overlays.length; i++) {
-                const cd = player.cooldowns[i];
-                const max = player.maxCooldowns[i];
-                overlays[i].style.height = cd > 0 ? `${(cd / max) * 100}%` : '0%';
-            }
-        }
     }
 }

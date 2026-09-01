@@ -196,7 +196,19 @@ export const Sfx = {
     // Tavandan düşen damla: koridorun tek canlı sesi
     drip: () => blip({ type: 'sine', from: 1250, to: 620, duration: 0.09, volume: 0.09 }),
     // Ayak sesi: dar tünelde yankılanan tok vuruş
-    step: () => blip({ type: 'triangle', from: 150, to: 96, duration: 0.06, volume: 0.09 })
+    step: () => blip({ type: 'triangle', from: 150, to: 96, duration: 0.06, volume: 0.09 }),
+
+    // --- Prolog 1: laboratuvar ---
+    // Camın çatlaması: kısa, tiz, kuru bir çıtırtı
+    glassCrack: () => {
+        noise({ duration: 0.09, volume: 0.22, filterFrom: 5200, filterTo: 1800 });
+        blip({ type: 'square', from: 1500, to: 900, duration: 0.05, volume: 0.12 });
+    },
+    // Kütlenin kımıldaması: ağır, ıslak, alçak bir kayma
+    ooze: () => {
+        blip({ type: 'sine', from: 130, to: 62, duration: 0.55, volume: 0.20 });
+        noise({ duration: 0.5, volume: 0.14, filterFrom: 500, filterTo: 90 });
+    }
 };
 
 // --- Basit döngüsel müzik ---

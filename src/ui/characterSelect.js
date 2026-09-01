@@ -1,4 +1,10 @@
-// Karakter seçim ekranı: kart ızgarası, detay modalı ve P1/P2 seçim sırası.
+import { FIGHTERS, fighterSprite } from '../game/fighters.js';
+
+// Karakter seçim ekranı: kadro kartları, detay penceresi ve P1/P2 seçim sırası.
+//
+// Kadro artık bir ağdan gelmiyor: iki dövüşçü de elle çizilmiş, kartta
+// gördüğün sprite arenaya çıkan sprite'ın ta kendisi. Bu yüzden yükleme
+// beklemesi de yok.
 //
 // Ekran fareyle de kolla da kullanılabiliyor. Kol imleci ayrı bir yol açmıyor:
 // odaklı kartın click()'i çağrılıyor, yani kol da farenin gittiği yerden
@@ -19,65 +25,71 @@ export class CharacterSelect {
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) this.closeModal();
         });
+
+        this.grid.innerHTML = '';
+        for (const fighter of FIGHTERS) this.addFighter(fighter);
     }
 
-    // Karakter yüklendikçe kartını ızgaraya ekler
-    addCharacter(character) {
-        const spinner = this.grid.querySelector('.loading-spinner');
-        if (spinner) spinner.remove();
+    // Dövüşçünün sprite'ını karta sığacak ölçekte çizen bir tuval üretir
+    previewCanvas(fighter, boxH) {
+        const sprite = fighterSprite(fighter.id);
+        const canvas = document.createElement('canvas');
+        if (!sprite) return canvas;
 
+        const scale = boxH / sprite.h;
+        canvas.width = Math.round(sprite.w * scale);
+        canvas.height = Math.round(boxH);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite.canvas, 0, 0, canvas.width, canvas.height);
+        return canvas;
+    }
+
+    addFighter(fighter) {
         const card = document.createElement('div');
         card.className = 'char-card';
-        card.style.setProperty('--class-color', character.themeColor);
-        card.setAttribute('id', `card-${character.id}`);
+        card.style.setProperty('--class-color', fighter.themeColor);
+        card.setAttribute('id', `card-${fighter.id}`);
 
-        card.innerHTML = `
-            <div class="char-image-container">
-                <img class="char-img" src="${character.sprite}" alt="${character.name}">
-            </div>
-            <div class="char-class">${character.className}</div>
-            <div class="char-name">${character.name}</div>
-            <div class="poke-tag">#${character.id}</div>
-        `;
+        const box = document.createElement('div');
+        box.className = 'char-image-container';
+        box.appendChild(this.previewCanvas(fighter, 150));
 
-        card.addEventListener('click', () => this.showDetails(character));
+        const name = document.createElement('div');
+        name.className = 'char-class';
+        name.textContent = fighter.name;
+
+        card.append(box, name);
+        card.addEventListener('click', () => this.showDetails(fighter));
         this.grid.appendChild(card);
     }
 
-    showDetails(character) {
+    showDetails(fighter) {
         const modalBody = this.overlay.querySelector('.modal-body');
         modalBody.innerHTML = `
             <div class="detail-header">
-                <img class="detail-pfp" src="${character.sprite}" alt="${character.name}" style="border: 2px solid ${character.themeColor}">
+                <div class="detail-pfp-box" style="border: 2px solid ${fighter.themeColor}"></div>
                 <div class="detail-titles">
-                    <span class="class-tag" style="--class-color: ${character.themeColor}">${character.className}</span>
-                    <h3>${character.name}</h3>
-                    <span class="poke-tag">No: #${character.id}</span>
+                    <span class="class-tag" style="--class-color: ${fighter.themeColor}">${fighter.name}</span>
                 </div>
             </div>
-            <p class="char-description" style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
-                ${character.description}
-            </p>
+            <p class="char-description">${fighter.description}</p>
             <div class="stats-container">
-                <h4 style="margin-bottom: 1rem; font-family: var(--font-header);">Sınıf İstatistikleri</h4>
-                ${Object.entries(character.baseStats).map(([stat, val]) => `
-                    <div class="stat-row" style="--class-color: ${character.themeColor}">
-                        <div class="stat-label-row">
-                            <span style="text-transform: capitalize;">${stat === 'speed' ? 'hız' : stat}</span>
-                            <span>${val}</span>
-                        </div>
-                        <div class="stat-bar-bg">
-                            <div class="stat-bar-fill" data-width="${stat === 'speed' ? val * 15 : val}%"></div>
-                        </div>
-                    </div>
-                `).join('')}
+                <div class="stat-row" style="--class-color: ${fighter.themeColor}">
+                    <div class="stat-label-row"><span>can</span><span>${fighter.stats.hp}</span></div>
+                    <div class="stat-bar-bg"><div class="stat-bar-fill" data-width="${fighter.stats.hp * 0.7}%"></div></div>
+                </div>
+                <div class="stat-row" style="--class-color: ${fighter.themeColor}">
+                    <div class="stat-label-row"><span>hız</span><span>${fighter.stats.speed}</span></div>
+                    <div class="stat-bar-bg"><div class="stat-bar-fill" data-width="${fighter.stats.speed * 15}%"></div></div>
+                </div>
             </div>
-            <button class="select-hero-btn" style="--class-color: ${character.themeColor}">
+            <button class="select-hero-btn" style="--class-color: ${fighter.themeColor}">
                 Oyuncu ${this.selectionTurn} Olarak Seç
             </button>
         `;
-
-        modalBody.querySelector('.select-hero-btn').addEventListener('click', () => this.selectHero(character));
+        modalBody.querySelector('.detail-pfp-box').appendChild(this.previewCanvas(fighter, 90));
+        modalBody.querySelector('.select-hero-btn').addEventListener('click', () => this.selectHero(fighter));
 
         this.overlay.classList.remove('hidden');
         this.overlay.classList.add('active');
@@ -90,34 +102,33 @@ export class CharacterSelect {
         }, 50);
     }
 
-    selectHero(character) {
-        const card = document.getElementById(`card-${character.id}`);
+    selectHero(fighter) {
+        const card = document.getElementById(`card-${fighter.id}`);
 
         if (this.selectionTurn === 1) {
-            this.player1Selected = character;
+            this.player1Selected = fighter;
             this.grid.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected-p1'));
             if (card) card.classList.add('selected-p1');
 
-            this.status.querySelector('.p1-status-badge').textContent = `P1: ${character.className} (${character.name})`;
-            this.status.querySelector('.p1-status-badge').classList.add('selected');
+            const badge = this.status.querySelector('.p1-status-badge');
+            badge.textContent = `P1: ${fighter.name}`;
+            badge.classList.add('selected');
 
             this.selectionTurn = 2;
             this.status.querySelector('.p2-status-badge').textContent = 'Oyuncu 2: Seçim Yapıyor...';
         } else {
-            this.player2Selected = character;
+            this.player2Selected = fighter;
             this.grid.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected-p2'));
             if (card) card.classList.add('selected-p2');
 
-            this.status.querySelector('.p2-status-badge').textContent = `P2: ${character.className} (${character.name})`;
-            this.status.querySelector('.p2-status-badge').classList.add('selected');
+            const badge = this.status.querySelector('.p2-status-badge');
+            badge.textContent = `P2: ${fighter.name}`;
+            badge.classList.add('selected');
 
             // İki oyuncu da seçildi: 2 kişilik mod düğmesi aktifleşir
             this.startBtn.classList.remove('not-ready');
             const hint = document.getElementById('mode-hint');
             if (hint) hint.textContent = 'Her iki oyuncu da hazır — 2 kişilik oyna!';
-
-            // Düğme ızgaranın yukarısında kalıyor: aşağıdan karakter seçen
-            // oyuncu onu görmüyordu, elle kaydırmak zorundaydı.
             this.startBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 

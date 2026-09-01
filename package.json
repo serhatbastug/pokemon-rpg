@@ -1,7 +1,7 @@
 {
-  "name": "pokemon-rpg",
+  "name": "virus-arena",
   "version": "0.1.0",
-  "description": "PokeRPG - 2 kişilik gerçek zamanlı arena savaşı",
+  "description": "Virüs - 2 kişilik gerçek zamanlı arena ve çizgi roman prologu",
   "type": "module",
   "private": true,
   "scripts": {

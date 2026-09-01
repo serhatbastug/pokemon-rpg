@@ -47,6 +47,10 @@ export const DEADZONE = 0.28;
 // kazara değen parmak sahnenin ortasında bir çarpma demek.
 export const RSTICK_TRIGGER = 0.55;
 
+// Kol takılı değilken kaç karede bir yeniden bakılır (60 fps'te ~yarım
+// saniye). Tarama ucuz ama bedava değil: her çağrı yeni bir liste ayırıyor.
+export const SCAN_INTERVAL = 30;
+
 // Kol yokken okunan sabit nötr durum. Paylaşılan bir nesne: okuyanlar bunu
 // değiştirmiyor, her karede yenisini ayırmaya değmez.
 const NEUTRAL = Object.freeze({ x: 0, y: 0, magnitude: 0, rx: 0, ry: 0, pressed: [] });
@@ -154,11 +158,16 @@ export class GamepadManager {
         this.handlers = [];       // (tuş) -> ...   yalnızca 1. kol
         this.slotHandlers = [];   // (yuva, tuş) -> ...   her kol
 
-        // Kol takıldığında tarayıcı bu olayı gönderir. Olay gelene kadar
-        // getGamepads() hiç çağrılmaz: her karede çağırmak her seferinde yeni
-        // bir liste ayırıyor ve kol yokken bunun karşılığı yok.
+        this.scanCountdown = 0;    // kol yokken bir sonraki taramaya kalan kare
+
+        // Kol takıldığında tarayıcı bu olayı gönderir - ama olaya GÜVENİLMEZ.
+        // Sayfa yeniden yüklendiğinde ya da kol sayfa açılmadan önce
+        // uyandırıldığında olay bu dinleyiciye hiç ulaşmayabiliyor; o zaman
+        // kol takılı dururken oyun kolu hiç görmüyordu. Olay yalnızca
+        // taramayı ERKEN başlatır, tek yol değildir (bkz. scanForPads).
         window.addEventListener('gamepadconnected', () => {
             this.connected = true;
+            this.scanCountdown = 0;
         });
         window.addEventListener('gamepaddisconnected', () => {
             if (this.allPads().length === 0) this.reset();
@@ -168,6 +177,20 @@ export class GamepadManager {
     reset() {
         this.connected = false;
         this.slots = [];
+        this.scanCountdown = 0;
+    }
+
+    // Kol var mı? 'gamepadconnected' olayı gelmediyse de bulunur. Her karede
+    // aramak boşuna liste ayırmak olurdu, bu yüzden SCAN_INTERVAL karede bir.
+    scanForPads() {
+        if (this.scanCountdown > 0) {
+            this.scanCountdown--;
+            return false;
+        }
+        this.scanCountdown = SCAN_INTERVAL;
+        if (this.allPads().length === 0) return false;
+        this.connected = true;
+        return true;
     }
 
     // Takılı kollar, tarayıcının verdiği numaraya göre sıralı. Sıranın sabit
@@ -192,7 +215,7 @@ export class GamepadManager {
     // Her karede bir kez çağrılır. Yeni basılan tuşlar için kayıtlı
     // dinleyicileri tetikler (tuş bırakılmadan tekrar tetiklenmez).
     poll() {
-        if (!this.connected) return;   // kol yokken tarama yapılmaz
+        if (!this.connected && !this.scanForPads()) return;
 
         const pads = this.allPads();
         if (pads.length === 0) {

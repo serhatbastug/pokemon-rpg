@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Dövüşçü önizleme</title>
+    <style>
+        body { margin: 0; background: #12161c; }
+        canvas { display: block; image-rendering: pixelated; }
+    </style>
+</head>
+<body>
+    <canvas id="c" width="1000" height="620"></canvas>
+    <script type="module">
+        import { drawFighter, FIGHTER_SPRITES } from '../src/game/fighterArt.js';
+
+        // ?only=virus  -> tek dövüşçü, büyük. Yoksa ikisi yan yana.
+        const only = new URLSearchParams(location.search).get('only');
+
+        const cv = document.getElementById('c');
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#12161c';
+        ctx.fillRect(0, 0, cv.width, cv.height);
+
+        const groundY = 560;
+        ctx.fillStyle = '#1b2129';
+        ctx.fillRect(0, groundY, 1000, 60);
+        ctx.fillStyle = '#2a323c';
+        ctx.fillRect(0, groundY, 1000, 4);
+
+        const zoomed = (key, x, zoom) => {
+            const s = FIGHTER_SPRITES[key]();
+            ctx.drawImage(s.canvas, Math.round(x - s.ox * zoom), Math.round(groundY - s.h * zoom),
+                s.w * zoom, s.h * zoom);
+        };
+
+        if (only) {
+            drawFighter(ctx, only, 90, groundY, 30);
+            zoomed(only, 380, 2.4);
+            // Kafa bölgesi 6 kat: yüz ayrıntısı ancak burada okunuyor
+            const s6 = FIGHTER_SPRITES[only]();
+            ctx.drawImage(s6.canvas, 0, 0, s6.w, Math.round(s6.h * 0.42),
+                600, 90, s6.w * 2.4, Math.round(s6.h * 0.42) * 2.4);
+        } else {
+            drawFighter(ctx, 'virus', 90, groundY, 30);
+            drawFighter(ctx, 'antivirus', 230, groundY, 30);
+            drawFighter(ctx, 'electro', 360, groundY, 30);
+            zoomed('virus', 560, 1.7);
+            zoomed('antivirus', 760, 1.7);
+            zoomed('electro', 940, 1.7);
+        }
+        window.__ready = true;
+    </script>
+</body>
+</html>

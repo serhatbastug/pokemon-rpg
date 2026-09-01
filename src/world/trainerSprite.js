@@ -1,4 +1,4 @@
-// Antrenör karakterinin elle çizilmiş piksel sprite'ı (PokeAPI'de antrenör
+// Antrenör karakterinin elle çizilmiş piksel sprite'ı (dışarıdan gelen bir
 // görseli yok). 12x16 ızgara, 4 yön ve yürüyüş için 2'şer kare.
 // Harfler renk haritasındaki anahtarlardır; '.' saydamdır.
 

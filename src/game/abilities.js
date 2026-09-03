@@ -13,6 +13,10 @@
 // özel kombosuz oldukları için orada değil, can barının altında.
 //
 // Bekleme süreleri KARE cinsinden (60 kare = 1 saniye).
+//
+// animFrames: hamlenin SALDIRI ANİMASYONU kaç kare sürüyor. Bekleme
+// süresinden ayrı: animasyon biter ama hamle hâlâ beklemede olabilir.
+// Duruşun ve uzuvun nasıl çizileceği fighterArt.js'teki POSES tablosunda.
 
 // Üç atılma da her karakterde aynı. Normal zıplamanın işlevsiz kalmaması için
 // bekleme süresi var: atılma büyük, zıplama bedava.
@@ -25,6 +29,7 @@ export const DASHES = [
         padCombo: ['l1', 'cross'],
         keySlot: 'up',
         cooldown: 90,
+        animFrames: 16,
         velocity: { x: 0, y: -21 }
     },
     {
@@ -35,6 +40,7 @@ export const DASHES = [
         padCombo: ['l1', 'square'],
         keySlot: 'left',
         cooldown: 90,
+        animFrames: 16,
         velocity: { x: -26, y: -5 }
     },
     {
@@ -45,6 +51,7 @@ export const DASHES = [
         padCombo: ['l1', 'circle'],
         keySlot: 'right',
         cooldown: 90,
+        animFrames: 16,
         velocity: { x: 26, y: -5 }
     }
 ];
@@ -65,10 +72,11 @@ export const ABILITIES = {
             // Yumruk atarken karakter ileri atılıyor: ağır olduğu için
             // yürüyerek yetişemediği mesafeyi böyle kapatıyor.
             lunge: 34,
-            reach: 86,
+            reach: 120,
             startup: 8,
             active: 8,
-            recovery: 16
+            recovery: 16,
+            animFrames: 32
         },
         special: {
             id: 'split',
@@ -83,7 +91,8 @@ export const ABILITIES = {
             pieceSpeed: 3.4,
             biteDamage: 5,
             biteInterval: 36,
-            biteRange: 54
+            biteRange: 54,
+            animFrames: 26
         },
         signature: {
             id: 'trail',
@@ -97,7 +106,8 @@ export const ABILITIES = {
             // Hasar vermiyor, alan tutuyor.
             life: 480,
             width: 120,
-            slow: 0.55
+            slow: 0.55,
+            animFrames: 22
         }
     },
 
@@ -114,7 +124,8 @@ export const ABILITIES = {
             damage: 7,
             speed: 13,
             radius: 7,
-            life: 90
+            life: 90,
+            animFrames: 14
         },
         special: {
             id: 'burst',
@@ -129,7 +140,8 @@ export const ABILITIES = {
             damage: 6,
             speed: 9,
             radius: 7,
-            life: 110
+            life: 110,
+            animFrames: 24
         },
         signature: {
             id: 'grab',
@@ -150,7 +162,8 @@ export const ABILITIES = {
             tickDamage: 2,
             tickInterval: 20,
             escapePresses: 12,
-            maxHold: 240
+            maxHold: 240,
+            animFrames: 30
         }
     },
 
@@ -168,7 +181,8 @@ export const ABILITIES = {
             damage: 3,
             tickInterval: 30,
             life: 180,
-            thickness: 20
+            thickness: 20,
+            animFrames: 26
         },
         special: {
             id: 'orb',
@@ -185,7 +199,8 @@ export const ABILITIES = {
             massDamage: 15,
             massSpeed: 2.4,
             massRadius: 34,
-            massLife: 300
+            massLife: 300,
+            animFrames: 40
         },
         signature: {
             id: 'blink',
@@ -197,7 +212,8 @@ export const ABILITIES = {
             cooldown: 240,
             // Arenada rastgele bir yere. Nereye düşeceği belli değil - kaçış
             // da olabilir, rakibin kucağına düşmek de.
-            margin: 90
+            margin: 90,
+            animFrames: 14
         }
     }
 };

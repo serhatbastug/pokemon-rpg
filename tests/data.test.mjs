@@ -551,6 +551,22 @@ check('bir oyuncunun tuşları kendi içinde çakışmıyor',
 check('iki oyuncunun tuşları birbirine karışmıyor',
     p1Keys.every(k => !p2Keys.includes(k)), p1Keys.filter(k => p2Keys.includes(k)).join(','));
 
+// ---- Saldırı animasyonları ----
+// Her hamlenin bir animasyon süresi var; bekleme süresinden bağımsız.
+check('her hamlenin animasyon süresi var',
+    allAbilities.every(a => a.animFrames > 0),
+    allAbilities.filter(a => !(a.animFrames > 0)).map(a => a.id).join(','));
+check('animasyon bekleme süresinden uzun sürmüyor',
+    allAbilities.every(a => a.cooldown === 0 || a.animFrames <= a.cooldown),
+    allAbilities.filter(a => a.cooldown > 0 && a.animFrames > a.cooldown).map(a => a.id).join(','));
+// Yakın dövüşte animasyon vuruş evreleriyle aynı uzunlukta olmalı: kol
+// toplanmadan hasar penceresi kapanırsa vuruş havada kalıyor.
+const punch = ab.ABILITIES.virus.basic;
+check('savurmanın animasyonu evreleriyle aynı uzunlukta',
+    punch.animFrames === punch.startup + punch.active + punch.recovery,
+    `${punch.animFrames} / ${punch.startup + punch.active + punch.recovery}`);
+check('savurmanın görünen kolu menziliyle uyumlu', punch.reach >= 100, `${punch.reach}`);
+
 
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);

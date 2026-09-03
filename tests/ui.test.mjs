@@ -592,6 +592,27 @@ async function main() {
     check('Kombo kumesi arenanin altinda ciziliyor', comboBar.lit > 500, JSON.stringify(comboBar));
     await shot('03h-kombo-kumesi');
 
+
+    // Saldırı animasyonu: hamle çıkınca duruş başlıyor, süresi dolunca bitiyor
+    await clearCds();
+    const animLive = await page.evaluate(() => {
+        const g = window.__game;
+        g.p1.useAbility('basic');
+        g.update();
+        return { id: g.p1.anim?.id, t: g.p1.pose?.t, total: g.p1.anim?.total };
+    });
+    check('Saldirinca durus baslıyor',
+        !!animLive.id && animLive.total > 0 && animLive.t >= 0 && animLive.t < 1,
+        JSON.stringify(animLive));
+
+    const animDone = await page.evaluate(() => {
+        const g = window.__game;
+        for (let i = 0; i < 200; i++) g.update();
+        return { anim: g.p1.anim, pose: g.p1.pose };
+    });
+    check('Durus suresi dolunca bitiyor', animDone.anim === null && animDone.pose === null,
+        JSON.stringify(animDone));
+
     // Raunt süresi geri sayıyor
     const timerBefore = await page.evaluate(() => +document.getElementById('round-timer').textContent);
     await wait(1300);

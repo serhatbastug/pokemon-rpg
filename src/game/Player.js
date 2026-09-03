@@ -66,6 +66,11 @@ export class Player {
         // Yakın dövüş hamlesinin evreleri (hazırlık / vuran kare / toparlanma)
         this.action = null;
 
+        // Saldırı animasyonu: hangi hamle, kaçıncı karesinde. Bekleme
+        // süresinden AYRI - animasyon biter, hamle hâlâ beklemede olabilir.
+        // Duruşu ve uzuvu fighterArt.js çiziyor.
+        this.anim = null;
+
         // Anti-virüsün koluna yakalanınca: kurtulmak için kendi saldırı
         // tuşuna basmak gerekiyor.
         this.grabbedBy = null;
@@ -86,6 +91,21 @@ export class Player {
 
     get isBlocking() {
         return this.blockFrames > 0;
+    }
+
+    // Çizime giden duruş: hangi hamle, ne kadarı geçti, hangi yöne dönük.
+    get pose() {
+        if (!this.anim) return null;
+        return {
+            id: this.anim.id,
+            t: this.anim.frame / this.anim.total,
+            dir: this.dir
+        };
+    }
+
+    startAnim(ability) {
+        if (!ability?.animFrames) return;
+        this.anim = { id: ability.id, frame: 0, total: ability.animFrames };
     }
 
     get onGround() {
@@ -118,7 +138,7 @@ export class Player {
         // Sprite AYNALANMIYOR: iki karakterin de kimliği asimetrisinde
         // (anti-virüsün kaplı yanı, virüsün yüksek omzu). Aynalayınca hangi
         // yanın kaplı olduğu karaktere değil, rakibin yerine bağlı olurdu.
-        drawFighter(ctx, this.fighter.id, this.x, this.footY, this.game.frame);
+        drawFighter(ctx, this.fighter.id, this.x, this.footY, this.game.frame, this.pose);
 
         ctx.restore();
 
@@ -184,6 +204,7 @@ export class Player {
         for (const id of Object.keys(this.cooldowns)) {
             if (this.cooldowns[id] > 0) this.cooldowns[id]--;
         }
+        if (this.anim && ++this.anim.frame >= this.anim.total) this.anim = null;
         if (this.blockFrames > 0) this.blockFrames--;
         if (this.blockCooldown > 0) this.blockCooldown--;
         if (this.invulnFrames > 0) {
@@ -223,6 +244,7 @@ export class Player {
     useDash(dash) {
         if (!this.ready(dash)) return;
         this.cooldowns[dash.id] = dash.cooldown;
+        this.startAnim(dash);
         this.vx = dash.velocity.x;
         this.vy = dash.velocity.y;
         this.game.combat.onDash(this, dash);
@@ -234,6 +256,7 @@ export class Player {
 
         // Yakın dövüş hamlesi evreli: hazırlık, vuran kare, toparlanma.
         // Menzillilerde tek karelik bir hazırlık yetiyor.
+        this.startAnim(ability);
         if (ability.kind === 'melee') {
             this.action = { ability, frame: 0 };
             this.cooldowns[ability.id] = ability.cooldown;
@@ -379,6 +402,7 @@ export class Player {
         this.blockFrames = 0;
         this.blockCooldown = 0;
         this.action = null;
+        this.anim = null;
         this.grabbedBy = null;
         this.escapePresses = 0;
         for (const id of Object.keys(this.cooldowns)) this.cooldowns[id] = 0;

@@ -12,6 +12,7 @@ import { PX } from '../pixel/pixelDraw.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import { PAD_GLYPHS } from '../pixel/controlHint.js';
 import { ABILITIES } from './abilities.js';
+import { muzzleOf } from './fighterArt.js';
 
 // 'KeyF' -> 'F', 'Comma' -> ','   (tuş kapağında yazan)
 const KEY_LABELS = { Comma: ',', Period: '.', Slash: '/', Space: 'SPACE' };
@@ -85,10 +86,13 @@ export class Combat {
     spawnShot(player, ability) {
         // Top küçük ve BİÇİMSİZ: her topun kendi çentik deseni var, hepsi
         // aynı daire olsa mermi gibi okunurdu.
+        // Çıkış noktası OMUZDAKİ BORUNUN UCU: gövdenin ortasından çıkarsa
+        // topu kimin gönderdiği okunmuyor.
+        const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
         this.entities.push({
             type: 'shot',
-            x: player.x + player.dir * player.width * 0.6,
-            y: player.y - player.height * 0.1,
+            x: m.x,
+            y: m.y,
             vx: player.dir * ability.speed,
             vy: 0,
             r: ability.radius,
@@ -125,11 +129,13 @@ export class Combat {
         // Işın bir kez çiziliyor ve ARENADA KALIYOR: karakter gitse de o hat
         // duruyor, üstünde durmak hasar demek.
         const { canvas } = this.game;
+        // Işın ileri uzanan ELDEN çıkıyor (bkz. fighterArt MUZZLES)
+        const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
         this.entities.push({
             type: 'beam',
-            x0: player.x,
+            x0: m.x,
             x1: player.dir > 0 ? canvas.width : 0,
-            y: player.y - player.height * 0.08,
+            y: m.y,
             thickness: ability.thickness,
             damage: ability.damage,
             tickInterval: ability.tickInterval,

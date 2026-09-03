@@ -876,11 +876,297 @@ export const FIGHTER_SPRITES = {
     electro: electroSprite
 };
 
+// ================= SALDIRI ANİMASYONLARI =================
+//
+// Sprite'lar bir kez çizilip saklanıyor. Her hamle için ayrı sprite üretmek
+// yerine iki şey yapılıyor:
+//   1) GÖVDE kaydırılıyor - satır satır, üst satırlar daha çok. Yaslanma ve
+//      öne düşme bundan çıkıyor. ctx.scale KULLANILMIYOR: piksel ızgarasını
+//      titretiyor (giriş animasyonlarında da aynı tuzağa düşülmüştü).
+//   2) SALDIRAN UZUV üstüne ayrıca çiziliyor - virüsün savurduğu kol,
+//      elektronun ileri uzattığı el, anti-virüsün borusundaki parlama.
+//
+// Duruşlar t = 0..1 ile tanımlı (hamlenin animasyonunun ne kadarı geçti);
+// süreler abilities.js'teki animFrames'ten geliyor.
+
+// dir çarpanı olanlar karakterin baktığı yöne göre eğilir; atılmalar dünya
+// yönünde olduğu için çarpılmaz.
+const DIR_POSES = new Set(['punch', 'blob', 'grab', 'beam']);
+
+// Sıfırdan bire çıkıp geri inen yumuşak eğri: uzuvun uzayıp toplanması.
+const swell = (t) => Math.sin(Math.max(0, Math.min(1, t)) * Math.PI);
+
+// Bir alt aralığın kendi içindeki ilerlemesi (0..1)
+const phase = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+
+const POSES = {
+    // Savurma: önce geriye yaslanıp toplanıyor, sonra bütün kütle öne
+    // düşüyor. Ağırlık hissi geri çekilmenin uzunluğundan geliyor.
+    punch: (t) => ({
+        lean: t < 0.28 ? -PX * 3 * phase(t, 0, 0.28)
+            : t < 0.5 ? PX * (-3 + 10 * phase(t, 0.28, 0.5))
+            : PX * 7 * (1 - phase(t, 0.5, 1)),
+        dy: t > 0.28 && t < 0.62 ? PX : 0
+    }),
+    // Bölünme: kütle ortadan ikiye açılıp geri kapanıyor
+    split: (t) => ({ gap: Math.round(swell(t) * 7) * PX }),
+    // Salgın izi: kütle çöküp yere yayılıyor
+    trail: (t) => ({ dy: Math.round(swell(t) * 3) * PX }),
+    // Top atarken gövde geri tepiyor
+    blob: (t) => ({ lean: -PX * 2 * swell(t) }),
+    // Saçılma: karakter kasılıyor, sonra her yöne açılıyor
+    burst: (t) => ({ dy: Math.round(swell(phase(t, 0, 0.35)) * 2) * PX, flash: phase(t, 0.3, 0.5) * (1 - phase(t, 0.5, 1)) }),
+    // Kolu fırlatırken öne uzanma
+    grab: (t) => ({ lean: PX * 5 * swell(t) }),
+    // Işını verirken öne dayanma
+    beam: (t) => ({ lean: PX * 3 * swell(t) }),
+    // Küreyi kurarken gövde yükseliyor
+    orb: (t) => ({ dy: -PX * 2 * swell(t) }),
+    // Işınlanma: yeni yerde sönük belirip yerine oturuyor
+    blink: (t) => ({ fade: t }),
+    dashUp: (t) => ({ dy: -PX * 2 * (1 - t) }),
+    dashLeft: (t) => ({ lean: -PX * 6 * (1 - t) }),
+    dashRight: (t) => ({ lean: PX * 6 * (1 - t) })
+};
+
+// --- gövdenin çizimi ---
+
+// Karakterin beyaz silueti: parlama için. Sprite gibi bir kez üretilip
+// saklanıyor - her karede yeniden boyamanın anlamı yok.
+const silhouettes = new Map();
+function silhouetteOf(key, sprite) {
+    const cached = silhouettes.get(key);
+    if (cached) return cached;
+    const { canvas, ctx } = newCanvas(sprite.w, sprite.h);
+    ctx.drawImage(sprite.canvas, 0, 0);
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, sprite.w, sprite.h);
+    silhouettes.set(key, canvas);
+    return canvas;
+}
+
+// Satır satır kaydırma: en üst satır tam, ayaklar sabit. Kaydırma PX'in
+// katına yuvarlanıyor, yoksa gövde kendi içinde titriyor.
+function drawLeaning(ctx, sprite, px, py, lean) {
+    for (let row = 0; row < sprite.h; row += PX) {
+        const k = 1 - row / sprite.h;
+        const off = Math.round((lean * k * k) / PX) * PX;
+        ctx.drawImage(sprite.canvas, 0, row, sprite.w, PX, px + off, py + row, sprite.w, PX);
+    }
+}
+
+// Bölünme: kütle ortadan ayrılıyor. İki yarım aynı sprite'tan geliyor,
+// aradaki boşluk kütlenin ayrıldığını gösteriyor.
+function drawSplit(ctx, sprite, px, py, gap) {
+    const half = Math.round(sprite.w / 2 / PX) * PX;
+    ctx.drawImage(sprite.canvas, 0, 0, half, sprite.h, px - gap, py, half, sprite.h);
+    ctx.drawImage(sprite.canvas, half, 0, sprite.w - half, sprite.h,
+        px + half + gap, py, sprite.w - half, sprite.h);
+}
+
+// --- saldıran uzuvlar ---
+
+// Virüsün savurduğu kol: omuzdan çıkıp ileri uzanan kalın bir kütle, ucunda
+// yumru bir pençe. Kolun kendisi sprite'ta yok - savurma anında var oluyor,
+// çünkü kütlenin sabit bir kolu yok, uzatınca oluyor.
+function virusPunchArm(ctx, x, footY, t, dir) {
+    const reach = swell(phase(t, 0.2, 0.8));
+    if (reach <= 0.02) return;
+
+    const P = VIRUS_P;
+    const cols = 10 + Math.round(reach * 26);
+    const shoulderY = footY - PX * 36;
+    const step = dir > 0 ? PX : -PX;
+    const rootX = x + dir * PX * 6;
+
+    // Kol SÜTUN SÜTUN çiziliyor: uca doğru hem inceliyor hem SARKIYOR.
+    // Gergin dik bir boru bu kütlenin dili değil - kendi ağırlığıyla düşen
+    // bir uzantı (prologdaki virüsün biçim kuralı).
+    let tipX = rootX;
+    let tipY = shoulderY;
+    for (let c = 0; c < cols; c++) {
+        const p = c / (cols - 1);
+        const cy = shoulderY + Math.round(p * p * 3) * PX;
+        const half = Math.max(2, Math.round(4.5 - p * 1.5));
+        const cx = rootX + c * step;
+        blk(ctx, cx, cy - half * PX, PX, half * 2 * PX, P.body);
+        blk(ctx, cx, cy - half * PX, PX, PX, P.outline);
+        blk(ctx, cx, cy + (half - 1) * PX, PX, PX, P.outline);
+        blk(ctx, cx, cy - (half - 1) * PX, PX, PX, P.light);
+        if (c % 5 === 3) blk(ctx, cx, cy, PX, PX * 2, P.dark);   // ek yeri
+        tipX = cx;
+        tipY = cy;
+    }
+
+    // Yumru pençe: üç kısa tırnak ileri bakıyor
+    const fx = dir > 0 ? tipX : tipX - PX * 4;
+    blk(ctx, fx, tipY - PX * 4, PX * 5, PX * 8, P.body);
+    blk(ctx, fx, tipY - PX * 4, PX * 5, PX, P.light);
+    blk(ctx, fx, tipY + PX * 3, PX * 5, PX, P.outline);
+    blk(ctx, fx, tipY - PX * 4, PX, PX * 8, P.outline);
+    for (let i = 0; i < 3; i++) {
+        const ty = tipY - PX * 3 + PX * (i * 3);
+        const tx = dir > 0 ? fx + PX * 5 : fx - PX * 3;
+        blk(ctx, tx, ty, PX * 3, PX * 2, P.body);
+        blk(ctx, tx, ty, PX * 3, PX, P.light);
+        blk(ctx, dir > 0 ? tx + PX * 2 : tx, ty, PX, PX * 2, P.outline);
+    }
+    // Kütle akarken damlıyor
+    if (reach > 0.5) drip(ctx, Math.round((rootX + tipX) / 2 / PX), Math.round((tipY + PX * 3) / PX), 2, P);
+}
+
+// Anti-virüsün omzundaki borunun ucundaki küçük kafa topu buradan atıyor:
+// ağzının önünde kısa bir parlama ve birkaç serpinti.
+function coralMuzzle(ctx, x, footY, t) {
+    const f = swell(phase(t, 0, 0.55));
+    if (f <= 0.05) return;
+    const P = CORAL_P;
+    const mx = x + PX * 8;
+    const my = footY - PX * 45;
+    const r = Math.round(f * 3) * PX;
+    if (r <= 0) return;
+
+    blk(ctx, mx - r, my - r, r * 2, r * 2, P.dark);
+    blk(ctx, mx - r + PX, my - r + PX, r * 2 - PX * 2, r * 2 - PX * 2, P.light);
+    blk(ctx, mx - PX, my - PX, PX * 2, PX * 2, P.vein);
+    for (let i = 0; i < 3; i++) {
+        blk(ctx, mx + PX * (2 + i * 2), my + PX * (i - 1), PX, PX, P.body);
+    }
+}
+
+// Saçılma: gövdeden her yöne fırlayan kısa mercan dikenleri. Topların
+// kendisi combat.js'te; bu, onların çıktığı andaki kasılma.
+function coralBurstSpikes(ctx, x, footY, t) {
+    const f = phase(t, 0.15, 0.75);
+    if (f <= 0 || f >= 1) return;
+    const P = CORAL_P;
+    const cy = footY - PX * 25;
+    for (let i = 0; i < 10; i++) {
+        const a = (Math.PI * 2 * i) / 10;
+        const d = PX * (4 + f * 12);
+        const bx = Math.round((x + Math.cos(a) * d) / PX) * PX;
+        const by = Math.round((cy + Math.sin(a) * d) / PX) * PX;
+        blk(ctx, bx, by, PX * 2, PX * 2, i % 2 ? P.body : P.light);
+    }
+}
+
+// Elektronun ileri uzattığı el: ışın buradan çıkıyor. Kol lacivert, el sarı
+// ve normalden bir tık büyük - karakterin kendi kuralı.
+function electroBeamArm(ctx, x, footY, t, dir) {
+    const reach = swell(phase(t, 0.1, 0.9));
+    if (reach <= 0.02) return;
+    const P = ELECTRO_P;
+    const len = Math.round((PX * 4 + reach * PX * 7) / PX) * PX;
+    const top = footY - PX * 32;
+    const x0 = dir > 0 ? x + PX * 3 : x - PX * 3 - len;
+
+    blk(ctx, x0, top, len, PX * 4, P.body);
+    blk(ctx, x0, top, len, PX, P.light);
+    blk(ctx, x0, top + PX * 3, len, PX, P.outline);
+    blk(ctx, x0 + PX * 2, top + PX, PX * 2, PX, P.seam);
+
+    // El: uçta, biraz daha büyük
+    const hx = dir > 0 ? x0 + len : x0 - PX * 5;
+    blk(ctx, hx, top - PX, PX * 5, PX * 6, P.hand);
+    blk(ctx, hx, top - PX, PX * 5, PX, P.handLight);
+    blk(ctx, hx, top + PX * 4, PX * 5, PX, P.handDark);
+    // Avucun önünde toplanan yük
+    if (reach > 0.6) {
+        const gx = dir > 0 ? hx + PX * 5 : hx - PX * 3;
+        blk(ctx, gx, top, PX * 3, PX * 4, P.spark);
+    }
+}
+
+// Küreyi kurarken iki el birden havada
+function electroOrbArms(ctx, x, footY, t) {
+    const raise = swell(phase(t, 0.05, 0.95));
+    if (raise <= 0.02) return;
+    const P = ELECTRO_P;
+    const shoulder = footY - PX * 32;
+    const len = Math.round((PX * 4 + raise * PX * 9) / PX) * PX;
+
+    for (const side of [-1, 1]) {
+        // Kollar OMUZ HİZASINDA, gövdenin dışında: ortaya yakın çizilince
+        // kaldırılan eller karakterin kafasını örtüyordu.
+        const ax = side > 0 ? x + PX * 7 : x - PX * 11;
+        blk(ctx, ax, shoulder - len, PX * 4, len, P.body);
+        blk(ctx, ax, shoulder - len, PX, len, P.light);
+        blk(ctx, ax + PX * 3, shoulder - len, PX, len, P.outline);
+        blk(ctx, ax - PX, shoulder - len - PX * 5, PX * 6, PX * 5, P.hand);
+        blk(ctx, ax - PX, shoulder - len - PX * 5, PX * 6, PX, P.handLight);
+        blk(ctx, ax - PX, shoulder - len - PX, PX * 6, PX, P.handDark);
+    }
+    // İki elin arasında biriken yük
+    if (raise > 0.5) {
+        blk(ctx, x - PX * 2, shoulder - len - PX * 4, PX * 4, PX * 3, P.spark);
+    }
+}
+
+const OVERLAYS = {
+    punch: (ctx, x, footY, t, dir) => virusPunchArm(ctx, x, footY, t, dir),
+    blob: (ctx, x, footY, t) => coralMuzzle(ctx, x, footY, t),
+    burst: (ctx, x, footY, t) => coralBurstSpikes(ctx, x, footY, t),
+    beam: (ctx, x, footY, t, dir) => electroBeamArm(ctx, x, footY, t, dir),
+    orb: (ctx, x, footY, t) => electroOrbArms(ctx, x, footY, t)
+};
+
+// Hamlenin arenaya çıktığı nokta: anti-virüsün topu omzundaki borunun
+// ucundan, elektronun ışını ileri uzanan elinden çıkmalı - ikisi de
+// gövdenin ortasından çıkarsa hamlenin kimden geldiği okunmuyor.
+// dx AYNALANMIYOR: boru karakterin hangi yanındaysa orada kalır.
+export const MUZZLES = {
+    antivirus: { dx: PX * 8, dy: -PX * 45 },
+    electro: { dx: PX * 12, dy: -PX * 30, mirror: true },
+    virus: { dx: 0, dy: -PX * 34, mirror: true }
+};
+
+export function muzzleOf(key, x, footY, dir = 1) {
+    const m = MUZZLES[key];
+    if (!m) return { x, y: footY - 100 };
+    return { x: x + (m.mirror ? dir * m.dx : m.dx), y: footY + m.dy };
+}
+
 // Dövüşçüyü ayakları (x, y) noktasına gelecek şekilde çizer.
 // frame: arenanın kare sayacı - yalnızca hareketli çizimler (elektrik) kullanır.
-export function drawFighter(ctx, key, x, y, frame = 0) {
+// pose: { id, t, dir } - oynayan saldırı animasyonu (yoksa null).
+export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
     const sprite = FIGHTER_SPRITES[key]?.();
     if (!sprite) return;
-    ctx.drawImage(sprite.canvas, Math.round(x - sprite.ox), Math.round(y - sprite.oy));
-    if (key === 'electro') drawElectroSparks(ctx, Math.round(x), Math.round(y), frame);
+
+    const shape = pose && POSES[pose.id] ? POSES[pose.id](pose.t) : null;
+    const dir = pose?.dir ?? 1;
+    const lean = (shape?.lean || 0) * (pose && DIR_POSES.has(pose.id) ? dir : 1);
+    const px = Math.round(x - sprite.ox);
+    const py = Math.round(y - sprite.oy) + Math.round((shape?.dy || 0) / PX) * PX;
+
+    ctx.save();
+    if (shape?.fade !== undefined) ctx.globalAlpha *= Math.min(1, 0.25 + shape.fade);
+
+    if (shape?.gap) drawSplit(ctx, sprite, px, py, shape.gap);
+    else if (Math.abs(lean) >= PX) drawLeaning(ctx, sprite, px, py, lean);
+    else ctx.drawImage(sprite.canvas, px, py);
+
+    // Kasılma parlaması: karakterin BEYAZ SİLUETİ üstüne biniyor.
+    // 'source-atop' ile beyaz basmak burada işe yaramıyor - arena tuvalinde
+    // arka plan zaten opak, beyaz sahnenin üstüne kutu gibi düşüyor.
+    if (shape?.flash > 0.02) {
+        ctx.globalAlpha *= Math.min(0.6, shape.flash);
+        ctx.drawImage(silhouetteOf(key, sprite), px, py);
+    }
+    ctx.restore();
+
+    if (key === 'electro') {
+        // Hamle sırasında elektrik çoğalıyor: yük boşalmadan duramayan
+        // karakterin saldırısı sessiz olamaz.
+        const boost = pose && (pose.id === 'beam' || pose.id === 'orb' || pose.id === 'blink') ? 2.4 : 1;
+        drawElectroSparks(ctx, Math.round(x), Math.round(y), frame, boost);
+    }
+
+    if (pose && OVERLAYS[pose.id]) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        OVERLAYS[pose.id](ctx, Math.round(x), Math.round(y), pose.t, dir);
+        ctx.restore();
+    }
 }

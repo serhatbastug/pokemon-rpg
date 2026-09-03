@@ -22,8 +22,8 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 
 | Komut | Ne yapar | Süre |
 |---|---|---|
-| `npm run check` | Veri ve saf mantık testleri (108 kontrol): ana menü yerleşimi (her iki kapıya da yürünebiliyor mu), arena kadrosu, prolog çizgi romanının senaryosu ve akışı, diyalog yürütücüsü, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (53 test): ana menü sahnesi, prolog çizgi romanı (kare ilerletme, balonlar), oyun kolu (iki kol, iki yuva), ekran geçişleri, dövüşçü seçimi, arena, giriş animasyonları (P1 → P2 sırası) ve FPS ölçümü. | ~1 dk |
+| `npm run check` | Veri ve saf mantık testleri (179 kontrol): ana menü yerleşimi (her iki kapıya da yürünebiliyor mu), arena kadrosu ve basamakları, prolog çizgi romanının senaryosu ve akışı, diyalog yürütücüsü, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (72 test): ana menü sahnesi, prolog çizgi romanı (kare ilerletme, balonlar), oyun kolu (iki kol, iki yuva), ekran geçişleri, dövüşçü seçimi, arena, basamaklar, giriş animasyonları (P1 → P2 sırası) ve FPS ölçümü. | ~1 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -127,9 +127,11 @@ Görüntüler `tools/shots/` altına düşer, sunucunun açık olması gerekir.
 |---|---|---|---|
 | Hareket | W A S D | Yön tuşları | Sol analog / D-pad |
 | Zıplama | W | Yukarı ok | **ÇARPI** |
+| Basamaktan inme | S | Aşağı ok | Sol analog aşağı |
+| Saldırı · Özel · Blok | F · G · V | , · . · / | **KARE · DAİRE · R1** |
+| Kombo tuşu | SHIFT | SHIFT (sağ) | **L1** |
 
-Saldırı tuşu yok: virüslerin güçleri henüz yazılmadı, arenada şimdilik
-hareket ve zıplama var.
+Hamleler, kombolar ve basamaklar için [Arena](#arena) bölümüne bakın.
 
 **İki kişilik arena, iki kolla:** her oyuncunun kendi DualSense'i olur.
 Takılan **ilk kol 1. oyuncuyu**, ikinci kol 2. oyuncuyu oynatır (kol sırası
@@ -162,6 +164,37 @@ küçük döngüsünü açar ve yalnızca bu ekranlar açıkken çalışır. Tu�
 düğmelerin `click()`'ini çağırır, yani kol farenin gittiği yerden gider.
 
 
+## Arena
+
+Arena tuvali **1280x640** (`index.html`), altında ayrı bir şeritte kombo
+kümesi. Sayfada yer varsa 1:1 gösteriliyor, dar ekranda küçülüyor - piksel
+ızgarası ancak böyle temiz kalıyor.
+
+**Basamaklar.** Her arenanın kendi seki düzeni var (`src/game/arenas.js`,
+`LEDGE`); arena maç boyunca sabit olduğu için düzen ezberlenebilir. Sekiler
+**tek yönlü**: altlarından zıplayarak üstlerine çıkılır, **AŞAĞI** tuşuyla
+inilir.
+
+- Alt seki zeminden **120 piksel**: normal zıplama (~140) yetiyor.
+- Üst seki **250 piksel**: oraya ancak alt sekiden zıplayarak ya da
+  **yukarı atılmayla** (~360) çıkılır.
+- Yükseklikler tuvale oranla değil, **piksel** cinsinden yazılıyor: bir
+  basamağa çıkılıp çıkılamaması zıplama yüksekliğine bağlı, tuvalin boyuna
+  değil. `npm run check` bu ilişkiyi doğruluyor.
+- Düzenler simetrik: iki oyuncu da aynı arenayı görüyor.
+
+Arka planlar **iki katman**: durağan olan (gök, zemin, ağaçlar, basamaklar)
+bir kez ayrı bir tuvale çizilip her karede kopyalanıyor, yalnızca canlı olan
+(lav, kar, yağmur, şimşek) her karede yeniden çiziliyor. Tuval büyüyünce blok
+blok çizmek kare başına binlerce `fillRect` demekti ve kare hızı 60'ın altına
+düşüyordu.
+
+Arenaları gözle görmek için:
+
+```
+node tools/arena-shots.mjs <klasör>    # dördü de, basamakların üstünde dövüşçüyle
+```
+
 ## Proje Yapısı
 
 ```
@@ -183,7 +216,7 @@ src/
     fighters.js         Arena kadrosu (VİRÜS, ANTİ-VİRÜS, ELECTRO-VİRÜS)
     fighterArt.js       Dövüşçülerin piksel çizimleri ve elektrik efekti
     fighterIntro.js     Giriş animasyonları (adam -> virüs), P1 ve P2 sırayla
-    arenas.js           Pixel art arena arka planları
+    arenas.js           Pixel art arena arka planları ve basamakları
     effects.js          Parçacıklar, sarsıntı, flaş, uçan yazılar
   world/
     trainerSprite.js    Elle çizilmiş antrenör piksel sprite'ı
@@ -220,6 +253,7 @@ tools/
   comic-shots.mjs       Çizgi roman karelerinin PNG'sini alır
   fighter-shots.mjs     Arena dövüşçülerinin PNG'sini alır
   intro-shots.mjs       Giriş animasyonlarının karelerini alır
+  arena-shots.mjs       Dört arenayı basamaklarıyla çeker
   fighters.html         Dövüşçü önizleme sayfası
 ```
 
@@ -276,8 +310,9 @@ hangi yanının kaplı olduğu karaktere ait bir şey, rakibin nerede durduğuna
 değil. `Player.dir` yine hesaplanıyor (güçler geldiğinde yön oradan okunacak)
 ama çizimi etkilemiyor.
 
-**Saldırı henüz yok.** Karakterler kuruldu; güçler sonra yazılacak. Arenada
-şimdilik hareket, zıplama, can barı ve K.O. yolu var.
+Üçünün de hamleleri `src/game/abilities.js` içinde: normal saldırı, özel,
+karaktere özel hamle ve üç atılma. Arena düzeni için [Arena](#arena)
+bölümüne bakın.
 
 Çizimi gözle görmek için:
 
@@ -291,5 +326,5 @@ node tools/fighter-shots.mjs antivirus  # tek dövüşçü, büyütülmüş
 - **Yeni dövüşçü:** `src/game/fighterArt.js` içine çizimini yazıp
   `FIGHTER_SPRITES`'a ekleyin, sonra `src/game/fighters.js` kadrosuna kayıt
   girin. `npm run check` ikisinin eşleştiğini doğrular.
-- **Yeni arena:** `src/game/arenas.js` dizisine `{ name, drawBg }` ekleyin.
+- **Yeni arena:** `src/game/arenas.js` dizisine `arena({ name, ledges, statik, live })` ekleyin.
 - **Tuş değişikliği:** `src/config/settings.js` içindeki `PLAYERS` nesnesini düzenleyin.

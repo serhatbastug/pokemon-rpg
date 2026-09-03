@@ -1,7 +1,7 @@
 import { Player } from './Player.js';
 import { EffectsManager } from './effects.js';
 import { Combat } from './combat.js';
-import { randomArena } from './arenas.js';
+import { randomArena, ledgesOf } from './arenas.js';
 import { PLAYERS, SCROLL_KEYS, FRAME_RATE, COMBAT } from '../config/settings.js';
 import { introFor } from './fighterIntro.js';
 import { drawPixelText } from '../pixel/pixelFont.js';
@@ -33,6 +33,9 @@ export class Game {
         this.p1 = null;
         this.p2 = null;
         this.currentArena = null;
+        // Arenanın basamakları: maç boyunca değişmiyor, bir kez hesaplanıp
+        // burada duruyor. Oyuncular her karede buradan okuyor.
+        this.ledges = [];
         this.rafId = null;
         this.isGameOver = false;
         this.frame = 0;      // hareketli çizimler (elektrik) buradan besleniyor
@@ -72,6 +75,7 @@ export class Game {
         // Arena maç boyunca SABİT: raunt başına değiştirmek, basamakları
         // ezberleyen oyuncunun emeğini her raunt sıfırlar.
         this.currentArena = randomArena();
+        this.ledges = ledgesOf(this.currentArena, this.canvas.width, this.canvas.height);
         this.frame = 0;
         this.round = 1;
         this.wins = { 1: 0, 2: 0 };

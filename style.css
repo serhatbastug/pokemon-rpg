@@ -63,7 +63,8 @@ body.battle-active {
 
 /* Container */
 .app-container {
-    max-width: 1200px;
+    /* Arena 1280 piksel genisledi; kenar boslugu ile birlikte sigmasi icin */
+    max-width: 1360px;
     margin: 0 auto;
     padding: 1.5rem;
     z-index: 1;
@@ -545,6 +546,15 @@ body.battle-active {
 canvas {
     background: radial-gradient(circle, #111827 0%, #030712 100%);
     display: block;
+}
+
+/* Arena kendi cozunurlugunde ciziliyor (1280x640) ve yer varsa 1:1
+   gosteriliyor: piksel izgarasi ancak boyle temiz kalir. Dar ekranda
+   kuculuyor, ama hicbir zaman buyutulmuyor. */
+.canvas-container canvas {
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
 }
 
 /* Kombo kumesi arenanin altinda ayri bir serit: hic kaybolmuyor ama

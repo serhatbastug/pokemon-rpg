@@ -579,6 +579,41 @@ async function main() {
         `zıplama ${Math.round(jumpTop)} / atılma ${Math.round(dash.y)}`);
     check('Atilmanin beklemesi var', dash.cd > 0, `${dash.cd} kare`);
 
+    // --- Basamaklar ---
+    // Tek yönlüler: altlarından zıplanınca üstlerine binilir, AŞAĞI tuşuyla
+    // da inilir. İkisi de gerçek tuşla deneniyor.
+    await clearCds();
+    const ledge = await page.evaluate(() => {
+        const g = window.__game;
+        const low = g.ledges.reduce((a, b) => (b.y > a.y ? b : a));   // en alçak basamak
+        g.p1.x = low.x + low.w / 2;
+        g.p1.y = g.p1.groundY;
+        g.p1.vy = 0;
+        g.p1.grounded = true;
+        g.p2.x = Math.min(g.canvas.width - 80, low.x + low.w + 220);  // yolumuzdan çekilsin
+        return { count: g.ledges.length, top: low.y, floor: g.p1.floorFoot, foot: g.p1.footY };
+    });
+    check('Arenanin basamaklari var', ledge.count >= 2, `${ledge.count} basamak`);
+    check('Basamak zeminin ustunde', ledge.floor - ledge.top >= 100,
+        `${Math.round(ledge.floor - ledge.top)} piksel`);
+
+    await hold('KeyW', 150);
+    await wait(900);
+    const onLedge = await page.evaluate(() => ({
+        foot: window.__game.p1.footY,
+        grounded: window.__game.p1.grounded
+    }));
+    check('Ziplayan oyuncu basamagin ustune biniyor',
+        Math.abs(onLedge.foot - ledge.top) < 2 && onLedge.grounded,
+        `ayak ${Math.round(onLedge.foot)} / basamak ${ledge.top}`);
+    await shot('03i-basamak');
+
+    await hold('KeyS', 150);
+    await wait(700);
+    const dropped = await page.evaluate(() => window.__game.p1.footY);
+    check('ASAGI tusu basamaktan indiriyor', Math.abs(dropped - ledge.floor) < 2,
+        `ayak ${Math.round(dropped)} / zemin ${ledge.floor}`);
+
     // Arenanın altındaki kombo kümesi: hiç kaybolmuyor
     const comboBar = await page.evaluate(() => {
         const c = document.getElementById('comboBar');

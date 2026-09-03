@@ -568,6 +568,49 @@ check('savurmanın animasyonu evreleriyle aynı uzunlukta',
 check('savurmanın görünen kolu menziliyle uyumlu', punch.reach >= 100, `${punch.reach}`);
 
 
+// ---- Arena basamakları ----
+// Basamağın tek ölçüsü "çıkılabiliyor mu": yükseklik zıplamaya bağlı, tuvale
+// değil. Zıplama yüksekliği v²/2g; yukarı atılma da aynı hesapla.
+const { ARENAS, ledgesOf, LEDGE } = await import('../src/game/arenas.js');
+const { PHYSICS: PHY } = await import('../src/config/settings.js');
+const { DASHES: DSH } = await import('../src/game/abilities.js');
+
+const AW = 1280, AH = 640;                       // arena tuvali (index.html)
+const footLine = AH - PHY.groundOffset;
+const jumpRise = (PHY.jumpVelocity ** 2) / (2 * PHY.gravity);
+const dashRise = (DSH.find(d => d.id === 'dashUp').velocity.y ** 2) / (2 * PHY.gravity);
+
+check('normal zıplama alt basamağa yetiyor', jumpRise > LEDGE.low + 10,
+    `zıplama ${Math.round(jumpRise)} / basamak ${LEDGE.low}`);
+check('üst basamağa zıplamayla çıkılamıyor', jumpRise < LEDGE.high,
+    `zıplama ${Math.round(jumpRise)} / basamak ${LEDGE.high}`);
+check('üst basamağa alt basamaktan çıkılıyor', LEDGE.low + jumpRise > LEDGE.high + 10,
+    `${Math.round(LEDGE.low + jumpRise)} / ${LEDGE.high}`);
+check('üst basamağa yukarı atılmayla da çıkılıyor', dashRise > LEDGE.high,
+    `atılma ${Math.round(dashRise)} / basamak ${LEDGE.high}`);
+
+for (const arena of ARENAS) {
+    const ledges = ledgesOf(arena, AW, AH);
+    const tag = arena.name;
+    check(`${tag}: basamakları var`, ledges.length >= 2, `${ledges.length} basamak`);
+    check(`${tag}: basamaklar geniş`, ledges.every(s => s.w >= 200),
+        ledges.map(s => s.w).join(','));
+    check(`${tag}: basamaklar tuvalin içinde`,
+        ledges.every(s => s.x >= 0 && s.x + s.w <= AW && s.y > 60 && s.y < footLine));
+    check(`${tag}: basamaklar zeminden yeterince yüksek`,
+        ledges.every(s => footLine - s.y >= LEDGE.low),
+        ledges.map(s => footLine - s.y).join(','));
+    // Simetri: iki oyuncu da aynı arenayı görmeli, kimse avantajlı doğmamalı
+    const mirrored = ledges.map(s => ({ x: AW - s.x - s.w, y: s.y, w: s.w }));
+    check(`${tag}: basamaklar simetrik`,
+        mirrored.every(m => ledges.some(s => Math.abs(s.x - m.x) <= 8 && s.y === m.y && s.w === m.w)));
+    // Aynı yükseklikteki iki basamak birbirine girmemeli: aralarındaki boşluk
+    // basamağın kenarı, oradan aşağı düşülüyor.
+    check(`${tag}: aynı yükseklikteki basamaklar ayrık`,
+        ledges.every((a, i) => ledges.every((b, j) =>
+            i === j || a.y !== b.y || a.x + a.w <= b.x || b.x + b.w <= a.x)));
+}
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

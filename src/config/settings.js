@@ -5,7 +5,10 @@ export const FRAME_RATE = 60;
 export const PHYSICS = {
     gravity: 0.6,
     jumpVelocity: -13,
-    groundOffset: 15 // karakterin zeminden yüksekliği
+    groundOffset: 15, // karakterin zeminden yüksekliği
+    // Basamaktan AŞAĞI tuşuyla inerken basamakların görmezden geldiği kare
+    // sayısı. Olmasa karakter aynı karede bastığı basamağa geri binerdi.
+    dropFrames: 12
 };
 
 // Oyuncu numarasına göre renk, başlangıç konumu ve kontroller.
@@ -21,7 +24,7 @@ export const PHYSICS = {
 export const PLAYERS = {
     1: {
         color: '#3b82f6',
-        start: { x: 220, y: 380 },
+        start: { x: 280, y: 500 },
         moveKeys: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' },
         actionKeys: { attack: 'KeyF', special: 'KeyG', block: 'KeyV', combo: 'ShiftLeft' },
         keyLabel: 'W A S D · F G V',
@@ -29,7 +32,7 @@ export const PLAYERS = {
     },
     2: {
         color: '#ef4444',
-        start: { x: 780, y: 380 },
+        start: { x: 1000, y: 500 },
         moveKeys: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
         actionKeys: { attack: 'Comma', special: 'Period', block: 'Slash', combo: 'ShiftRight' },
         keyLabel: '← ↑ → ↓ · , . /',

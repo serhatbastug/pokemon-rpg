@@ -12,7 +12,7 @@ import { abilitiesOf, abilityOf, DASHES } from './abilities.js';
 // KARE, klavyede A. İkisini tek ada indirirsek kolda "sola atılma" ile
 // klavyede "karakterin kendi hamlesi" aynı tuşa düşüyor.
 const ACTIONS = [
-    'jump', 'attack', 'special', 'block', 'combo', 'left', 'right',
+    'jump', 'attack', 'special', 'block', 'combo', 'left', 'right', 'down',
     'keyAttack', 'padSquare', 'padCircle', 'padTriangle'
 ];
 
@@ -46,6 +46,12 @@ export class Player {
         this.dir = playerNum === 1 ? 1 : -1;
         this.vy = 0;
         this.vx = 0;          // atılma ve geri tepme; yürüyüşten ayrı
+
+        // Ayak altında bir yüzey var mı (zemin ya da basamak). Zıplama buna
+        // bakıyor: basamağın üstünden de zıplanabilmeli.
+        this.grounded = true;
+        // Basamaktan aşağı inerken basamakların görmezden gelindiği kareler
+        this.dropFrames = 0;
 
         this.invulnerable = false;
         this.frozen = false;
@@ -109,11 +115,37 @@ export class Player {
     }
 
     get onGround() {
-        return this.y >= this.groundY - 0.5;
+        return this.grounded;
     }
 
+    // Arenanın en alt zemini (y merkez cinsinden). Basamaklar bunun üstünde.
     get groundY() {
-        return this.game.canvas.height - this.height / 2 - PHYSICS.groundOffset;
+        return this.floorFoot - this.height / 2;
+    }
+
+    // Zeminin ayak çizgisi. Basamakların y'si de ayak çizgisi cinsinden.
+    get floorFoot() {
+        return this.game.canvas.height - PHYSICS.groundOffset;
+    }
+
+    // Ayakların bu karede değdiği yüzeyin ayak çizgisi; hiçbiri yoksa null.
+    //
+    // Basamaklar TEK YÖNLÜ: altlarından zıplayıp üstlerine çıkılır, içlerinden
+    // geçilmez. Bu yüzden yalnızca DÜŞERKEN ve ayaklar basamağın üstünü o
+    // karede geçtiyse iniliyor. Birden çok aday varsa en YÜKSEK olanı kazanır:
+    // aşağı düşen figür ilk ona değer.
+    landingFoot(prevFoot) {
+        const foot = this.footY;
+        let best = foot >= this.floorFoot ? this.floorFoot : null;
+        if (this.vy < 0 || this.dropFrames > 0) return best;
+
+        const half = this.width * 0.3;   // ayakların değdiği genişlik
+        for (const s of this.game.ledges) {
+            if (this.x + half < s.x || this.x - half > s.x + s.w) continue;
+            if (prevFoot > s.y + 1 || foot < s.y) continue;
+            if (best === null || s.y < best) best = s.y;
+        }
+        return best;
     }
 
     // Bu oyuncu kolla mı oynuyor? Ekrandaki tuş ipuçları buna bakıyor -
@@ -189,6 +221,7 @@ export class Player {
             combo:   input.isDown(k.combo) || this.padDown(PAD_COMBO_BUTTON),
             left:    input.isDown(this.controls.left),
             right:   input.isDown(this.controls.right),
+            down:    input.isDown(this.controls.down) || this.padStick().y > 0.5,
             keyAttack:   input.isDown(k.attack),
             padSquare:   this.padDown(PAD_ATTACK_BUTTON),
             padCircle:   this.padDown(PAD_SPECIAL_BUTTON),
@@ -305,17 +338,31 @@ export class Player {
         if (Math.abs(this.vx) < 0.3) this.vx = 0;
         this.x = Math.min(canvas.width - this.width / 2, Math.max(this.width / 2, this.x));
 
-        // Yerçekimi ve zıplama (uçmayı engeller)
-        const groundY = this.groundY;
-        if (!this.held.combo && this.held.jump && this.y >= groundY) {
+        // Yerçekimi, zıplama ve basamaklar. Zıplama "yerde miyim"e değil
+        // "ayak altımda bir şey var mı"ya bakıyor: basamağın üstünden de
+        // zıplanabilmeli. Havada zıplanamıyor, uçmak yok.
+        const prevFoot = this.footY;
+
+        if (!this.held.combo && this.held.jump && this.grounded) {
             this.vy = PHYSICS.jumpVelocity;
+            this.grounded = false;
+        }
+
+        // Basamağın üstündeyken AŞAĞI: sekiden aşağı süzülme. Kısa bir süre
+        // basamaklar görmezden geliniyor, yoksa karakter aynı karede geri biner.
+        if (this.pressed.down && this.grounded && prevFoot < this.floorFoot - 1) {
+            this.dropFrames = PHYSICS.dropFrames;
+            this.grounded = false;
         }
 
         this.vy += PHYSICS.gravity;
         this.y += this.vy;
+        if (this.dropFrames > 0) this.dropFrames--;
 
-        if (this.y >= groundY) {
-            this.y = groundY;
+        const land = this.landingFoot(prevFoot);
+        this.grounded = land !== null;
+        if (this.grounded) {
+            this.y = land - this.height / 2;
             this.vy = 0;
         }
     }
@@ -394,6 +441,8 @@ export class Player {
         this.y = this.groundY;
         this.vx = 0;
         this.vy = 0;
+        this.grounded = true;
+        this.dropFrames = 0;
         this.isDead = false;
         this.invulnerable = false;
         this.invulnFrames = 0;

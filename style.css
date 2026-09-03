@@ -363,6 +363,21 @@ body.battle-active {
 }
 
 /* Battle HUD styling */
+/* Savaş ekranı ARENANIN BOYUNA göre daralıyor.
+   Arena her ekrana sığmalı: sayfa kaydırılmasın, alt kenarı (zemin ve kombo
+   kümesi) kesilmesin. Tuvalin kendi çözünürlüğü değişmiyor - yalnızca
+   gösterildiği boy, hem genişliğe hem YÜKSEKLİĞE göre kısılıyor.
+   --arena-en-boy: 1280 / (640 + 132), arenanın ve altındaki kombo şeridinin
+   birlikte oranı. --ust-alan: üstteki HUD ve kenar boşlukları.
+   Ölçü ekranda değil BURADA duruyor ki HUD ile arena aynı genişlikte kalsın;
+   HUD boydan boya uzayınca arena ekranın soluna sıkışmış gibi duruyordu. */
+#battle-screen {
+    --arena-en-boy: 1.658;
+    --ust-alan: 215px;
+    width: min(100%, 1280px, calc((100vh - var(--ust-alan)) * var(--arena-en-boy)));
+    margin-inline: auto;
+}
+
 .battle-hud {
     display: flex;
     justify-content: space-between;
@@ -548,11 +563,12 @@ canvas {
     display: block;
 }
 
-/* Arena kendi cozunurlugunde ciziliyor (1280x640) ve yer varsa 1:1
-   gosteriliyor: piksel izgarasi ancak boyle temiz kalir. Dar ekranda
-   kuculuyor, ama hicbir zaman buyutulmuyor. */
+/* Arena kendi cozunurlugunde ciziliyor (1280x640); ekranda ne kadar yer
+   varsa o kadar buyuk gosteriliyor, hicbir zaman buyutulmuyor. Ikisi de
+   kapsayicinin genisligini aldigi icin arena ile kombo seridi HEP AYNI
+   olcekte kalir - biri otekinden genis durursa serit arenadan tasar. */
 .canvas-container canvas {
-    max-width: 100%;
+    width: 100%;
     height: auto;
     image-rendering: pixelated;
 }

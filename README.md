@@ -23,7 +23,7 @@ Ardından tarayıcıda `http://localhost:8765` adresini açın.
 | Komut | Ne yapar | Süre |
 |---|---|---|
 | `npm run check` | Veri ve saf mantık testleri (179 kontrol): ana menü yerleşimi (her iki kapıya da yürünebiliyor mu), arena kadrosu ve basamakları, prolog çizgi romanının senaryosu ve akışı, diyalog yürütücüsü, oyun kolu eşlemesi. Tarayıcı gerekmez. | ~1 sn |
-| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (72 test): ana menü sahnesi, prolog çizgi romanı (kare ilerletme, balonlar), oyun kolu (iki kol, iki yuva), ekran geçişleri, dövüşçü seçimi, arena, basamaklar, giriş animasyonları (P1 → P2 sırası) ve FPS ölçümü. | ~1 dk |
+| `npm run test:ui` | Puppeteer ile uçtan uca oynanış (74 test): ana menü sahnesi, prolog çizgi romanı (kare ilerletme, balonlar), oyun kolu (iki kol, iki yuva), ekran geçişleri, dövüşçü seçimi, arena, basamaklar, giriş animasyonları (P1 → P2 sırası) ve FPS ölçümü. | ~1 dk |
 | `npm test` | İkisini sırayla çalıştırır. | |
 
 UI testleri için sunucunun ayrı bir terminalde çalışıyor olması gerekir (`npm start`).
@@ -167,8 +167,16 @@ düğmelerin `click()`'ini çağırır, yani kol farenin gittiği yerden gider.
 ## Arena
 
 Arena tuvali **1280x640** (`index.html`), altında ayrı bir şeritte kombo
-kümesi. Sayfada yer varsa 1:1 gösteriliyor, dar ekranda küçülüyor - piksel
-ızgarası ancak böyle temiz kalıyor.
+kümesi.
+
+**Ekrana sığma.** Tuvalin çözünürlüğü sabit; gösterildiği boy hem genişliğe
+hem **yüksekliğe** göre kısılıyor (`#battle-screen` içindeki `--arena-en-boy`
+ve `--ust-alan`). Sayfa hiç kaydırılmamalı: kaydırılırsa arenanın **altı**
+(zemin ve kombo kümesi) ekran dışında kalıyor. Ölçü savaş ekranının
+kendisinde duruyor ki HUD ile arena aynı genişlikte kalsın - HUD boydan boya
+uzayınca arena ekranın soluna sıkışmış gibi duruyordu. `npm run test:ui`
+sayfanın kaydırılmadığını ve iki tuvalin aynı genişlikte olduğunu
+doğruluyor.
 
 **Basamaklar.** Her arenanın kendi seki düzeni var (`src/game/arenas.js`,
 `LEDGE`); arena maç boyunca sabit olduğu için düzen ezberlenebilir. Sekiler

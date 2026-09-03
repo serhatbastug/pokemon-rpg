@@ -445,6 +445,24 @@ async function main() {
     check('Savas ekrani acildi', battleVisible);
     await shot('03-savas');
 
+    // Arena ekrana sığmalı: sayfa kaydırılırsa arenanın ALTI (zemin ve kombo
+    // kümesi) görünmüyor. Tuvalin boyu ekrana göre kısılıyor.
+    const fits = await page.evaluate(() => {
+        const bar = document.getElementById('comboBar').getBoundingClientRect();
+        const arena = document.getElementById('battleCanvas').getBoundingClientRect();
+        return {
+            scrollH: document.documentElement.scrollHeight,
+            viewH: window.innerHeight,
+            barBottom: Math.round(bar.bottom),
+            arenaW: Math.round(arena.width),
+            barW: Math.round(bar.width)
+        };
+    });
+    check('Savas ekrani ekrana sigiyor (kaydirma yok)',
+        fits.scrollH <= fits.viewH + 1 && fits.barBottom <= fits.viewH, JSON.stringify(fits));
+    check('Arena ile kombo seridi ayni genislikte', Math.abs(fits.arenaW - fits.barW) <= 1,
+        `${fits.arenaW} / ${fits.barW}`);
+
     // Seçilen dövüşçünün girişi varsa önce o oynar; yürüme testi için
     // animasyonlar sona sarılıyor (girişlerin kendi testi aşağıda).
     await page.evaluate(() => {

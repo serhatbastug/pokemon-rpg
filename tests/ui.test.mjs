@@ -450,6 +450,9 @@ async function main() {
     await page.evaluate(() => {
         const g = window.__game;
         while (g.intro) { g.intro.frame = g.intro.frames; g.update(); }
+        // Raunt başı donması ('RAUNT 1' -> 'BAŞLA') yürüme testini bekletmesin
+        g.phaseTimer = 0;
+        g.update();
     });
     await wait(150);
 
@@ -466,6 +469,136 @@ async function main() {
     check('Arenaya secilen dovusculer cikti',
         ['virus', 'antivirus'].includes(arenaStart.p1) && ['virus', 'antivirus'].includes(arenaStart.p2),
         `${arenaStart.p1} vs ${arenaStart.p2}`);
+
+
+    // --- Saldırılar, blok ve kombolar ---
+    // Kadro seçim ekranından geldiği için p1 virüs ya da anti-virüs; testler
+    // ikisinde de geçecek biçimde yazıldı (biri yakın dövüşçü, biri menzilli).
+    const clearCds = () => page.evaluate(() => {
+        const g = window.__game;
+        for (const p of [g.p1, g.p2]) {
+            for (const id of Object.keys(p.cooldowns)) p.cooldowns[id] = 0;
+            p.blockCooldown = 0;
+            p.blockFrames = 0;
+            p.invulnerable = false;
+            p.invulnFrames = 0;
+            p.action = null;
+            p.hp = p.maxHp;
+        }
+        g.combat.reset();
+        g.p1.x = 400; g.p1.y = g.p1.groundY;
+        g.p2.x = 470; g.p2.y = g.p2.groundY;
+    });
+
+    await clearCds();
+    await hold('KeyF', 150);
+    await wait(400);
+    const hit = await page.evaluate(() => ({ hp: window.__game.p2.hp, max: window.__game.p2.maxHp }));
+    check('Normal saldiri rakibin canini goturuyor', hit.hp < hit.max,
+        `${hit.hp} / ${hit.max}`);
+    await shot('03g-saldiri');
+
+    // Blok penceresi açıkken temel saldırı hiç geçmemeli
+    await clearCds();
+    await page.evaluate(() => {
+        const g = window.__game;
+        g.p2.startBlock();
+        g.p1.useAbility('basic');
+    });
+    await wait(450);
+    const blocked = await page.evaluate(() => ({
+        hp: window.__game.p2.hp,
+        max: window.__game.p2.maxHp,
+        cd: window.__game.p2.blockCooldown
+    }));
+    check('Blok temel saldiriyi tamamen kesiyor', blocked.hp === blocked.max,
+        `${blocked.hp} / ${blocked.max}`);
+    check('Blok bekleme suresine giriyor', blocked.cd > 0, `${blocked.cd} kare`);
+
+    // Bekleme dolmadan ikinci blok açılmıyor
+    const secondBlock = await page.evaluate(() => {
+        const p = window.__game.p2;
+        p.blockFrames = 0;
+        p.startBlock();
+        return p.blockFrames;
+    });
+    check('Bekleme bitmeden ikinci blok acilmiyor', secondBlock === 0, `${secondBlock}`);
+
+    // Özel saldırı arenaya bir şey bırakıyor ve beklemeye giriyor
+    await clearCds();
+    await hold('KeyG', 120);
+    await wait(200);
+    const special = await page.evaluate(() => {
+        const g = window.__game;
+        const id = window.__abilities.ABILITIES[g.p1.fighter.id].special.id;
+        return {
+            types: [...new Set(g.combat.entities.map(e => e.type))],
+            cd: g.p1.cooldowns[id],
+            strip: document.getElementById('p1-cd-special').style.width
+        };
+    });
+    check('Ozel saldiri arenaya bir sey birakiyor', special.types.length > 0, special.types.join(','));
+    check('Ozel saldiri beklemeye giriyor', special.cd > 0, `${special.cd} kare`);
+    check('Ozelin beklemesi HUD serididinde gorunuyor',
+        special.strip !== '100%' && special.strip !== '', special.strip);
+
+    // SHIFT (kolda L1) + F: karakterin kendi hamlesi
+    await clearCds();
+    await page.keyboard.down('ShiftLeft');
+    await wait(60);
+    await page.keyboard.down('KeyF');
+    await wait(120);
+    await page.keyboard.up('KeyF');
+    await page.keyboard.up('ShiftLeft');
+    const signature = await page.evaluate(() => window.__game.combat.entities.map(e => e.type));
+    check('SHIFT+F karakterin kendi hamlesini cikariyor', signature.length > 0,
+        signature.join(',') || 'hiçbir şey');
+
+    // SHIFT + W: yukarı atılma. Normal zıplamadan yükseğe çıkmalı ve
+    // beklemeye girmeli, yoksa oyuncu normal zıplamayı hiç kullanmaz.
+    await clearCds();
+    await hold('KeyW', 60);
+    await wait(280);
+    const jumpTop = await page.evaluate(() => window.__game.p1.y);
+    await page.evaluate(() => {
+        const g = window.__game;
+        g.p1.y = g.p1.groundY; g.p1.vy = 0;
+        for (const id of Object.keys(g.p1.cooldowns)) g.p1.cooldowns[id] = 0;
+    });
+    await page.keyboard.down('ShiftLeft');
+    await wait(60);
+    await page.keyboard.down('KeyW');
+    await wait(280);
+    const dash = await page.evaluate(() => ({
+        y: window.__game.p1.y,
+        cd: window.__game.p1.cooldowns.dashUp
+    }));
+    await page.keyboard.up('KeyW');
+    await page.keyboard.up('ShiftLeft');
+    check('SHIFT+W atilmasi normal ziplamadan yukari cikiyor', dash.y < jumpTop,
+        `zıplama ${Math.round(jumpTop)} / atılma ${Math.round(dash.y)}`);
+    check('Atilmanin beklemesi var', dash.cd > 0, `${dash.cd} kare`);
+
+    // Arenanın altındaki kombo kümesi: hiç kaybolmuyor
+    const comboBar = await page.evaluate(() => {
+        const c = document.getElementById('comboBar');
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let lit = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i] > 70 || d[i + 1] > 70 || d[i + 2] > 70) lit++;
+        }
+        return { lit, w: c.width, h: c.height };
+    });
+    check('Kombo kumesi arenanin altinda ciziliyor', comboBar.lit > 500, JSON.stringify(comboBar));
+    await shot('03h-kombo-kumesi');
+
+    // Raunt süresi geri sayıyor
+    const timerBefore = await page.evaluate(() => +document.getElementById('round-timer').textContent);
+    await wait(1300);
+    const timerAfter = await page.evaluate(() => +document.getElementById('round-timer').textContent);
+    check('Raunt suresi geri sayiyor', timerAfter < timerBefore, `${timerBefore} -> ${timerAfter}`);
+
+    await clearCds();
 
     const battleFps = await measureFps(3000);
     check('Savas ekrani 50+ FPS', battleFps.fps >= 50, JSON.stringify(battleFps));
@@ -560,12 +693,32 @@ async function main() {
     // İkisi de bitince tur başlar
     await page.evaluate(() => { window.__game.intro.frame = window.__game.intro.frames - 1; });
     await wait(200);
+    // Girişler bitti: raunt başı donmasını da geç, sonra yürümeye bak
+    await page.evaluate(() => { window.__game.phaseTimer = 0; });
     await hold('KeyD', 250);
     const afterIntro = await page.evaluate(() => ({ intro: !!window.__game.intro, x: window.__game.p1.x }));
     check('Iki giris de bitince tur basliyor ve oyuncu yuruyor',
         !afterIntro.intro && afterIntro.x > firstIntro.x + 10, JSON.stringify(afterIntro));
 
+    // --- Maç üç raunt: bir K.O. yalnızca raundu bitirir ---
+    await page.evaluate(() => { window.__game.p1.takeDamage(9999); });
+    await page.waitForFunction(() => window.__game.round === 2, { timeout: 8000 });
+    const afterRound1 = await page.evaluate(() => ({
+        raunt: window.__game.round,
+        galibiyet: window.__game.wins[2],
+        bitti: window.__game.isGameOver,
+        can: window.__game.p1.hp,
+        maxCan: window.__game.p1.maxHp
+    }));
+    check('Bir K.O. yalnizca raundu bitiriyor, mac surer',
+        afterRound1.raunt === 2 && afterRound1.galibiyet === 1 && !afterRound1.bitti &&
+        afterRound1.can === afterRound1.maxCan, JSON.stringify(afterRound1));
+    await shot('03f-raunt-2');
+
     // --- Savaş sonu penceresi kolla: ÇARPI yeniden başlatır ---
+    // İkinci raundu da alınca maç biter.
+    await page.evaluate(() => { window.__game.phaseTimer = 0; });
+    await page.waitForFunction(() => window.__game.phase === 'fight', { timeout: 8000 });
     await page.evaluate(() => { window.__game.p1.takeDamage(9999); });
     await page.waitForFunction(
         () => !document.getElementById('gameover-screen').classList.contains('hidden'),

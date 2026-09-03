@@ -15,6 +15,7 @@ import { StartPrompt } from './ui/startPrompt.js';
 import { ComicScene } from './comic/ComicScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
+import { ABILITIES } from './game/abilities.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -125,6 +126,7 @@ window.__characterSelect = characterSelect;
 // Giriş animasyonunun süresi: tools/intro-shots.mjs kareyi buradan sarıyor
 window.__introInfo = { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES };
 window.__fighters = { FIGHTERS };
+window.__abilities = { ABILITIES };
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();

@@ -465,6 +465,92 @@ player.frame = 99999;
 player.advance();
 check('çizgi roman: son kareden sonra bitiyor', player.finished && !player.running);
 
+// ---- Dövüş hamleleri ----
+// Üç dövüşçünün de üç kendi hamlesi (normal, özel, L1+ÜÇGEN) ve üç ortak
+// atılması var. Ekranın altındaki kümenin dört dairesi buradan besleniyor.
+const ab = await import('../src/game/abilities.js');
+const { COMBAT: CFG, PLAYERS: PL } = await import('../src/config/settings.js');
+
+check('her dövüşçünün normal, özel ve kendi hamlesi var',
+    FIGHTERS.every(f => ab.ABILITIES[f.id]?.basic && ab.ABILITIES[f.id]?.special && ab.ABILITIES[f.id]?.signature),
+    FIGHTERS.filter(f => !ab.ABILITIES[f.id]).map(f => f.id).join(','));
+check('hamlesi olup kadroda olmayan dövüşçü yok',
+    Object.keys(ab.ABILITIES).every(id => FIGHTERS.some(f => f.id === id)));
+
+const allAbilities = FIGHTERS.flatMap(f => ab.abilitiesOf(f.id));
+check('her hamlenin kimliği, adı ve simgesi var',
+    allAbilities.every(a => a.id && a.name && a.icon && a.kind),
+    allAbilities.filter(a => !(a.id && a.name && a.icon && a.kind)).map(a => a.id).join(','));
+check('bir dövüşçünün hamle kimlikleri benzersiz',
+    FIGHTERS.every(f => {
+        const ids = ab.abilitiesOf(f.id).map(a => a.id);
+        return new Set(ids).size === ids.length;
+    }));
+check('bekleme süreleri negatif değil', allAbilities.every(a => a.cooldown >= 0));
+
+// Enfekte kol ıskalarsa bekleme YOK, yakalayınca var: bedeli tutunca ödeniyor
+const grab = ab.ABILITIES.antivirus.signature;
+check('enfekte kol ıskalayınca beklemesiz, yakalayınca beklemeli',
+    grab.cooldown === 0 && grab.cooldownOnHit > 0,
+    `${grab.cooldown} / ${grab.cooldownOnHit}`);
+check('yakalanan kurtulmak için birden çok kez basıyor', grab.escapePresses > 1);
+check('yakalamanın kendiliğinden bırakma süresi var', grab.maxHold > 0);
+
+// Menzilli normal saldırılar yakın dövüşten az vurmalı: virüs mesafeyi
+// kapatmak zorunda olduğu için tek vuruşu ağır.
+check('virüsün yakın vuruşu menzillilerden sert',
+    ab.ABILITIES.virus.basic.damage > ab.ABILITIES.antivirus.basic.damage &&
+    ab.ABILITIES.virus.basic.damage > ab.ABILITIES.electro.basic.damage);
+check('elektronun ışını antinin topundan az vuruyor',
+    ab.ABILITIES.electro.basic.damage < ab.ABILITIES.antivirus.basic.damage);
+check('elektronun ışını arenada kalıyor', ab.ABILITIES.electro.basic.life > 60);
+check('küre üç el ateş ediyor ve kütleler büyük, yavaş',
+    ab.ABILITIES.electro.special.volleys === 3 &&
+    ab.ABILITIES.electro.special.massSpeed < ab.ABILITIES.antivirus.basic.speed &&
+    ab.ABILITIES.electro.special.massRadius > ab.ABILITIES.antivirus.basic.radius);
+check('küre üç el bitene kadar yaşıyor',
+    ab.ABILITIES.electro.special.life >= ab.ABILITIES.electro.special.volleys *
+        ab.ABILITIES.electro.special.volleyInterval);
+check('saçılma her yöne yeterince top atıyor', ab.ABILITIES.antivirus.special.count >= 8);
+check('bölünme birden çok parça çıkarıyor', ab.ABILITIES.virus.special.pieces > 1);
+check('salgın izi yavaşlatıyor ama hasar vermiyor',
+    ab.ABILITIES.virus.signature.slow > 0 && ab.ABILITIES.virus.signature.slow < 1 &&
+    ab.ABILITIES.virus.signature.damage === undefined);
+
+// Kümedeki dört daire: üç atılma + karakterin kendi hamlesi
+for (const f of FIGHTERS) {
+    const combos = ab.comboAbilities(f.id);
+    check(`${f.id}: kümede dört daire var`, combos.length === 4, `${combos.length}`);
+    check(`${f.id}: her dairenin kombo tuşu ve klavye yuvası var`,
+        combos.every(c => c.padCombo?.length === 2 && c.keySlot));
+    check(`${f.id}: kombolar hep L1 ile başlıyor`, combos.every(c => c.padCombo[0] === 'l1'));
+    const second = combos.map(c => c.padCombo[1]);
+    check(`${f.id}: kombolar aynı tuşa düşmüyor`, new Set(second).size === 4, second.join(','));
+    const slots = combos.map(c => c.keySlot);
+    check(`${f.id}: klavye komboları da aynı tuşa düşmüyor`, new Set(slots).size === 4, slots.join(','));
+}
+check('atılmaların beklemesi var: normal zıplama işlevsiz kalmasın',
+    ab.DASHES.every(d => d.cooldown > 0));
+check('atılmalar zıplamadan güçlü', ab.DASHES[0].velocity.y < -13);
+
+// ---- Maç ve blok ayarları ----
+check('maç üç raunt, iki raundu alan kazanıyor',
+    CFG.maxRounds === 3 && CFG.roundsToWin === 2);
+check('raunt süre sınırı var', CFG.roundFrames > 0);
+check('blok basılı tutulmuyor: pencere kısa, bekleme uzun',
+    CFG.blockWindow > 0 && CFG.blockCooldown > CFG.blockWindow);
+check('blok özelleri yarı geçiriyor, temeli tamamen kesiyor',
+    CFG.blockLeak > 0 && CFG.blockLeak < 1);
+
+// İki oyuncu tek klavyede: hiçbir tuş iki kişide birden olmamalı
+const keysOf = (n) => [...Object.values(PL[n].moveKeys), ...Object.values(PL[n].actionKeys)];
+const p1Keys = keysOf(1);
+const p2Keys = keysOf(2);
+check('bir oyuncunun tuşları kendi içinde çakışmıyor',
+    new Set(p1Keys).size === p1Keys.length && new Set(p2Keys).size === p2Keys.length);
+check('iki oyuncunun tuşları birbirine karışmıyor',
+    p1Keys.every(k => !p2Keys.includes(k)), p1Keys.filter(k => p2Keys.includes(k)).join(','));
+
 
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);

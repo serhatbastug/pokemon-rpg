@@ -1,18 +1,24 @@
 import { Player } from './Player.js';
 import { EffectsManager } from './effects.js';
+import { Combat } from './combat.js';
 import { randomArena } from './arenas.js';
-import { PLAYERS, SCROLL_KEYS, FRAME_RATE } from '../config/settings.js';
+import { PLAYERS, SCROLL_KEYS, FRAME_RATE, COMBAT } from '../config/settings.js';
 import { introFor } from './fighterIntro.js';
+import { drawPixelText } from '../pixel/pixelFont.js';
 
-// Oyun motoru: oyun döngüsü ve tur durumu.
+// Oyun motoru: oyun döngüsü ve maç durumu.
 // UI (ekran geçişleri) main.js'te; HUD güncellemeleri Hud sınıfında.
 //
 // Kontroller: her oyuncu ya klavyeden ya da kendi oyun kolundan oynar - ikisi
 // de her zaman açık. 1. oyuncu takılan ilk kolu, 2. oyuncu ikinciyi kullanır;
 // tek kol varsa 2. oyuncu klavyede kalır.
 //
-// SALDIRI YOK: virüslerin güçleri henüz yazılmadı, bu turda arenada yalnızca
-// hareket ve zıplama var. Mermi sistemi (eski Pokemon hamleleri) kaldırıldı.
+// MAÇ ÜÇ RAUNT: iki raundu alan kazanır, üçüncüye gerek kalmayabilir. Her
+// raundun süre sınırı var - blok yüzünden şart, yoksa iki oyuncu da bekleyip
+// birbirine hiç yaklaşmayabilir. Süre biterse canı fazla olan raundu alır.
+//
+// Aşamalar: 'intro' (giriş animasyonları) -> her raunt için 'ready' (kısa
+// donma, "RAUNT n") -> 'fight' -> 'roundOver' -> sonraki raunt ya da maç sonu.
 export class Game {
     constructor({ canvas, input, gamepad = null, hud, onGameOver }) {
         this.canvas = canvas;
@@ -23,14 +29,22 @@ export class Game {
         this.onGameOver = onGameOver;
 
         this.effects = new EffectsManager();
+        this.combat = new Combat(this);
         this.p1 = null;
         this.p2 = null;
         this.currentArena = null;
         this.rafId = null;
         this.isGameOver = false;
         this.frame = 0;      // hareketli çizimler (elektrik) buradan besleniyor
-        this.intro = null;   // oynayan giriş animasyonu; varken tur başlamaz
+        this.intro = null;   // oynayan giriş animasyonu; varken maç başlamaz
         this.introQueue = [];
+
+        this.round = 1;
+        this.wins = { 1: 0, 2: 0 };
+        this.phase = 'intro';
+        this.phaseTimer = 0;
+        this.roundTimer = COMBAT.roundFrames;
+        this.banner = null;
 
         input.onKeyDown(e => this.handleKeyDown(e));
     }
@@ -54,8 +68,14 @@ export class Game {
     start(fighter1, fighter2) {
         this.isGameOver = false;
         this.effects.reset();
+        this.combat.reset();
+        // Arena maç boyunca SABİT: raunt başına değiştirmek, basamakları
+        // ezberleyen oyuncunun emeğini her raunt sıfırlar.
         this.currentArena = randomArena();
         this.frame = 0;
+        this.round = 1;
+        this.wins = { 1: 0, 2: 0 };
+        this.banner = null;
 
         this.p1 = new Player({
             ...PLAYERS[1].start,
@@ -63,6 +83,7 @@ export class Game {
             playerNum: 1,
             color: PLAYERS[1].color,
             controls: PLAYERS[1].moveKeys,
+            actionKeys: PLAYERS[1].actionKeys,
             padSlot: PLAYERS[1].padSlot,
             game: this
         });
@@ -72,18 +93,23 @@ export class Game {
             playerNum: 2,
             color: PLAYERS[2].color,
             controls: PLAYERS[2].moveKeys,
+            actionKeys: PLAYERS[2].actionKeys,
             padSlot: PLAYERS[2].padSlot,
             game: this
         });
 
-        // Girişi olan dövüşçüler tur başında sırayla oynar: ÖNCE P1, SONRA P2.
+        // Girişi olan dövüşçüler maç başında sırayla oynar: ÖNCE P1, SONRA P2.
         this.introQueue = [this.p1, this.p2]
             .map(p => introFor(p, this.canvas))
             .filter(Boolean);
         this.intro = this.introQueue.shift() || null;
+        this.phase = this.intro ? 'intro' : 'ready';
+        this.phaseTimer = COMBAT.roundStartFreeze;
 
         this.hud.setPlayers(this.p1, this.p2);
         this.hud.updateHealth(this.p1, this.p2);
+        this.hud.updateRounds(this.wins);
+        this.hud.updateTimer(COMBAT.roundFrames);
         this.hud.updateControlBadges(this.gamepad?.padCount || 0);
 
         // Piksel sanatı modu
@@ -117,6 +143,47 @@ export class Game {
         return player === this.p1 ? this.p2 : this.p1;
     }
 
+    startRound(n) {
+        this.round = n;
+        this.combat.reset();
+        this.effects.reset();
+        this.p1.resetForRound();
+        this.p2.resetForRound();
+        this.roundTimer = COMBAT.roundFrames;
+        this.phase = 'ready';
+        this.phaseTimer = COMBAT.roundStartFreeze;
+        this.banner = { text: `RAUNT ${n}`, color: '#f8fafc' };
+        this.hud.updateHealth(this.p1, this.p2);
+        this.hud.updateTimer(this.roundTimer);
+    }
+
+    // winnerNum 0 = beraberlik (süre bitti, canlar eşit)
+    endRound(winnerNum) {
+        if (this.phase !== 'fight') return;
+        this.phase = 'roundOver';
+        this.phaseTimer = COMBAT.intermissionFrames;
+
+        if (winnerNum) {
+            this.wins[winnerNum]++;
+            const winner = winnerNum === 1 ? this.p1 : this.p2;
+            this.banner = { text: `RAUNT ${this.round}: ${winner.fighter.name}`, color: winner.color };
+        } else {
+            this.banner = { text: 'BERABERE', color: '#cbd5e1' };
+        }
+        this.hud.updateRounds(this.wins);
+    }
+
+    // Maç bitti mi, bittiyse kim aldı? Maçı bitiren şey iki raunt kazanmak;
+    // üç raunt dolduğu hâlde kimse ikiye ulaşamadıysa (beraberlik olduysa)
+    // çok raunt alan, o da eşitse canı oranca fazla olan kazanır.
+    matchWinner() {
+        if (this.wins[1] >= COMBAT.roundsToWin) return 1;
+        if (this.wins[2] >= COMBAT.roundsToWin) return 2;
+        if (this.round < COMBAT.maxRounds) return 0;
+        if (this.wins[1] !== this.wins[2]) return this.wins[1] > this.wins[2] ? 1 : 2;
+        return (this.p1.hp / this.p1.maxHp) >= (this.p2.hp / this.p2.maxHp) ? 1 : 2;
+    }
+
     endGame(winnerNum) {
         this.isGameOver = true;
         if (this.rafId) cancelAnimationFrame(this.rafId);
@@ -124,6 +191,44 @@ export class Game {
 
         const winner = winnerNum === 1 ? this.p1 : this.p2;
         this.onGameOver(winnerNum, winner);
+    }
+
+    stepPhase() {
+        if (this.phaseTimer > 0) this.phaseTimer--;
+
+        if (this.phase === 'ready' && this.phaseTimer <= 0) {
+            this.phase = 'fight';
+            this.banner = { text: 'BAŞLA', color: '#fbbf24', life: 40 };
+            return;
+        }
+
+        if (this.phase === 'roundOver' && this.phaseTimer <= 0) {
+            const winner = this.matchWinner();
+            if (winner) this.endGame(winner);
+            else this.startRound(this.round + 1);
+            return;
+        }
+
+        if (this.phase === 'fight') {
+            this.roundTimer--;
+            this.hud.updateTimer(this.roundTimer);
+            if (this.roundTimer <= 0) {
+                // Süre bitti: canı fazla olan raundu alır.
+                const r1 = this.p1.hp / this.p1.maxHp;
+                const r2 = this.p2.hp / this.p2.maxHp;
+                this.endRound(r1 === r2 ? 0 : (r1 > r2 ? 1 : 2));
+            }
+        }
+    }
+
+    drawBanner(ctx) {
+        if (!this.banner) return;
+        if (this.banner.life !== undefined) {
+            if (--this.banner.life <= 0) { this.banner = null; return; }
+        }
+        drawPixelText(ctx, this.banner.text, this.canvas.width / 2, 70, {
+            scale: 6, color: this.banner.color, shadow: '#020617', align: 'center'
+        });
     }
 
     update() {
@@ -149,19 +254,36 @@ export class Game {
             ctx.restore();
 
             this.intro.draw(ctx);
-            if (this.intro.step()) this.intro = this.introQueue.shift() || null;
+            if (this.intro.step()) {
+                this.intro = this.introQueue.shift() || null;
+                if (!this.intro) {
+                    this.phase = 'ready';
+                    this.phaseTimer = COMBAT.roundStartFreeze;
+                    this.banner = { text: 'RAUNT 1', color: '#f8fafc' };
+                }
+            }
             return;
         }
 
         this.currentArena.drawBg(ctx, canvas.width, canvas.height);
 
+        this.stepPhase();
+
+        // Raunt başında ve raunt arasında kimse oynamaz: hamleler ekranda
+        // kalmasın, "BAŞLA" yazmadan vuruş başlamasın.
+        const live = this.phase === 'fight';
+        this.p1.frozen = !live;
+        this.p2.frozen = !live;
+
         this.p1.update();
         this.p2.update();
 
         // Oyuncular her zaman birbirlerine dönük sayılır (sprite aynalanmıyor,
-        // ama güçler geldiğinde yön buradan okunacak)
+        // ama hamlelerin yönü buradan okunuyor)
         this.p1.dir = (this.p2.x >= this.p1.x) ? 1 : -1;
         this.p2.dir = (this.p1.x >= this.p2.x) ? 1 : -1;
+
+        if (live) this.combat.update();
 
         ctx.save();
         effects.applyShake(ctx);
@@ -169,16 +291,20 @@ export class Game {
         effects.drawParticles(ctx);
         effects.drawDeathPixels(ctx);
 
+        this.combat.draw(ctx);
         this.p1.draw(ctx);
         this.p2.draw(ctx);
 
         effects.drawFloatingTexts(ctx);
+        this.combat.drawGrabPrompt(ctx);
         ctx.restore();
 
+        this.drawBanner(ctx);
         effects.drawFlash(ctx, canvas.width, canvas.height);
 
         // Kol tarayıcıya ancak bir tuşuna basılınca görünüyor; savaş başladıktan
         // sonra uyanan kol da HUD'daki simgeleri değiştirebilmeli.
         this.hud.updateControlBadges(this.gamepad?.padCount || 0);
+        this.hud.drawComboBars(this.p1, this.p2);
     }
 }

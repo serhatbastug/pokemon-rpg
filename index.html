@@ -70,11 +70,22 @@
                         <div class="hp-bar-bg"><div id="p1-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
                         <span id="p1-hp-text" class="bar-text">100 / 100</span>
                     </div>
+                    <!-- Kombosuz iki hamlenin bekleme süresi. Dört kombonun
+                         göstergesi arenanın altındaki kümede. -->
+                    <div class="cd-strips">
+                        <div class="cd-strip"><span>BLOK</span><div class="cd-bar"><i id="p1-cd-block"></i></div></div>
+                        <div class="cd-strip"><span>ÖZEL</span><div class="cd-bar"><i id="p1-cd-special"></i></div></div>
+                    </div>
                     <p id="p1-controls" class="hud-controls">W A S D</p>
                 </div>
 
-                <!-- Vs Emblem -->
-                <div class="vs-emblem">VS</div>
+                <!-- Maçın ortası: raunt işaretleri ve kalan süre.
+                     Maç üç raunt, iki raundu alan kazanır. -->
+                <div class="match-center">
+                    <div id="p1-rounds" class="round-pips"><i></i><i></i></div>
+                    <div id="round-timer" class="round-timer">60</div>
+                    <div id="p2-rounds" class="round-pips"><i></i><i></i></div>
+                </div>
 
                 <!-- P2 Info -->
                 <div class="player-hud p2-hud">
@@ -86,6 +97,10 @@
                         <div class="hp-bar-bg"><div id="p2-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
                         <span id="p2-hp-text" class="bar-text">100 / 100</span>
                     </div>
+                    <div class="cd-strips">
+                        <div class="cd-strip"><span>BLOK</span><div class="cd-bar"><i id="p2-cd-block"></i></div></div>
+                        <div class="cd-strip"><span>ÖZEL</span><div class="cd-bar"><i id="p2-cd-special"></i></div></div>
+                    </div>
                     <p id="p2-controls" class="hud-controls">← ↑ → ↓</p>
                 </div>
             </div>
@@ -93,6 +108,9 @@
             <!-- Canvas Arena -->
             <div class="canvas-container">
                 <canvas id="battleCanvas" width="1000" height="500"></canvas>
+                <!-- Kombo kümesi arenanın İÇİNDE değil altında: köşede duran
+                     karakterin ayaklarını örtmesin, ama hiç kaybolmasın. -->
+                <canvas id="comboBar" width="1000" height="132"></canvas>
             </div>
         </section>
 

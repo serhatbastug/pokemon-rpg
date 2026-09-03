@@ -430,12 +430,85 @@ body.battle-active {
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-.vs-emblem {
+/* Macin ortasi: raunt isaretleri ve kalan sure.
+   Mac uc raunt, iki raundu alan kazanir - bu yuzden oyuncu basina iki isaret. */
+.match-center {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0 1.2rem;
+}
+
+.round-pips {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.round-pips i {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--border-glass);
+    background: transparent;
+    transition: background 0.2s ease;
+}
+
+.round-pips i.won {
+    background: #fbbf24;
+    border-color: #fbbf24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.7);
+}
+
+.round-timer {
     font-family: var(--font-header);
     font-size: 2rem;
     font-weight: 800;
     color: var(--text-secondary);
-    padding: 0 2rem;
+    min-width: 3ch;
+    text-align: center;
+}
+
+.round-timer.urgent {
+    color: #ff4444;
+}
+
+/* Kombosuz iki hamlenin beklemesi: dolu = hazir */
+.cd-strips {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.cd-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.cd-bar {
+    width: 54px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.cd-bar i {
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: #7dd3fc;
+}
+
+.cd-strip:last-child .cd-bar i {
+    background: #fbbf24;
+}
+
+.p2-hud .cd-strips {
+    justify-content: flex-end;
 }
 
 /* HUD: bu oyuncunun hangi kontrolle oynadigi */
@@ -459,6 +532,8 @@ body.battle-active {
 .canvas-container {
     width: 100%;
     display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
     background: #050508;
     border: 2px solid var(--border-glass);
@@ -470,6 +545,13 @@ body.battle-active {
 canvas {
     background: radial-gradient(circle, #111827 0%, #030712 100%);
     display: block;
+}
+
+/* Kombo kumesi arenanin altinda ayri bir serit: hic kaybolmuyor ama
+   kosede duran karakterin ayaklarini da ortmuyor. */
+#comboBar {
+    background: #0b1220;
+    border-top: 2px solid var(--border-glass);
 }
 
 .controls-reminder {

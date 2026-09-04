@@ -80,7 +80,7 @@ export class Combat {
         // ulaşamazdı (zıplama duvarı aşmıyor, yalnız yukarı atılma aşıyor).
         const front = player.x + player.dir * ability.reach / 2;
         const wall = this.wallAt(front, player.y);
-        if (wall) {
+        if (wall && wall.owner !== player) {
             player.action.landed = true;
             wall.hp -= 2;
             this.game.effects.createExplosion(wall.x, player.y, '#dff4fb');
@@ -154,7 +154,7 @@ export class Combat {
         // arenada kalan bir iz, sonradan gelen duvar onu kesmiyor.
         let end = player.dir > 0 ? canvas.width : 0;
         for (const w of this.entities) {
-            if (w.type !== 'wall') continue;
+            if (w.type !== 'wall' || w.owner === player) continue;
             if (m.y < w.y - w.h || m.y > w.y) continue;
             const edge = w.x - player.dir * w.w / 2;
             if (player.dir > 0 ? (edge > m.x && edge < end) : (edge < m.x && edge > end)) end = edge;
@@ -399,11 +399,13 @@ export class Combat {
                         this.game.effects.createPulse(e.x, e.y, e.owner.fighter.themeColor);
                         dead = true;
                     }
-                    // Buz duvarı iki tarafın da mermisini durduruyor - buzun
-                    // kendi kırığını da. Duvar arkasından atış yapılamasın.
+                    // Buz duvarı RAKİBİN mermisini durduruyor, sahibininkini
+                    // geçiriyor: duvar buzun büyüttüğü kendi kalkanı. Önce
+                    // iki tarafı da durduruyordu ve buz kendi özeliyle kendini
+                    // susturuyordu (bkz. abilities.js'teki denge notu).
                     if (!dead) {
                         const blocking = this.wallAt(e.x, e.y);
-                        if (blocking) {
+                        if (blocking && blocking.owner !== e.owner) {
                             blocking.hp--;
                             this.game.effects.createPulse(e.x, e.y, '#dff4fb');
                             dead = true;

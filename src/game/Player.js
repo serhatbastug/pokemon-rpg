@@ -319,9 +319,13 @@ export class Player {
             return;
         }
 
-        // Donma: kısa. Bir hamle penceresi açıyor, raunt kazandırmıyor.
-        // Ardından uzun bir bağışıklık geliyor - zincirleme donma yok.
-        this.chill = 0;
+        // Donma: bir saniye. Bir hamle penceresi açıyor, raunt kazandırmıyor.
+        // Ardından bağışıklık geliyor - zincirleme donma yok.
+        //
+        // Birikim SIFIRLANMIYOR: sıfırlayınca yavaşlatma en yüksek değerine
+        // ulaştığı anda siliniyordu, yani %42'lik yavaşlatma oyunda hiç
+        // yaşanmıyordu. Artık donmadan sonra da rakip yavaş kalıyor;
+        // bağışıklık biterken buz basıncı sürdürdüyse döngü tekrar kapanır.
         this.frozenFrames = CHILL.freeze;
         this.freezeImmune = CHILL.immune;
         this.action = null;

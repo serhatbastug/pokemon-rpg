@@ -252,9 +252,13 @@ export const ABILITIES = {
             kind: 'shard',
             icon: 'shard',
             cooldown: 26,
-            // Kadronun en zayıf temel vuruşu: bedeli üşütmesi. Antinin
-            // topundan az vuruyor ama her isabet donmaya bir adım.
-            damage: 6,
+            // DENGE (2026-09-04, oynanarak): 6 hasardı, çok zayıf kaldı.
+            // Yanlış hesabım: üşümeyi "değerli" sayıp vuruşu ucuzlatmıştım,
+            // ama üşümenin kendisi de kısılmış olduğu için karakter iki
+            // yerden birden zayıfladı. Vuruş 9'a çıktı - sürekli hasarda
+            // hâlâ antinin altında (0,346 / 0,350), ama artık kavisli atışı
+            // ıskalamanın bedeli maçı kaybettirmiyor.
+            damage: 9,
             chill: 1,
             speed: 11,
             // Kırık YERÇEKİMİNE tabi: düz gitmiyor, kavis çiziyor. Uzaktan
@@ -271,12 +275,20 @@ export const ABILITIES = {
             name: 'BUZ DUVARI',
             kind: 'wall',
             icon: 'wall',
-            cooldown: 540,
+            cooldown: 420,
             // Kadronun tek SAVUNMA özeli: hasarı yok, kimseyi vurmuyor.
-            // İki tarafa da SİMETRİK: hem rakibin hem buzun mermisini
-            // durduruyor, hem rakibin hem buzun yolunu kesiyor. Böylece
-            // arkasına saklanıp atış yapılamıyor - duvarın işi hasar değil,
-            // rakibi durdurup buzun kısa menzilli AYAZ'ına mecbur bırakmak.
+            //
+            // DENGE (2026-09-04, oynanarak): duvar önce İKİ TARAFA DA
+            // simetrikti - buzun kendi kırığını da durduruyordu. Sonuç:
+            // özelini kullanan buz dokuz saniye boyunca hiç hasar veremiyor,
+            // yani kendi özeli kendini cezalandırıyordu. Artık duvar
+            // MERMİDE tek yönlü: rakibin atışını durduruyor, sahibininkini
+            // geçiriyor - bu buzun büyüttüğü kendi kalkanı.
+            //
+            // Kamp kurmaya dönüşmesini engelleyen şey YOL: duvar iki
+            // oyuncunun da yolunu kesiyor, buz da onu geçemiyor. Yani
+            // arkasından atış yapmak için buz ilerlemekten vazgeçiyor, ve
+            // duvar üç saniyede sönüyor.
             offset: 130,
             width: 28,
             // Zıplama 140 piksel yükseliyor (13²/2·0,6), yukarı atılma 367.
@@ -287,8 +299,8 @@ export const ABILITIES = {
             // Kaç mermi durdurur. Yakın dövüş vuruşu ikisini birden
             // götürüyor (bkz. combat.meleeHit), yoksa virüs duvarın
             // arkasındaki buza hiç ulaşamazdı.
-            hp: 4,
-            life: 240,
+            hp: 5,
+            life: 180,
             animFrames: 30
         },
         signature: {
@@ -298,13 +310,18 @@ export const ABILITIES = {
             icon: 'frost',
             padCombo: ['l1', 'triangle'],
             keySlot: 'attack',
-            cooldown: 300,
-            // Çevresine bir anda yayılan ayaz. Hasarı sembolik; işi İKİ
-            // üşüme birden eklemek - bir kırıkla birleşince donma çıkıyor.
-            // Menzili kısa: donma bedava olmasın, buz yaklaşmayı göze alsın.
-            damage: 3,
+            cooldown: 240,
+            // Çevreye bir anda yayılan ayaz: İKİ üşüme birden ekliyor, yani
+            // bir kırıkla birleşince donma çıkıyor. Menzili kısa - donma
+            // bedava olmasın, buz yaklaşmayı göze alsın.
+            //
+            // DENGE (2026-09-04): hasarı 3'tü, "sembolik" diye yazmıştım.
+            // Oynanışta bu bir hamle değil bir jest oldu: buz kendini
+            // tehlikeye atıp yaklaşıyor ve karşılığında hiçbir şey almıyordu.
+            // Yakınlaşmanın riski varsa ödülü de olmalı.
+            damage: 12,
             chill: 2,
-            radius: 150,
+            radius: 180,
             animFrames: 26
         }
     }
@@ -321,12 +338,23 @@ export const ABILITIES = {
 //   - Donduktan sonra rakip UZUN SÜRE tekrar donmuyor; üşümeler yavaşlatmaya
 //     devam ediyor ama zincirleme donma yok.
 //   - Üşüme birikimi kendiliğinden sönüyor: buz basıncı sürdürmezse sıfırlanır.
+// DENGE (2026-09-04, oynanarak): ilk hâlinde üç fren de fazla sıkıydı ve
+// buz "çok güçsüz" çıktı. Üçü de gevşetildi, ama fren olarak duruyorlar:
+//   - Donma yarım saniyeydi: bir hamle penceresi açmıyordu bile, buz üç
+//     kırık isabet ettirip karşılığında BİR kırıklık zaman kazanıyordu.
+//     Bir saniyeye çıktı - iki kırık ya da bir AYAZ sığıyor.
+//   - Bağışıklık donmanın 8 katıydı, şimdi 3 katı. Zincirleme donma hâlâ
+//     yok ama buz basıncı sürdürünse döngü kapanıyor.
+//   - Üşüme donunca SIFIRLANIYORDU. En büyük hatam buydu: yavaşlatma en
+//     yüksek değerine ulaştığı anda siliniyordu, yani %36'lık yavaşlatma
+//     oyunda hiç yaşanmıyordu. Artık birikim donmadan sonra DURUYOR,
+//     kendiliğinden sönene kadar rakibi yavaşlatmaya devam ediyor.
 export const CHILL = {
     max: 3,               // kaç üşüme donmaya çevirir
-    slowPerStack: 0.12,   // her üşüme %12 yavaşlatır (en çok %36)
+    slowPerStack: 0.14,   // her üşüme %14 yavaşlatır (en çok %42)
     decay: 180,           // 3 sn yeni üşüme gelmezse birikim söner
-    freeze: 30,           // donma yarım saniye
-    immune: 240           // donduktan sonra 4 sn tekrar donmaz
+    freeze: 60,           // donma bir saniye
+    immune: 180           // donduktan sonra 3 sn tekrar donmaz
 };
 
 

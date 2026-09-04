@@ -547,23 +547,28 @@ check('bölünme tek başına rakibi öldüremiyor', splitMax < minHp,
 // hareketi kesen bir güç kolayca eziciye döner, o yüzden bedeli ve frenleri
 // burada kurala bağlı.
 
-// Kontrolün bedeli hasar: buz, DOĞRUDAN vuran iki karakterin ikisinden de
-// az hasar vermeli. Elektro bu karşılaştırmanın dışında - onun ışını tek bir
-// vuruş değil arenada kalan bir hat, hasarı "vuruş başına" ölçülemiyor.
+// Kontrolün bedeli hasar - ama BEDEL KADAR, daha fazlası değil. İlk turda
+// buzu hem az vuran hem az donduran bir karakter yapmıştım ve oynanışta
+// "çok güçsüz" çıktı. Ölçü şu: buz KADRONUN EN HIZLI ATICISINI geçmemeli.
+// Virüs bu karşılaştırmanın dışında - o yakın dövüşçü, mesafeyi kapatmak
+// zorunda olduğu için sürekli hasarı zaten menzillilerden düşük.
+// Elektro da dışında: ışını tek bir vuruş değil arenada kalan bir hat.
 const dps = (a) => a.damage / a.cooldown;
 const iceBasic = ab.ABILITIES.ice.basic;
-const direct = ['virus', 'antivirus'].map(id => ab.ABILITIES[id].basic);
-check('buzun sürekli hasarı doğrudan vuran ikisinden de az',
-    direct.every(o => dps(iceBasic) < dps(o)),
-    direct.map(o => `${o.id} ${dps(o).toFixed(3)}`).join(' · ') + ` | kırık ${dps(iceBasic).toFixed(3)}`);
+const fastest = ab.ABILITIES.antivirus.basic;
+check('buzun sürekli hasarı en hızlı atıcıyı geçmiyor',
+    dps(iceBasic) < dps(fastest),
+    `kırık ${dps(iceBasic).toFixed(3)} / top ${dps(fastest).toFixed(3)}`);
 check('buzun tek vuruşu virüsün savurmasından hafif',
     iceBasic.damage < ab.ABILITIES.virus.basic.damage,
     `${iceBasic.damage} / ${ab.ABILITIES.virus.basic.damage}`);
 
-// Donma KISA, bağışıklık UZUN: zincirleme donma olmamalı. Rakip donduktan
-// sonra en az dört donma boyu serbest kalıyor.
-check('donma kısa, bağışıklık ondan çok uzun',
-    ab.CHILL.freeze <= 45 && ab.CHILL.immune >= ab.CHILL.freeze * 4,
+// Donma bir hamle penceresi kadar olmalı: ne yok sayılacak kadar kısa (ilk
+// hâli yarım saniyeydi, bir kırıklık zaman bile kazandırmıyordu) ne de
+// rakibin sırasını gasbedecek kadar uzun. Bağışıklık hâlâ katbekat uzun:
+// zincirleme donma yok.
+check('donma bir hamle penceresi kadar, bağışıklık katbekat uzun',
+    ab.CHILL.freeze <= 90 && ab.CHILL.immune >= ab.CHILL.freeze * 2.5,
     `donma ${ab.CHILL.freeze} / bağışıklık ${ab.CHILL.immune}`);
 
 // Tek isabet dondurmamalı: donma BİRİKİMİN sonucu olmalı, sürprizin değil.

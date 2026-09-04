@@ -50,7 +50,9 @@ export const FIGHTERS = [
         // Dengesi statlarında değil hamlelerinde - kadronun en az hasar veren
         // dövüşçüsü, karşılığında rakibi yavaşlatıp donduran tek karakter
         // (bkz. abilities.js'teki CHILL).
-        stats: { hp: 110, speed: 4.5 },
+        // DENGE (2026-09-04): can 110'du. Buz yakınlaşmak zorunda olan ama
+        // yavaş bir karakter; yaklaşırken yediği hasarı taşıyamıyordu.
+        stats: { hp: 118, speed: 4.5 },
         intro: 'ice',
         description: 'Yayılmayı yavaşlatan değil DURDURAN sap. Taşıyıcısını yutmuyor, ' +
             'olduğu yerde donduruyor: gövde artık ne akar ne dinlenir, kristal kristal ' +

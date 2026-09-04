@@ -727,6 +727,101 @@ async function main() {
 
     await shot('03b-savas-iki-kol');
 
+    // --- ICE-VİRÜS: üşüme, donma ve buz duvarı ---
+    // Buzun bütün dövüşü üşüme birikiminin etrafında dönüyor. Sayılar
+    // data testinde; burada sınanan şey kuralların arenada İŞLEYİP
+    // işlemediği. Oyun döngüsü elle adımlanıyor, girdi taklit edilmiyor.
+    const iceReady = await page.evaluate(() => {
+        const { FIGHTERS } = window.__fighters;
+        const f = (id) => FIGHTERS.find(x => x.id === id);
+        const g = window.__game;
+        g.start(f('ice'), f('antivirus'));
+        // Girişleri elle geçiyoruz: burada sınanan şey üşüme, giriş değil.
+        for (let i = 0; i < 1200 && (g.intro || g.introQueue.length); i++) g.update();
+        return { intro: !!g.intro, p1: g.p1.fighter.id, can: g.p1.maxHp };
+    });
+    check('Buz arenaya cikiyor', !iceReady.intro && iceReady.p1 === 'ice',
+        JSON.stringify(iceReady));
+
+    const chill = await page.evaluate(() => {
+        const g = window.__game;
+        g.p2.chill = 0;
+        g.p2.frozenFrames = 0;
+        g.p2.freezeImmune = 0;
+        const adimlar = [];
+        for (let i = 0; i < 3; i++) {
+            g.p2.addChill(1);
+            adimlar.push({ chill: g.p2.chill, donma: g.p2.frozenFrames });
+        }
+        return adimlar;
+    });
+    check('Uc usume rakibi donduruyor',
+        chill[0].donma === 0 && chill[1].donma === 0 && chill[2].donma > 0,
+        JSON.stringify(chill));
+    // Birikim donunca SIFIRLANMAMALI: sıfırlanırsa yavaşlatma en yüksek
+    // değerine ulaştığı anda siliniyor ve oyunda hiç yaşanmıyor.
+    check('Donduktan sonra usume birikimi duruyor', chill[2].chill === 3,
+        JSON.stringify(chill[2]));
+
+    const donmus = await page.evaluate(() => {
+        const g = window.__game;
+        g.p2.frozenFrames = 60;
+        g.p2.anim = null;
+        g.p2.action = null;
+        const x0 = g.p2.x;
+        g.p2.pressed.attack = true;
+        g.p2.handleActions();
+        g.p2.held.left = true;
+        for (let i = 0; i < 10; i++) g.p2.move();
+        return { hamle: !!g.p2.anim, kayma: Math.abs(g.p2.x - x0) };
+    });
+    check('Donmus oyuncu ne hamle cikariyor ne yuruyor',
+        !donmus.hamle && donmus.kayma < 1, JSON.stringify(donmus));
+
+    const bagisik = await page.evaluate(() => {
+        const g = window.__game;
+        g.p2.frozenFrames = 0;
+        g.p2.chill = 0;
+        const bagisiklik = g.p2.freezeImmune;
+        for (let i = 0; i < 3; i++) g.p2.addChill(1);
+        return { bagisiklik, donma: g.p2.frozenFrames, chill: g.p2.chill };
+    });
+    check('Bagisiklik acikken tekrar donmuyor',
+        bagisik.bagisiklik > 0 && bagisik.donma === 0 && bagisik.chill === 3,
+        JSON.stringify(bagisik));
+
+    // Buz duvarı MERMİDE tek yönlü: rakibin atışını durdurur, sahibininkini
+    // geçirir. İki mermi aynı noktadan aynı hızla gönderiliyor, tek fark
+    // sahipleri.
+    const duvar = await page.evaluate(() => {
+        const g = window.__game;
+        g.combat.reset();
+        g.p1.x = 400;
+        g.p2.x = 900;
+        g.p1.dir = 1;
+        g.p1.cooldowns.wall = 0;
+        g.p1.useAbility('special');
+        const w = g.combat.entities.find(e => e.type === 'wall');
+        if (!w) return { duvar: false };
+
+        const mermi = (type, owner) => ({
+            type, x: w.x - 30, y: w.y - 60, vx: 12, vy: 0, gravity: 0,
+            r: 7, damage: 1, chill: 1, kind: 'basic', owner, life: 90, seed: 1
+        });
+        g.combat.entities.push(mermi('shot', g.p2));    // rakibin topu
+        g.combat.entities.push(mermi('shard', g.p1));   // buzun kendi kırığı
+        for (let i = 0; i < 6; i++) g.combat.update();
+        return {
+            duvar: true,
+            rakipGecti: g.combat.entities.some(e => e.type === 'shot'),
+            buzGecti: g.combat.entities.some(e => e.type === 'shard'),
+            duvarCani: g.combat.entities.find(e => e.type === 'wall')?.hp
+        };
+    });
+    check('Buz duvari rakibin mermisini durduruyor, sahibininkini geciriyor',
+        duvar.duvar && !duvar.rakipGecti && duvar.buzGecti, JSON.stringify(duvar));
+    await shot('03j-buz-duvari');
+
     // --- Giriş animasyonları: sıra ÖNCE P1, SONRA P2 ---
     // İki dövüşçünün de girişi varsa ikisi de oynar; tur ancak ikisi
     // bitince başlar ve o ana kadar kimse hareket edemez.

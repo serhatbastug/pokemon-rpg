@@ -516,6 +516,31 @@ check('bölünme birden çok parça çıkarıyor', ab.ABILITIES.virus.special.pi
 check('salgın izi yavaşlatıyor ama hasar vermiyor',
     ab.ABILITIES.virus.signature.slow > 0 && ab.ABILITIES.virus.signature.slow < 1 &&
     ab.ABILITIES.virus.signature.damage === undefined);
+// ---- Virüsün dengesi ----
+// Virüs oynanışta fazla güçlü çıktı (2026-09-04). Üç kuralı da burada
+// tutuyoruz ki bir daha sayı oynarken sessizce bozulmasın.
+
+// Virüs tek vuruşta en sert vuran, ama sürekli hasarda menzillinin üstüne
+// çıkmamalı: yakın dövüşün bedeli yaklaşmak, ödülü tek vuruşun ağırlığı.
+const virusDps = ab.ABILITIES.virus.basic.damage / ab.ABILITIES.virus.basic.cooldown;
+const antiDps = ab.ABILITIES.antivirus.basic.damage / ab.ABILITIES.antivirus.basic.cooldown;
+check('virüsün sürekli hasarı menzilliyi geçmiyor', virusDps < antiDps,
+    `virüs ${virusDps.toFixed(3)} / anti ${antiDps.toFixed(3)} (hasar/kare)`);
+
+// İz beklemesinden UZUN yaşarsa arenada hiç temiz zemin kalmıyor, üstelik
+// üst üste iki iz birikiyor. "Alan tutmak" arenanın tamamını tutmak olmamalı.
+const trail = ab.ABILITIES.virus.signature;
+check('salgın izi beklemesinden kısa yaşıyor', trail.life < trail.cooldown,
+    `${trail.life} / ${trail.cooldown}`);
+
+// Bölünme parçalarının ısırığı bloğu ve dokunulmazlık karelerini deliyor
+// (takeTickDamage). Kesintisiz olduğu için tek başına rakibi bitirememeli.
+const split = ab.ABILITIES.virus.special;
+const splitMax = split.pieces * Math.floor(split.pieceLife / split.biteInterval) * split.biteDamage;
+const minHp = Math.min(...FIGHTERS.map(f => f.stats.hp));
+check('bölünme tek başına rakibi öldüremiyor', splitMax < minHp,
+    `en çok ${splitMax} hasar / en az ${minHp} can`);
+
 
 // Kümedeki dört daire: üç atılma + karakterin kendi hamlesi
 for (const f of FIGHTERS) {

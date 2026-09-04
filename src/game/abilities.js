@@ -61,14 +61,27 @@ export const ABILITIES = {
     // İkisi de menzilli olduğu için virüsün bütün derdi mesafeyi kapatmak:
     // normal saldırısı onu ileri atıyor, özeli de kendi yerine küçük
     // virüsleri yolluyor.
+    //
+    // DENGE (2026-09-04, oynanarak): virüs fazla güçlü çıktı. Üç ayrı sebebi
+    // vardı, üçü de ayrı ayrı düzeltildi:
+    //   1) Hem en sert vuran hem en dayanıklıydı (18 hasar / 42 kare = saniyede
+    //      25, üstüne 130 can). Vuruş seyreltildi, can 120'ye indi.
+    //   2) Salgın izi beklemesinden UZUN yaşıyordu (480 > 300): arenada hep bir
+    //      iz vardı, hatta ikisi birden. Artık yaşamı beklemesinin altında.
+    //   3) Bölünme parçalarının ısırığı takeTickDamage ile gidiyor - bloğu da
+    //      dokunulmazlık karelerini de deler. Kesintisiz olduğu için sayılar
+    //      küçük tutulmalı.
     virus: {
         basic: {
             id: 'punch',
             name: 'SAVURMA',
             kind: 'melee',
             icon: 'punch',
-            cooldown: 42,
-            damage: 18,
+            // Ağır saldırının bedeli beklemede: ıskalayan virüs açıkta kalmalı,
+            // yoksa menzilliye yaklaşmanın hiçbir riski olmuyor. 32 karelik
+            // animasyondan sonra 20 kare daha toparlanıyor.
+            cooldown: 52,
+            damage: 15,
             // Yumruk atarken karakter ileri atılıyor: ağır olduğu için
             // yürüyerek yetişemediği mesafeyi böyle kapatıyor.
             lunge: 34,
@@ -83,14 +96,18 @@ export const ABILITIES = {
             name: 'BÖLÜNME',
             kind: 'split',
             icon: 'split',
-            cooldown: 600,
+            cooldown: 660,
             // Kütle dörde ayrılıyor; parçalar rakibe yürüyüp yakından
             // ısırıyor. Menzilli karaktere karşı virüsün tek cevabı bu.
+            // Isırık bloğu ve dokunulmazlığı DELİYOR (takeTickDamage): dört
+            // parça yedi saniye boyunca 5'er vurunca tek başına bir can barını
+            // götürüyordu. Süre ve sıklık kısıldı; parçalar hâlâ menzilliyi
+            // yerinden kaldırıyor ama maçı tek başına bitirmiyor.
             pieces: 4,
-            pieceLife: 420,
+            pieceLife: 300,
             pieceSpeed: 3.4,
-            biteDamage: 5,
-            biteInterval: 36,
+            biteDamage: 4,
+            biteInterval: 48,
             biteRange: 54,
             animFrames: 26
         },
@@ -101,10 +118,13 @@ export const ABILITIES = {
             icon: 'trail',
             padCombo: ['l1', 'triangle'],
             keySlot: 'attack',
-            cooldown: 300,
+            // Bekleme İZDEN UZUN olmalı: tersi olduğunda iz hiç sönmüyor,
+            // hatta üst üste iki iz birikiyordu - "alan tutmak" arenanın
+            // tamamını tutmaya dönüşüyordu. Artık aralarda temiz zemin var.
+            cooldown: 420,
             // Yere yapışkan bir birikinti bırakıyor: üstünden geçen yavaşlar.
             // Hasar vermiyor, alan tutuyor.
-            life: 480,
+            life: 270,
             width: 120,
             slow: 0.55,
             animFrames: 22

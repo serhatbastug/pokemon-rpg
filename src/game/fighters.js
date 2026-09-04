@@ -16,7 +16,7 @@ export const FIGHTERS = [
         id: 'virus',
         name: 'VİRÜS',
         themeColor: '#6ea32c',
-        stats: { hp: 130, speed: 4 },
+        stats: { hp: 120, speed: 4 },
         intro: 'virus',
         description: 'Salgının ayakta duran hâli. Taşıdığı insandan geriye bir hat bile ' +
             'kalmamış; kütle ne durur ne dinlenir, yalnızca yayılır. Ağır ve dayanıklı, ' +

@@ -84,13 +84,13 @@ async function main() {
     await page.goto(BASE_URL, { waitUntil: 'networkidle2' });
     check('Sayfa yuklendi', await page.title() === 'Virüs - Arena ve Prolog', await page.title());
 
-    // Kadro ağdan gelmiyor: iki dövüşçü de elle çizilmiş, kartlar anında hazır
+    // Kadro ağdan gelmiyor: dördü de elle çizilmiş, kartlar anında hazır
     await page.waitForSelector('.char-card', { timeout: 10000 });
     const cardCount = await page.$$eval('.char-card', els => els.length);
-    check('Uc dovuscu karti hazir', cardCount === 3, `${cardCount} kart`);
+    check('Dort dovuscu karti hazir', cardCount === 4, `${cardCount} kart`);
     const cardNames = await page.$$eval('.char-class', els => els.map(e => e.textContent));
-    check('Kadro VIRUS, ANTI-VIRUS, ELECTRO-VIRUS',
-        cardNames.join(',') === 'VİRÜS,ANTİ-VİRÜS,ELECTRO-VİRÜS', cardNames.join(','));
+    check('Kadro VIRUS, ANTI-VIRUS, ELECTRO-VIRUS, ICE-VIRUS',
+        cardNames.join(',') === 'VİRÜS,ANTİ-VİRÜS,ELECTRO-VİRÜS,ICE-VİRÜS', cardNames.join(','));
 
     // --- Ana menü sahnesi ---
     // Menü artık gezilebilir bir piksel sahne; karakter seçimine ancak
@@ -360,7 +360,7 @@ async function main() {
     await shot('01-secim-ekrani');
 
     // --- Karakter seçimi kolla: imleç, ÇARPI ile aç, DAİRE ile kapat ---
-    await page.waitForFunction(() => document.querySelectorAll('.char-card').length === 3, { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelectorAll('.char-card').length === 4, { timeout: 10000 });
     await wait(200);
     const padHintOn = await page.evaluate(() => ({
         hint: !document.getElementById('pad-hint').classList.contains('hidden'),

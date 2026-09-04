@@ -60,6 +60,9 @@ export class Combat {
             case 'trail': return this.spawnTrail(player, ability);
             case 'grab':  return this.spawnArm(player, ability);
             case 'blink': return this.blink(player, ability);
+            case 'shard': return this.spawnShard(player, ability);
+            case 'wall':  return this.spawnWall(player, ability);
+            case 'frost': return this.spreadFrost(player, ability);
         }
     }
 
@@ -70,10 +73,24 @@ export class Combat {
     // Virüsün savurması: hazırlık bitince önündeki kutuya bakıyor.
     meleeHit(player, ability) {
         if (player.action?.landed) return;
+
+        // Önce BUZ DUVARI: araya duvar girmişse savurma duvara iniyor,
+        // arkasındakine değil. Yakın dövüşçünün duvara cevabı bu - iki
+        // savurmada kırılıyor, yoksa virüs duvarın arkasındaki buza hiç
+        // ulaşamazdı (zıplama duvarı aşmıyor, yalnız yukarı atılma aşıyor).
+        const front = player.x + player.dir * ability.reach / 2;
+        const wall = this.wallAt(front, player.y);
+        if (wall) {
+            player.action.landed = true;
+            wall.hp -= 2;
+            this.game.effects.createExplosion(wall.x, player.y, '#dff4fb');
+            this.game.effects.triggerShake(6);
+            return;
+        }
+
         const enemy = this.game.getEnemyOf(player);
         if (!enemy || enemy.isDead) return;
 
-        const front = player.x + player.dir * ability.reach / 2;
         const dx = Math.abs(enemy.x - front);
         const dy = Math.abs(enemy.y - player.y);
         if (dx > ability.reach / 2 + enemy.width / 2 || dy > enemy.height * 0.8) return;
@@ -131,10 +148,21 @@ export class Combat {
         const { canvas } = this.game;
         // Işın ileri uzanan ELDEN çıkıyor (bkz. fighterArt MUZZLES)
         const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
+        // Işın da buz duvarında kesiliyor: duvar mermiyi durdurup ışını
+        // geçirseydi "duvar" değil "kalkan" olurdu, oyuncu neyin geçtiğini
+        // ezberlemek zorunda kalırdı. Yalnızca KURULURKEN bakılıyor - ışın
+        // arenada kalan bir iz, sonradan gelen duvar onu kesmiyor.
+        let end = player.dir > 0 ? canvas.width : 0;
+        for (const w of this.entities) {
+            if (w.type !== 'wall') continue;
+            if (m.y < w.y - w.h || m.y > w.y) continue;
+            const edge = w.x - player.dir * w.w / 2;
+            if (player.dir > 0 ? (edge > m.x && edge < end) : (edge < m.x && edge > end)) end = edge;
+        }
         this.entities.push({
             type: 'beam',
             x0: m.x,
-            x1: player.dir > 0 ? canvas.width : 0,
+            x1: end,
             y: m.y,
             thickness: ability.thickness,
             damage: ability.damage,
@@ -225,6 +253,89 @@ export class Combat {
         });
     }
 
+    // ---- ICE-VİRÜS ----
+
+    // Buz kırığı: topun tersine YERÇEKİMİNE tabi. Düz gitmediği için uzak
+    // mesafede isabet beceri istiyor; karşılığında her isabet rakibe bir
+    // üşüme ekliyor (bkz. Player.addChill).
+    spawnShard(player, ability) {
+        const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
+        this.entities.push({
+            type: 'shard',
+            x: m.x,
+            y: m.y,
+            vx: player.dir * ability.speed,
+            // Hafif yukarı çıkıp düşüyor: kavis "atıldı" der, düz çizgi
+            // "ateşlendi" der - buz atıyor, ateş etmiyor.
+            vy: -2.4,
+            gravity: ability.gravity,
+            r: ability.radius,
+            damage: ability.damage,
+            chill: ability.chill,
+            kind: 'basic',
+            owner: player,
+            life: ability.life,
+            seed: Math.floor(Math.random() * 1000)
+        });
+    }
+
+    // Buz duvarı: iki tarafa da simetrik bir engel. Mermiyi de yolu da
+    // kesiyor, hasar vermiyor.
+    spawnWall(player, ability) {
+        const { canvas } = this.game;
+        // Arenanın dışına dikilmesin: kenara sıkışan oyuncu duvarı tuvalin
+        // dışına koyup onu görünmez bir engele çevirmesin.
+        const x = Math.max(ability.width, Math.min(canvas.width - ability.width,
+            player.x + player.dir * ability.offset));
+        this.entities.push({
+            type: 'wall',
+            x,
+            y: player.footY,       // duvarın TABANI
+            w: ability.width,
+            h: ability.height,
+            hp: ability.hp,
+            maxHp: ability.hp,
+            owner: player,
+            life: ability.life,
+            maxLife: ability.life
+        });
+        this.game.effects.createPulse(x, player.footY - ability.height / 2, '#dff4fb');
+    }
+
+    // Ayaz: çevreye bir anda yayılan soğuk. Hasarı sembolik, işi İKİ üşüme
+    // birden eklemek - bir kırıkla birleşince donma çıkıyor.
+    spreadFrost(player, ability) {
+        this.entities.push({
+            type: 'frost',
+            x: player.x,
+            y: player.y,
+            r: ability.radius,
+            owner: player,
+            life: 24,
+            maxLife: 24
+        });
+
+        const enemy = this.game.getEnemyOf(player);
+        if (enemy && !enemy.isDead &&
+            Math.hypot(enemy.x - player.x, enemy.y - player.y) <= ability.radius) {
+            enemy.takeDamage(ability.damage, { kind: 'special', from: player });
+            enemy.addChill(ability.chill);
+        }
+        this.game.effects.triggerFlash('rgba(191, 239, 255, 0.16)', 4);
+    }
+
+    // Bir noktada buz duvarı var mı. Duvarın ÜSTÜNDEN geçen mermi durmuyor:
+    // yukarı atılmayla duvarı aşan oyuncu havada atış da yapabilsin.
+    wallAt(x, y) {
+        for (const e of this.entities) {
+            if (e.type !== 'wall') continue;
+            if (Math.abs(x - e.x) > e.w / 2) continue;
+            if (y < e.y - e.h || y > e.y) continue;
+            return e;
+        }
+        return null;
+    }
+
     spawnArm(player, ability) {
         // Kol ıskalarsa bekleme süresi YOK (abilities.js'te cooldown 0);
         // bedeli yakaladığında ödeniyor.
@@ -272,15 +383,31 @@ export class Combat {
 
             switch (e.type) {
                 case 'shot':
-                case 'mass': {
+                case 'mass':
+                case 'shard': {
+                    // Kırık düşüyor; top ve kütle düz gidiyor.
+                    if (e.gravity) e.vy += e.gravity;
                     e.x += e.vx;
                     e.y += e.vy;
                     e.life--;
                     for (const p of players) {
                         if (!this.hitsPlayer(e, p)) continue;
                         p.takeDamage(e.damage, { kind: e.kind, from: e.owner });
+                        // Buz kırığı vurduğu yeri ÜŞÜTÜYOR: hasarı az, biriken
+                        // şey bu (bkz. abilities.js'teki CHILL).
+                        if (e.chill) p.addChill(e.chill);
                         this.game.effects.createPulse(e.x, e.y, e.owner.fighter.themeColor);
                         dead = true;
+                    }
+                    // Buz duvarı iki tarafın da mermisini durduruyor - buzun
+                    // kendi kırığını da. Duvar arkasından atış yapılamasın.
+                    if (!dead) {
+                        const blocking = this.wallAt(e.x, e.y);
+                        if (blocking) {
+                            blocking.hp--;
+                            this.game.effects.createPulse(e.x, e.y, '#dff4fb');
+                            dead = true;
+                        }
                     }
                     if (e.x < -40 || e.x > canvas.width + 40 || e.y < -60 || e.y > canvas.height + 40) dead = true;
                     if (e.life <= 0) dead = true;
@@ -343,6 +470,35 @@ export class Combat {
                         if (Math.abs(p.footY - e.y) > 30) continue;
                         p.speedMultiplier = e.slow;
                     }
+                    if (e.life <= 0) dead = true;
+                    break;
+                }
+                case 'wall': {
+                    e.life--;
+                    // Duvar İKİ oyuncunun da yolunu kesiyor - sahibinin de.
+                    // Tek yanlı bir duvar buzu duvarın arkasından rahatça
+                    // saldıran bir karaktere çevirirdi.
+                    for (const p of players) {
+                        if (p.isDead) continue;
+                        // Üstünden aşan oyuncu geçiyor: ayakları duvarın
+                        // tepesinden yukarıdaysa duvar orada yok sayılıyor.
+                        if (p.footY <= e.y - e.h) continue;
+                        if (Math.abs(p.footY - e.y) > e.h) continue;
+                        const overlap = e.w / 2 + p.width / 2 - Math.abs(p.x - e.x);
+                        if (overlap <= 0) continue;
+                        const side = p.x < e.x ? -1 : 1;
+                        p.x = e.x + side * (e.w / 2 + p.width / 2);
+                        if (p.vx * side < 0) p.vx = 0;
+                    }
+                    if (e.hp <= 0 || e.life <= 0) {
+                        this.game.effects.createExplosion(e.x, e.y - e.h / 2, '#dff4fb');
+                        dead = true;
+                    }
+                    break;
+                }
+                case 'frost': {
+                    // Yalnızca görüntü: vuruşu spreadFrost anında yapıldı.
+                    e.life--;
                     if (e.life <= 0) dead = true;
                     break;
                 }
@@ -418,6 +574,9 @@ export class Combat {
                 case 'orb': this.drawOrb(ctx, e); break;
                 case 'piece': this.drawPiece(ctx, e); break;
                 case 'trail': this.drawTrail(ctx, e); break;
+                case 'shard': this.drawShard(ctx, e); break;
+                case 'wall': this.drawWall(ctx, e); break;
+                case 'frost': this.drawFrost(ctx, e); break;
                 case 'arm': this.drawArm(ctx, e); break;
             }
         }
@@ -585,6 +744,88 @@ export class Combat {
         ctx.fillStyle = '#87c33a';
         for (let x = e.x - w / 2; x < e.x + w / 2; x += PX * 3) {
             if (((x / PX) | 0) % 2 === 0) ctx.fillRect(x, e.y - PX * 4, PX * 2, PX);
+        }
+        ctx.restore();
+    }
+
+    // Buz kırığı: antinin yuvarlakça topunun tersine SİVRİ. Uçtaki blok bir
+    // tık ileride ve dar - hangi yöne gittiği tek karede okunuyor.
+    drawShard(ctx, e) {
+        const r = Math.round(e.r / PX) * PX;
+        const d = Math.sign(e.vx) || 1;
+        const x = Math.round(e.x / PX) * PX;
+        const y = Math.round(e.y / PX) * PX;
+
+        // Gövde: üç satır, uca doğru daralıyor
+        ctx.fillStyle = '#173a4d';
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        ctx.fillStyle = '#8fd4e8';
+        ctx.fillRect(x - r + PX, y - r + PX, r * 2 - PX * 2, r * 2 - PX * 2);
+        ctx.fillStyle = '#dff4fb';
+        ctx.fillRect(x - r + PX, y - r + PX, PX * 2, r * 2 - PX * 2);
+        // Sivri uç
+        ctx.fillStyle = '#dff4fb';
+        ctx.fillRect(x + d * r, y - PX, PX * 2, PX * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - PX, y - PX, PX * 2, PX * 2);
+        // Arkasında bıraktığı kırağı izi
+        ctx.fillStyle = 'rgba(223, 244, 251, 0.45)';
+        ctx.fillRect(x - d * r * 2, y - PX, r * 2, PX);
+    }
+
+    // Buz duvarı: dikey bir kütle. Canı azaldıkça ÇATLIYOR - kaç vuruş
+    // kaldığını ayrı bir çubuk değil duvarın kendisi söylüyor.
+    drawWall(ctx, e) {
+        const w = Math.round(e.w / PX) * PX;
+        const x = Math.round((e.x - w / 2) / PX) * PX;
+        const top = Math.round((e.y - e.h) / PX) * PX;
+        const h = Math.round(e.h / PX) * PX;
+        const fade = Math.min(1, e.life / 45);
+
+        ctx.save();
+        ctx.globalAlpha = 0.92 * fade;
+        ctx.fillStyle = '#4a90ad';
+        ctx.fillRect(x, top, w, h);
+        ctx.fillStyle = '#8fd4e8';
+        ctx.fillRect(x + PX, top, w - PX * 2, h);
+        ctx.fillStyle = '#dff4fb';
+        ctx.fillRect(x + PX, top, PX * 2, h);      // ışık soldan
+        ctx.fillStyle = '#2f6c88';
+        ctx.fillRect(x + w - PX * 2, top, PX, h);
+
+        // Çatlaklar: her kayıp can bir çatlak. Hep aynı yerde duruyorlar ki
+        // duvar titremesin - kırılma birikiyor, kaynıyor değil.
+        const cracks = e.maxHp - e.hp;
+        ctx.fillStyle = '#173a4d';
+        for (let i = 0; i < cracks; i++) {
+            const cy = top + Math.round((h * (i + 1)) / (e.maxHp + 1) / PX) * PX;
+            for (let k = 0; k < 4; k++) {
+                ctx.fillRect(x + PX + k * PX * 2, cy + (k % 2 ? PX : 0), PX * 2, PX);
+            }
+        }
+
+        // Tepesindeki sivri uçlar: duvar kesilmiş bir blok değil, büyümüş buz
+        ctx.fillStyle = '#dff4fb';
+        for (let k = 0; k < 4; k++) {
+            const hh = (k % 2 ? 2 : 3) * PX;
+            ctx.fillRect(x + PX + k * PX * 2, top - hh, PX * 2, hh);
+        }
+        ctx.restore();
+    }
+
+    // Ayazın halkası: dışa açılıp sönen soğuk. Menzili görünür olmalı -
+    // oyuncu hangi mesafede donduracağını bilmeden oynayamaz.
+    drawFrost(ctx, e) {
+        const k = 1 - e.life / e.maxLife;
+        const rad = e.r * (0.25 + k * 0.75);
+        ctx.save();
+        ctx.globalAlpha = 0.55 * (1 - k);
+        ctx.fillStyle = '#dff4fb';
+        for (let i = 0; i < 18; i++) {
+            const a = (Math.PI * 2 * i) / 18;
+            const bx = Math.round((e.x + Math.cos(a) * rad) / PX) * PX;
+            const by = Math.round((e.y + Math.sin(a) * rad * 0.7) / PX) * PX;
+            ctx.fillRect(bx, by, PX * 2, PX * 2);
         }
         ctx.restore();
     }

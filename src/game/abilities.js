@@ -235,8 +235,100 @@ export const ABILITIES = {
             margin: 90,
             animFrames: 14
         }
+    },
+    // ---- ICE-VİRÜS: üşüten, kontrol eden ----
+    //
+    // Kadronun dördüncüsü ve en AZ hasar verenı. Kimliği vuruşta değil
+    // BİRİKİMDE: her buz değişi rakibe bir "üşüme" ekliyor, üç üşüme rakibi
+    // kısa süre DONDURUYOR (bkz. CHILL). Buzun kazanma yolu rakibi yavaşlatıp
+    // bir anlığına durdurmak, sonra o boşluğu kullanmak.
+    //
+    // Diğer üçüyle çakışmıyor: virüs yakın döğüşçü, anti basınç kuruyor,
+    // elektro alan tutuyor - hiçbiri rakibin SIRASINI kesmiyor.
+    ice: {
+        basic: {
+            id: 'shard',
+            name: 'BUZ KIRIĞI',
+            kind: 'shard',
+            icon: 'shard',
+            cooldown: 26,
+            // Kadronun en zayıf temel vuruşu: bedeli üşütmesi. Antinin
+            // topundan az vuruyor ama her isabet donmaya bir adım.
+            damage: 6,
+            chill: 1,
+            speed: 11,
+            // Kırık YERÇEKİMİNE tabi: düz gitmiyor, kavis çiziyor. Uzaktan
+            // isabet ettirmek beceri istiyor - buzun menzilli olmasının
+            // bedeli bu. Antinin topu düz ve hızlı, buzunki ağır ve düşüyor;
+            // iki menzilli karakter aynı şeyi yapmasın.
+            gravity: 0.22,
+            radius: 10,
+            life: 150,
+            animFrames: 20
+        },
+        special: {
+            id: 'wall',
+            name: 'BUZ DUVARI',
+            kind: 'wall',
+            icon: 'wall',
+            cooldown: 540,
+            // Kadronun tek SAVUNMA özeli: hasarı yok, kimseyi vurmuyor.
+            // İki tarafa da SİMETRİK: hem rakibin hem buzun mermisini
+            // durduruyor, hem rakibin hem buzun yolunu kesiyor. Böylece
+            // arkasına saklanıp atış yapılamıyor - duvarın işi hasar değil,
+            // rakibi durdurup buzun kısa menzilli AYAZ'ına mecbur bırakmak.
+            offset: 130,
+            width: 28,
+            // Zıplama 140 piksel yükseliyor (13²/2·0,6), yukarı atılma 367.
+            // Duvar 180: zıplamayla AŞILAMIYOR ama L1+ÇARPI ile aşılıyor.
+            // Yani duvarın cevabı oyuncuda zaten var, bekleme süresi olan
+            // bir kombo - aşılamayan duvar denge değil kilit olurdu.
+            height: 180,
+            // Kaç mermi durdurur. Yakın dövüş vuruşu ikisini birden
+            // götürüyor (bkz. combat.meleeHit), yoksa virüs duvarın
+            // arkasındaki buza hiç ulaşamazdı.
+            hp: 4,
+            life: 240,
+            animFrames: 30
+        },
+        signature: {
+            id: 'frost',
+            name: 'AYAZ',
+            kind: 'frost',
+            icon: 'frost',
+            padCombo: ['l1', 'triangle'],
+            keySlot: 'attack',
+            cooldown: 300,
+            // Çevresine bir anda yayılan ayaz. Hasarı sembolik; işi İKİ
+            // üşüme birden eklemek - bir kırıkla birleşince donma çıkıyor.
+            // Menzili kısa: donma bedava olmasın, buz yaklaşmayı göze alsın.
+            damage: 3,
+            chill: 2,
+            radius: 150,
+            animFrames: 26
+        }
     }
+
 };
+// ---- ÜŞÜME ve DONMA (yalnız ICE-VİRÜS) ----
+//
+// Buzun bütün kimliği burada. Her buz değişi bir üşüme ekliyor; üşümeler
+// yavaşlatıyor, üçe ulaşınca rakip KISA SÜRE donuyor.
+//
+// Dövüş oyununda hareketi kesen bir güç kolayca eziciye dönüşür. Üç fren
+// birden konuldu:
+//   - Donma KISA (yarım saniye): bir hamle penceresi açar, raunt kazandırmaz.
+//   - Donduktan sonra rakip UZUN SÜRE tekrar donmuyor; üşümeler yavaşlatmaya
+//     devam ediyor ama zincirleme donma yok.
+//   - Üşüme birikimi kendiliğinden sönüyor: buz basıncı sürdürmezse sıfırlanır.
+export const CHILL = {
+    max: 3,               // kaç üşüme donmaya çevirir
+    slowPerStack: 0.12,   // her üşüme %12 yavaşlatır (en çok %36)
+    decay: 180,           // 3 sn yeni üşüme gelmezse birikim söner
+    freeze: 30,           // donma yarım saniye
+    immune: 240           // donduktan sonra 4 sn tekrar donmaz
+};
+
 
 // Bir dövüşçünün bütün hamleleri, bekleme sayaçlarının kurulacağı sırayla.
 export function abilitiesOf(fighterId) {

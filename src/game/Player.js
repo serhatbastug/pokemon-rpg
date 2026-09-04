@@ -3,7 +3,7 @@ import {
     PAD_JUMP_BUTTON, PAD_ATTACK_BUTTON, PAD_SPECIAL_BUTTON, PAD_BLOCK_BUTTON, PAD_COMBO_BUTTON
 } from '../config/settings.js';
 import { drawFighter, FIGHTER_SPRITES } from './fighterArt.js';
-import { abilitiesOf, abilityOf, DASHES } from './abilities.js';
+import { abilitiesOf, abilityOf, DASHES, CHILL } from './abilities.js';
 
 // Bir karenin girdi anlık görüntüsü. Basılı tutmayı da, "yeni basıldı"yı da
 // buradan okuyoruz: kol tuşları için tarayıcıda olay yok, klavye ile aynı
@@ -60,6 +60,15 @@ export class Player {
         this.flashFrames = 0;
         this.invulnFrames = 0;
         this.isDead = false;
+
+        // ICE-VİRÜS'ün üşütmesi. Buz değişleri burada birikiyor; üç üşüme
+        // kısa bir donmaya dönüşüyor, sonra uzun bir bağışıklık başlıyor.
+        // `frozen`den AYRI tutuluyor: `frozen`ı Game raunt aralarında her
+        // karede yazıyor, üşüme oraya karışırsa dövüş sırasında siliniyor.
+        this.chill = 0;
+        this.chillTimer = 0;       // birikimin sönmesine kalan kare
+        this.frozenFrames = 0;     // donmuş kalan kare
+        this.freezeImmune = 0;     // tekrar donmaya bağışık kalan kare
 
         // Bekleme süreleri: hamle kimliği -> kalan kare
         this.cooldowns = {};
@@ -174,7 +183,53 @@ export class Player {
 
         ctx.restore();
 
+        if (this.chill > 0 || this.frozenFrames > 0) this.drawChill(ctx);
         if (this.isBlocking) this.drawShield(ctx);
+    }
+
+    // Üşümenin ve donmanın görüntüsü. Oyuncu kaç üşümede olduğunu GÖRMELİ:
+    // görünmeyen bir sayaç yüzünden donmak "oyun beni dondurdu" olur, oysa
+    // buzun bütün dövüşü bu sayacın etrafında dönüyor.
+    drawChill(ctx) {
+        const PXL = 4;
+        ctx.save();
+
+        // Donmuşken gövdenin üstünde buz kabuğu
+        if (this.frozenFrames > 0) {
+            const h = Math.round(this.height * 0.9 / PXL) * PXL;
+            const w = Math.round(this.width * 1.25 / PXL) * PXL;
+            const top = this.footY - h;
+            ctx.globalAlpha = 0.42;
+            ctx.fillStyle = '#8fd4e8';
+            ctx.fillRect(this.x - w / 2, top, w, h);
+            ctx.globalAlpha = 0.85;
+            ctx.fillStyle = '#dff4fb';
+            ctx.fillRect(this.x - w / 2, top, w, PXL);
+            ctx.fillRect(this.x - w / 2, this.footY - PXL, w, PXL);
+            ctx.fillRect(this.x - w / 2, top, PXL, h);
+            ctx.fillRect(this.x + w / 2 - PXL, top, PXL, h);
+            // Kabuktaki çatlak: donma bitmek üzereyken çoğalıyor
+            ctx.fillStyle = '#ffffff';
+            const cracks = Math.round((1 - this.frozenFrames / CHILL.freeze) * 4);
+            for (let i = 0; i < cracks; i++) {
+                ctx.fillRect(this.x - w / 4 + i * PXL * 3, top + PXL * (4 + i * 6), PXL * 4, PXL);
+            }
+        }
+
+        // Üşüme işaretleri: kafanın üstünde küçük buz taneleri, kaç tane
+        // biriktiyse o kadar. Üçüncüsü dolduğu an donma geliyor.
+        ctx.globalAlpha = 1;
+        for (let i = 0; i < CHILL.max; i++) {
+            const bx = this.x - PXL * 7 + i * PXL * 6;
+            const by = this.footY - this.height - PXL * 5;
+            ctx.fillStyle = i < this.chill ? '#dff4fb' : 'rgba(223, 244, 251, 0.18)';
+            ctx.fillRect(bx, by, PXL * 4, PXL * 4);
+            if (i < this.chill) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(bx + PXL, by + PXL, PXL * 2, PXL * 2);
+            }
+        }
+        ctx.restore();
     }
 
     // Blok penceresi açıkken karakterin önünde duran kalkan. Piksel dilinde:
@@ -244,6 +299,42 @@ export class Player {
             this.invulnFrames--;
             if (this.invulnFrames === 0) this.invulnerable = false;
         }
+
+        // Üşüme kendiliğinden söner: buz basıncı sürdürmezse birikim sıfırdan
+        // başlar. Yoksa tek bir kırık bütün rauntta üstte kalırdı.
+        if (this.frozenFrames > 0) this.frozenFrames--;
+        if (this.freezeImmune > 0) this.freezeImmune--;
+        if (this.chillTimer > 0 && --this.chillTimer === 0) this.chill = 0;
+    }
+
+    // Buz değdi: üşüme ekle, üç olunca dondur.
+    addChill(amount) {
+        if (this.isDead || this.game.isGameOver) return;
+        const { effects } = this.game;
+
+        this.chillTimer = CHILL.decay;
+        this.chill = Math.min(CHILL.max, this.chill + amount);
+        if (this.chill < CHILL.max || this.freezeImmune > 0) {
+            effects.spawnText(this.x, this.y - 90, 'ÜŞÜME', '#bfefff');
+            return;
+        }
+
+        // Donma: kısa. Bir hamle penceresi açıyor, raunt kazandırmıyor.
+        // Ardından uzun bir bağışıklık geliyor - zincirleme donma yok.
+        this.chill = 0;
+        this.frozenFrames = CHILL.freeze;
+        this.freezeImmune = CHILL.immune;
+        this.action = null;
+        this.anim = null;
+        effects.spawnText(this.x, this.y - 90, 'DONDU!', '#eaffff', true);
+        effects.triggerFlash('rgba(191, 239, 255, 0.22)', 5);
+        effects.createPulse(this.x, this.y, '#dff4fb');
+    }
+
+    // Üşümenin yavaşlatması. Salgın izinden ayrı çarpan: ikisi de aynı anda
+    // olabilir, biri diğerini silmemeli.
+    get chillSlow() {
+        return 1 - this.chill * CHILL.slowPerStack;
     }
 
     ready(ability) {
@@ -253,7 +344,9 @@ export class Player {
     // Kombo tuşu (L1 / Shift) BASILI TUTULUYORSA diğer tuşlar kombo hâline
     // geçer: normal saldırı, özel ve zıplama o karede çıkmaz.
     handleActions() {
-        if (this.action || this.grabbedBy) return;
+        // Donmuş oyuncu hamle çıkaramaz: donmanın bütün değeri rakibin
+        // SIRASINI kesmesi. Yalnızca yavaşlatsaydı salgın izinden farkı olmazdı.
+        if (this.action || this.grabbedBy || this.frozenFrames > 0) return;
 
         if (this.held.combo) {
             if (this.pressed.jump) return this.useDash(DASHES[0]);                        // L1+ÇARPI / Shift+yukarı
@@ -313,13 +406,17 @@ export class Player {
     }
 
     move() {
-        if (this.frozen || this.grabbedBy) {
+        // Donmuş karakter havadaysa OLDUĞU YERDE asılı kalıyor: yer çekimi de
+        // duruyor. Raunt aralarının donması (`frozen`) da aynı yoldan geçiyor,
+        // ikisi tek davranış olsun. Buz için ayrıca doğru duruyor - donan şey
+        // düşmez, kalır.
+        if (this.frozen || this.grabbedBy || this.frozenFrames > 0) {
             this.vx *= 0.7;
             return;
         }
 
         const { input, canvas } = this.game;
-        const moveSpeed = this.speed * this.speedMultiplier;
+        const moveSpeed = this.speed * this.speedMultiplier * this.chillSlow;
 
         // Yatay hareket: klavye tuşları ile kolun sol analogu aynı işi görür.
         // Klavyede iki yön birden basılıysa birbirini götürür; kolda analog
@@ -454,6 +551,10 @@ export class Player {
         this.anim = null;
         this.grabbedBy = null;
         this.escapePresses = 0;
+        this.chill = 0;
+        this.chillTimer = 0;
+        this.frozenFrames = 0;
+        this.freezeImmune = 0;
         for (const id of Object.keys(this.cooldowns)) this.cooldowns[id] = 0;
     }
 

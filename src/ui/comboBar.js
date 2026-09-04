@@ -99,6 +99,23 @@ const ICONS = {
         ctx.fillRect(cx + PX * 3, cy - PX, PX * 2, PX * 2);
         ctx.fillRect(cx - PX * 3, cy - PX * 4, PX, PX);
         ctx.fillRect(cx + PX * 2, cy + PX * 2, PX, PX);
+    },
+
+    // Ayaz: merkezden her yöne açılan buz taneleri. Diğer üç simge bir NESNE
+    // gösteriyor (birikinti, kol, gövde); bu bir YAYILMA gösteriyor - ayazın
+    // kendisi görünmüyor, çevreye ne yaptığı görünüyor.
+    frost: (ctx, cx, cy) => {
+        ctx.fillStyle = '#dff4fb';
+        ctx.fillRect(cx - PX, cy - PX, PX * 2, PX * 2);
+        for (let i = 0; i < 8; i++) {
+            const a = (Math.PI * 2 * i) / 8;
+            const d = PX * (i % 2 ? 5 : 4);
+            ctx.fillStyle = i % 2 ? '#8fd4e8' : '#ffffff';
+            ctx.fillRect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d), PX, PX);
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - PX * 3, cy - PX * 3, PX, PX);
+        ctx.fillRect(cx + PX * 2, cy + PX * 2, PX, PX);
     }
 };
 

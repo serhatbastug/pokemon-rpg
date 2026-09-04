@@ -42,12 +42,14 @@
             ctx.drawImage(s6.canvas, 0, 0, s6.w, Math.round(s6.h * 0.42),
                 600, 90, s6.w * 2.4, Math.round(s6.h * 0.42) * 2.4);
         } else {
-            drawFighter(ctx, 'virus', 90, groundY, 30);
-            drawFighter(ctx, 'antivirus', 230, groundY, 30);
-            drawFighter(ctx, 'electro', 360, groundY, 30);
-            zoomed('virus', 560, 1.7);
-            zoomed('antivirus', 760, 1.7);
-            zoomed('electro', 940, 1.7);
+            drawFighter(ctx, 'virus', 80, groundY, 30);
+            drawFighter(ctx, 'antivirus', 200, groundY, 30);
+            drawFighter(ctx, 'electro', 310, groundY, 30);
+            drawFighter(ctx, 'ice', 420, groundY, 30);
+            zoomed('virus', 540, 1.4);
+            zoomed('antivirus', 690, 1.4);
+            zoomed('electro', 820, 1.4);
+            zoomed('ice', 960, 1.4);
         }
         window.__ready = true;
     </script>

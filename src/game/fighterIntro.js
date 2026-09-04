@@ -11,6 +11,11 @@
 //   VİRÜS         · ÜÇÜNCÜ bir adam; kendi eline bakar, yeşil elden yukarı
 //     yürür, adam olduğu yere ERİR ve birikintiden çok daha iri bir kütle
 //     yükselir. Burada dönüşüm örtme değil çöküş: taşıyıcı geriye kalmıyor.
+//   ICE-VİRÜS     · DÖRDÜNCÜ bir adam; kendine sarılmış, üşüyor ve titriyor.
+//     Soğuk önce YERE işliyor (ayaklarının çevresinde kırağı halkası büyür),
+//     sonra ayaklardan yukarı çıkıp adamı kabuğa alıyor. En sonunda kabuk
+//     ÇATLIYOR ve içinden buz gözleri yanan kütle çıkıyor. Diğer üçünde
+//     dönüşüm bir anda gelir; burada önce DONDURUR, sonra kırar.
 //
 // İkisinde de kaplanma sırasında karakter kafasını kendi SAĞINA hafifçe
 // yatırır, dönüşüm tamamlanınca kafasını geri alır.
@@ -24,7 +29,8 @@
 
 import { PX, newCanvas, blk, hash } from '../pixel/pixelDraw.js';
 import {
-    paintIntroFigure, paintIntroCarrier, drawElectroSparks,
+    paintIntroFigure, paintIntroCarrier, paintIntroIce,
+    drawElectroSparks, drawFrostMotes,
     antivirusSprite, virusSprite,
     FIGURE_SIZE, CARRIER_SIZE, VIRUS_SIZE, VIRUS_EYES
 } from './fighterArt.js';
@@ -32,6 +38,7 @@ import {
 export const INTRO_FRAMES = 260;              // ELECTRO-VİRÜS
 export const ANTIVIRUS_INTRO_FRAMES = 240;
 export const VIRUS_INTRO_FRAMES = 270;
+export const ICE_INTRO_FRAMES = 250;
 
 const span = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
 const easeOut = (k) => 1 - (1 - k) * (1 - k);
@@ -462,13 +469,112 @@ export class VirusIntro extends BaseIntro {
     }
 }
 
+// ================= ICE-VİRÜS =================
+
+const I_SHIVER = [0.20, 0.50];    // titreme kuruluyor
+const I_RING = [0.28, 0.56];      // kırağı halkası yerde büyüyor
+const I_COVER = [0.50, 0.86];     // kabuk ayaklardan yukarı çıkıyor
+const I_CRACK = [0.86, 0.96];     // kabuk çatlıyor
+
+// Ayakların çevresinde büyüyen kırağı halkası. Dönüşüm gövdeden değil
+// YERDEN başlıyor: soğuk önce zemine işliyor, sonra yukarı tırmanıyor.
+// Halka DÜZGÜN değil - dilleri farklı boyda, buz tabaka tabaka tutuyor.
+function frostRing(ctx, x, y, k, u) {
+    if (k <= 0) return;
+    const put = (bx, by, bw, bh, color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(bx), Math.round(by), Math.round(bw), Math.round(bh));
+    };
+    const reach = easeOut(k) * 16;
+    for (const dir of [-1, 1]) {
+        for (let i = 1; i <= reach; i++) {
+            const d = i * u * 2;
+            // Dilin boyu konuma göre sabit: her karede değişince halka
+            // kaynıyor gibi duruyordu, oysa buz tutuyor.
+            const tongue = hash(i, dir, 41);
+            if (tongue > 0.55 && i > reach - 4) continue;
+            const h = tongue < 0.3 ? u * 2 : u;
+            put(x + dir * d, y - h, u * 2, h, tongue < 0.5 ? '#dff4fb' : '#8fd4e8');
+        }
+    }
+    put(x - reach * u, y - u, reach * 2 * u, u, 'rgba(255, 255, 255, 0.5)');
+}
+
+// Kabuğun çatlaması: dışa fırlayan kırıklar ve soluk mavi parlama.
+function shatter(ctx, x, footY, k, u, frame) {
+    if (k <= 0 || k >= 1) return;
+    const put = (bx, by, bw, bh, color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(bx), Math.round(by), Math.round(bw), Math.round(bh));
+    };
+    const cy = footY - u * 30;
+    for (let i = 0; i < 18; i++) {
+        const a = (Math.PI * 2 * i) / 18 + hash(i, 0, 43);
+        const d = easeOut(k) * u * (14 + hash(i, 1, 44) * 16);
+        const s = k < 0.5 ? u * 2 : u;
+        put(x + Math.cos(a) * d, cy + Math.sin(a) * d * 0.9, s, s,
+            i % 3 ? '#dff4fb' : '#ffffff');
+    }
+    // Çatlama anında kısa bir beyaz-mavi çakma
+    if (k < 0.35) {
+        ctx.fillStyle = `rgba(223, 244, 251, ${(0.5 * (1 - k / 0.35)).toFixed(2)})`;
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+}
+
+export class IceIntro extends BaseIntro {
+    constructor(opts) {
+        super({ ...opts, size: FIGURE_SIZE, reveal: 'bottom' });
+        this.key = 'ice';
+        this.frontColors = ['#4a90ad', '#ffffff'];
+    }
+
+    get frames() {
+        return ICE_INTRO_FRAMES;
+    }
+
+    state(t) {
+        return {
+            t,
+            // Titreme kaplama başlayınca SÖNÜYOR: donan şey titremez.
+            shake: span(t, I_SHIVER[0], I_SHIVER[1]) * (1 - span(t, I_COVER[0], I_COVER[0] + 0.12)),
+            ring: span(t, I_RING[0], I_RING[1]),
+            // Kaplama AŞAĞIDAN çıkıyor; easeIn ile kafa en sona kalıyor,
+            // böylece yatık kafa kaplanmadan önce düzelmiş oluyor.
+            turn: easeIn(span(t, I_COVER[0], I_COVER[1])),
+            headTilt: span(t, I_COVER[0], I_COVER[0] + 0.08) - span(t, 0.80, 0.88),
+            crack: span(t, I_CRACK[0], I_CRACK[1])
+        };
+    }
+
+    paintMan(octx, s) {
+        // Kollar kavuşmuş: üşüyen adamın duruşu. Buz hâli de aynı duruşu
+        // alıyor, yoksa dönüşüm sırasında kollar yer değiştirmiş görünürdü.
+        return paintIntroFigure(octx, this.figW / 2, this.figH,
+            { mode: 'man', manPalette: 'd', hug: 1, headTilt: s.headTilt });
+    }
+
+    paintVirus(octx, s) {
+        paintIntroIce(octx, this.figW / 2, this.figH, { hug: 1, headTilt: s.headTilt });
+    }
+
+    overlay(ctx, s, geo) {
+        if (s.ring > 0) frostRing(ctx, geo.drawX, geo.drawFootY, s.ring, geo.unit);
+        if (s.turn > 0.05) {
+            drawFrostMotes(ctx, geo.drawX, geo.drawFootY, this.frame, s.turn, geo.unit);
+        }
+        if (s.crack > 0) shatter(ctx, geo.drawX, geo.drawFootY, s.crack, geo.unit, this.frame);
+    }
+}
+
 // Kadrodaki 'intro' anahtarının karşılığı. Ayrı bir kayıt olarak duruyor ki
 // tarayıcısız veri testi de anahtarların karşılığı var mı diye bakabilsin
 // (sınıfın kendisi tuval istiyor, node'da kurulamıyor).
 export const INTROS = {
     virus: VirusIntro,
     electro: ElectroIntro,
-    antivirus: AntivirusIntro
+    antivirus: AntivirusIntro,
+    ice: IceIntro
 };
 
 // Bu oyuncunun girişi varsa örneğini üretir

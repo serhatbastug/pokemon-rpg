@@ -21,9 +21,9 @@ function check(name, condition, detail = '') {
 const { FIGHTERS, fighterById } = await import('../src/game/fighters.js');
 const { FIGHTER_SPRITES } = await import('../src/game/fighterArt.js');
 
-check('kadroda üç dövüşçü var', FIGHTERS.length === 3, FIGHTERS.map(f => f.id).join(','));
-check('kadro virüs, anti-virüs ve elektro-virüs',
-    FIGHTERS.map(f => f.id).join(',') === 'virus,antivirus,electro');
+check('kadroda dört dövüşçü var', FIGHTERS.length === 4, FIGHTERS.map(f => f.id).join(','));
+check('kadro virüs, anti-virüs, elektro-virüs ve ice-virüs',
+    FIGHTERS.map(f => f.id).join(',') === 'virus,antivirus,electro,ice');
 check('dövüşçü kimlikleri benzersiz', new Set(FIGHTERS.map(f => f.id)).size === FIGHTERS.length);
 check('her dövüşçünün çizimi var',
     FIGHTERS.every(f => typeof FIGHTER_SPRITES[f.id] === 'function'),
@@ -42,9 +42,9 @@ check('elektro-virüs can ve hızda ortada',
     eStats.speed > fighterById('virus').stats.speed && eStats.speed < fighterById('antivirus').stats.speed,
     JSON.stringify(eStats));
 
-// Giriş animasyonları: anti-virüs ve elektro-virüsün var, virüsün yok
+// Giriş animasyonları: kadronun dördünün de kendi girişi var
 const intro = await import('../src/game/fighterIntro.js');
-check('kadronun üçünün de giriş animasyonu var',
+check('kadronun dördünün de giriş animasyonu var',
     FIGHTERS.every(f => f.intro), FIGHTERS.filter(f => !f.intro).map(f => f.id).join(','));
 check('her giriş anahtarının karşılığı var',
     FIGHTERS.filter(f => f.intro).every(f => intro.INTROS[f.intro]),
@@ -53,7 +53,8 @@ check('karşılığı olup kadroda kullanılmayan giriş yok',
     Object.keys(intro.INTROS).every(k => FIGHTERS.some(f => f.intro === k)));
 check('her dövüşçünün girişi kendi anahtarını taşıyor',
     FIGHTERS.every(f => f.intro === f.id), FIGHTERS.map(f => `${f.id}:${f.intro}`).join(' '));
-const introFrames = [intro.INTRO_FRAMES, intro.ANTIVIRUS_INTRO_FRAMES, intro.VIRUS_INTRO_FRAMES];
+const introFrames = [intro.INTRO_FRAMES, intro.ANTIVIRUS_INTRO_FRAMES,
+    intro.VIRUS_INTRO_FRAMES, intro.ICE_INTRO_FRAMES];
 check('giriş animasyonları 3-6 saniye arası',
     introFrames.every(n => n >= 180 && n <= 360), introFrames.join(' / '));
 check('bilinmeyen dövüşçü için null', fighterById('yok-boyle-biri') === null);
@@ -541,6 +542,52 @@ const minHp = Math.min(...FIGHTERS.map(f => f.stats.hp));
 check('bölünme tek başına rakibi öldüremiyor', splitMax < minHp,
     `en çok ${splitMax} hasar / en az ${minHp} can`);
 
+// ---- ICE-VİRÜS'ün dengesi ----
+// Buz kadroya kontrol getiriyor (yavaşlatma + kısa donma). Dövüş oyununda
+// hareketi kesen bir güç kolayca eziciye döner, o yüzden bedeli ve frenleri
+// burada kurala bağlı.
+
+// Kontrolün bedeli hasar: buz, DOĞRUDAN vuran iki karakterin ikisinden de
+// az hasar vermeli. Elektro bu karşılaştırmanın dışında - onun ışını tek bir
+// vuruş değil arenada kalan bir hat, hasarı "vuruş başına" ölçülemiyor.
+const dps = (a) => a.damage / a.cooldown;
+const iceBasic = ab.ABILITIES.ice.basic;
+const direct = ['virus', 'antivirus'].map(id => ab.ABILITIES[id].basic);
+check('buzun sürekli hasarı doğrudan vuran ikisinden de az',
+    direct.every(o => dps(iceBasic) < dps(o)),
+    direct.map(o => `${o.id} ${dps(o).toFixed(3)}`).join(' · ') + ` | kırık ${dps(iceBasic).toFixed(3)}`);
+check('buzun tek vuruşu virüsün savurmasından hafif',
+    iceBasic.damage < ab.ABILITIES.virus.basic.damage,
+    `${iceBasic.damage} / ${ab.ABILITIES.virus.basic.damage}`);
+
+// Donma KISA, bağışıklık UZUN: zincirleme donma olmamalı. Rakip donduktan
+// sonra en az dört donma boyu serbest kalıyor.
+check('donma kısa, bağışıklık ondan çok uzun',
+    ab.CHILL.freeze <= 45 && ab.CHILL.immune >= ab.CHILL.freeze * 4,
+    `donma ${ab.CHILL.freeze} / bağışıklık ${ab.CHILL.immune}`);
+
+// Tek isabet dondurmamalı: donma BİRİKİMİN sonucu olmalı, sürprizin değil.
+check('tek isabet dondurmuyor',
+    ab.CHILL.max > 1 && iceBasic.chill < ab.CHILL.max &&
+    ab.ABILITIES.ice.signature.chill < ab.CHILL.max,
+    `en çok ${ab.CHILL.max} · kırık ${iceBasic.chill} · ayaz ${ab.ABILITIES.ice.signature.chill}`);
+
+// Birikim sönmezse buz bir kez vurup rauntun sonuna kadar üstte kalırdı.
+check('üşüme birikimi kendiliğinden sönüyor', ab.CHILL.decay > 0);
+
+// Üşümenin yavaşlatması salgın izinden HAFİF olmalı: iz bir noktada duruyor,
+// üşüme rakibin peşinden geliyor. Peşinden gelen daha sert olamaz.
+const chillSlow = ab.CHILL.max * ab.CHILL.slowPerStack;
+const trailSlow = 1 - ab.ABILITIES.virus.signature.slow;
+check('üşümenin yavaşlatması salgın izinden hafif', chillSlow < trailSlow,
+    `üşüme %${Math.round(chillSlow * 100)} / iz %${Math.round(trailSlow * 100)}`);
+
+// Buz duvarı SAVUNMA: hiç hasar vermiyor.
+const wall = ab.ABILITIES.ice.special;
+check('buz duvarı hasar vermiyor', wall.damage === undefined);
+check('buz duvarı beklemesinden kısa yaşıyor', wall.life < wall.cooldown,
+    `${wall.life} / ${wall.cooldown}`);
+
 
 // Kümedeki dört daire: üç atılma + karakterin kendi hamlesi
 for (const f of FIGHTERS) {
@@ -613,6 +660,14 @@ check('üst basamağa alt basamaktan çıkılıyor', LEDGE.low + jumpRise > LEDG
     `${Math.round(LEDGE.low + jumpRise)} / ${LEDGE.high}`);
 check('üst basamağa yukarı atılmayla da çıkılıyor', dashRise > LEDGE.high,
     `atılma ${Math.round(dashRise)} / basamak ${LEDGE.high}`);
+
+// Buz duvarının boyu da aynı ölçüyle: zıplamayla AŞILAMAMALI ama yukarı
+// atılmayla aşılmalı. Aşılamayan duvar denge değil kilit olurdu; zıplamayla
+// aşılan duvar da kimseyi durdurmazdı.
+const iceWall = ab.ABILITIES.ice.special;
+check('buz duvarı zıplamayla aşılmıyor, yukarı atılmayla aşılıyor',
+    iceWall.height > jumpRise && iceWall.height < dashRise,
+    `duvar ${iceWall.height} · zıplama ${Math.round(jumpRise)} · atılma ${Math.round(dashRise)}`);
 
 for (const arena of ARENAS) {
     const ledges = ledgesOf(arena, AW, AH);

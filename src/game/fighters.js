@@ -41,6 +41,20 @@ export const FIGHTERS = [
         description: 'Yükü boşaltmadan duramayan taşıyıcı. Kabuğun altındaki damarlar ' +
             'hiç sönmez, durduğu yerde bile havayı çatırdatır. Cana da hıza da yakın ' +
             'duran, ortadaki dövüşçü.'
+    },
+    {
+        id: 'ice',
+        name: 'ICE-VİRÜS',
+        themeColor: '#8fd4e8',
+        // Can ve hız ortada: buz ne virüs kadar ağır ne anti kadar ince.
+        // Dengesi statlarında değil hamlelerinde - kadronun en az hasar veren
+        // dövüşçüsü, karşılığında rakibi yavaşlatıp donduran tek karakter
+        // (bkz. abilities.js'teki CHILL).
+        stats: { hp: 110, speed: 4.5 },
+        intro: 'ice',
+        description: 'Yayılmayı yavaşlatan değil DURDURAN sap. Taşıyıcısını yutmuyor, ' +
+            'olduğu yerde donduruyor: gövde artık ne akar ne dinlenir, kristal kristal ' +
+            'büyür. Dokunduğu her şeyin ısısını alır; en az vuran, en çok bekleten.'
     }
 ];
 

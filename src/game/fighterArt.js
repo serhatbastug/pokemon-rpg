@@ -608,10 +608,13 @@ const E_ARM_TOP = 4;
 // Taşıyıcı (adam) ve elektro hâli tek bir çizimden gelir.
 // ox, oy: sprite kutusunun sol üst köşesi (canvas pikseli).
 // mode: 'man' | 'electro' · armRaise: 0 = kol yanda, 1 = kol tamamen havada
-function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0, manPalette = 'a' } = {}) {
+// hug: 0 = kollar yanda, 1 = kollar göğüste kavuşmuş (üşüyen adam - buzun
+// giriş animasyonu). Buzun kendi çizimi de aynı duruşu alabiliyor, yoksa
+// dönüşüm sırasında kollar yer değiştirmiş gibi görünürdü.
+function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0, hug = 0, manPalette = 'a' } = {}) {
     const on = mode === 'electro';
     const P = ELECTRO_P;
-    const H = manPalette === 'c' ? HUMAN_C : HUMAN_P;
+    const H = manPalette === 'c' ? HUMAN_C : manPalette === 'd' ? HUMAN_D : HUMAN_P;
     const X = (col) => ox + col * PX;
     const Y = (row) => oy + row * PX;
     const cx = X(E_CX);
@@ -744,6 +747,26 @@ function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0
         const inner = side < 0 ? E_CX - 11 : E_CX + 7;
         const handCol = side < 0 ? inner - (on ? 1 : 0) : inner;
 
+        if (hug > 0.5) {
+            // Kendine sarılmış kollar: omuzdan kısa bir üst kol, sonra göğsün
+            // önünden geçen ön kol. İki ön kol FARKLI satırda - aynı satıra
+            // gelince tek bir çubuk oluyor, "kavuşmuş" değil "kemer" duruyor.
+            const elbow = E_SHOULDER + 5;
+            for (let row = E_SHOULDER + 1; row < elbow; row++) {
+                blk(ctx, X(inner), Y(row), w(armW), PX, cloth);
+                blk(ctx, X(inner), Y(row), PX, PX, edge);
+                blk(ctx, X(inner + armW - 1), Y(row), PX, PX, edge);
+            }
+            const fy = elbow + (side < 0 ? 0 : 2);
+            const fx = side < 0 ? inner : inner - 5;
+            blk(ctx, X(fx), Y(fy), w(9), w(3), cloth);
+            blk(ctx, X(fx), Y(fy), w(9), PX, on ? P.light : cloth);
+            blk(ctx, X(fx), Y(fy + 2), w(9), PX, clothDark);
+            // Karşı omzu kavrayan el: ön kolun uzak ucunda
+            blk(ctx, X(side < 0 ? fx + 7 : fx), Y(fy), w(2), w(3), hand);
+            return { x: X(fx) + w(4), y: Y(fy) };
+        }
+
         if (raise <= 0.01) {
             for (let row = E_SHOULDER + 1; row < E_HIP; row++) {
                 blk(ctx, X(inner), Y(row), w(armW), PX, cloth);
@@ -868,12 +891,323 @@ export function paintIntroCarrier(ctx, x, footY, opts) {
     paintCarrier(ctx, x - PX * A_CX, footY - PX * A_ROWS, opts);
 }
 
+// ================= ICE-VİRÜS =================
+//
+// Dördüncü dövüşçü. Elektro gibi taşıyıcısını TAMAMEN kaplıyor ama biçim
+// dili üçünden de ayrı: virüs SARKAR, elektro ÇATIRDAR, buz UZAR. Kütle
+// akmıyor - omuzdan, koldan ve kafadan dışarı doğru kristal dikenler
+// büyüyor, hepsi yukarı ve dışa doğru.
+//
+// Palet elektroyla karışmasın diye bilerek karşıt seçildi: elektro koyu
+// lacivert + sarı, buz AÇIK buz mavisi + beyaz. Silueti de ayrı - elektronun
+// dik saçının yerinde buzun kırık bir tacı var.
+//
+// Elektroyla AYNI ızgarada (E_*) çiziliyor. Bu şart: giriş animasyonunda
+// adam ile buz hâli üst üste oturmalı, ayrı ölçü kullanılsa dönüşüm
+// sırasında figür kayardı (anti-virüste bu tuzağa bir kez düşülmüştü).
+// Gövde rengi ORTA tonda, açık değil. İlk denemede gövde de vurgular da
+// açık buz mavisiydi ve karakter diğer üçünün yanında soluk kalıyordu:
+// elektronun koyu lacivert + parlak sarısı gibi buzun da kendi içinde
+// kontrastı olmalı. Beyaz kırıklar ancak orta tonun üstünde okunuyor.
+const ICE_P = {
+    body: '#5aa8c4',
+    dark: '#2f6c88',
+    light: '#a8e0f0',
+    deep: '#1b4a63',        // kristalin içi: dış yüzeyden koyu
+    outline: '#0d2836',
+    frost: '#ffffff',
+    eye: '#eaffff',
+    glow: '#bfefff'
+};
+
+// Dördüncü adam: buzun taşıyıcısı. Üçünden de ayrı biri olmalı (elektro koyu
+// saç / gri-mavi tulum, anti açık kahve / haki, virüs siyah saç / bordo).
+const HUMAN_D = {
+    k: '#1f2937',
+    h: '#6b5233',           // kumral
+    s: '#f0bd93',
+    S: '#cf9668',
+    c: '#3f5c63',           // deniz mavisi yağmurluk
+    C: '#2d4249',
+    y: '#22303a'
+};
+
+// Buz hâli. ox, oy: sprite kutusunun sol üst köşesi (canvas pikseli).
+// hug: 0 = kollar yanda, 1 = kollar göğüste kavuşmuş (giriş animasyonunda
+// üşüyen adamın duruşu; buz hâli de aynı duruşu almalı, yoksa dönüşüm
+// sırasında kollar yer değiştirmiş gibi görünür).
+function paintIce(ctx, ox, oy, { headTilt = 0, hug = 0 } = {}) {
+    const P = ICE_P;
+    const X = (col) => ox + col * PX;
+    const Y = (row) => oy + row * PX;
+    const w = (cols) => cols * PX;
+
+    const tiltAt = (row) => {
+        const k = Math.max(0, Math.min(1, (row - E_HEAD + 8) / 18));
+        return -Math.round(headTilt * 2 * (1 - k)) * PX;
+    };
+    const HX = (col, row) => X(col) + tiltAt(row);
+    const hblk = (col, row, cols, rows, color) => {
+        for (let r = 0; r < rows; r++) blk(ctx, HX(col, row + r), Y(row + r), w(cols), PX, color);
+    };
+
+    // Dışarı büyüyen kristal diken: kökten uca doğru inceliyor. Basamak
+    // basamak gidiyor - düz bir üçgen "buz" değil "cam parçası" okunuyordu.
+    const spike = (col, row, len, dx, dy, thick = 3) => {
+        for (let i = 0; i < len; i++) {
+            const t = Math.max(1, Math.round(thick * (1 - i / len)));
+            const c = Math.round(col + dx * i);
+            const r = Math.round(row + dy * i);
+            blk(ctx, X(c), Y(r), w(t), PX, i >= len - 2 ? P.light : P.body);
+            blk(ctx, X(c), Y(r), PX, PX, P.outline);
+            if (t > 1) blk(ctx, X(c) + w(t) - PX, Y(r), PX, PX, P.dark);
+        }
+    };
+
+    // --- Kafanın üstündeki kırık taç ---
+    // Üç diken, boyları ve açıları farklı. Eşit boyda üç diken taç değil
+    // tarak gibi duruyordu (elektronun dik saçında da aynı ders çıkmıştı).
+    spike(E_CX - 5, E_HEAD - 1, 5, -0.35, -1, 4);
+    spike(E_CX - 1, E_HEAD - 2, 7, 0, -1, 4);
+    spike(E_CX + 3, E_HEAD - 1, 4, 0.5, -1, 3);
+
+    // --- Kafa: köşeli bir miğfer ---
+    hblk(E_CX - 4, E_HEAD, 8, 10, P.body);
+    hblk(E_CX - 4, E_HEAD, 1, 10, P.outline);
+    hblk(E_CX + 3, E_HEAD, 1, 10, P.outline);
+    hblk(E_CX - 4, E_HEAD + 10, 8, 1, P.outline);
+    hblk(E_CX - 4, E_HEAD, 8, 1, P.outline);
+    hblk(E_CX - 3, E_HEAD + 1, 2, 9, P.light);       // sol yanak: ışık soldan
+    hblk(E_CX + 1, E_HEAD + 2, 2, 8, P.dark);        // sağ yanak gölgede
+    // Yüzeyi bölen kırılma hattı. Tam ORTADAN geçirmiştim: iki gözün arasına
+    // düşüp yüzü ikiye bölüyor, gözleri de yutuyordu. Yana kaçık ve kısa
+    // olunca hem hat okunuyor hem yüz duruyor.
+    hblk(E_CX + 2, E_HEAD + 1, 1, 4, P.frost);
+
+    // Gözler: önce KOYU OYUK, sonra oyuğun içinde yanan yarık. Doğrudan
+    // parlak yazınca gözler açık yüzeyde kaybolup kafa boş bir blok
+    // duruyordu - yanan şeyin arkasında karanlık olmalı.
+    hblk(E_CX - 3, E_HEAD + 4, 2, 2, P.deep);
+    hblk(E_CX + 1, E_HEAD + 4, 2, 2, P.deep);
+    hblk(E_CX - 3, E_HEAD + 5, 2, 1, P.eye);
+    hblk(E_CX + 1, E_HEAD + 5, 2, 1, P.eye);
+    // Kaş hizasında çıkıntı: gözlerin üstünü gölgeleyip bakışı sertleştiriyor
+    hblk(E_CX - 3, E_HEAD + 3, 6, 1, P.dark);
+    // Ağız YOK - yerinde kırağı tutmuş TEK bir çatlak var. Önce iki çatlak
+    // ve bir gölge vardı, yüz karalama gibi okunuyordu.
+    hblk(E_CX - 2, E_HEAD + 8, 4, 1, P.frost);
+    // Çenenin daralması: kafanın alt satırı iki blok dar. Dört köşe bir blok
+    // "kafa" değil "kutu" okunuyordu.
+    hblk(E_CX - 4, E_HEAD + 9, 1, 1, P.outline);
+    hblk(E_CX + 3, E_HEAD + 9, 1, 1, P.outline);
+
+    // --- Boyun ve gövde ---
+    blk(ctx, X(E_CX - 2), Y(E_NECK), w(4), PX, P.deep);
+    for (let row = E_SHOULDER; row < E_HIP; row++) {
+        const half = row < E_SHOULDER + 2 ? 8 : 7;
+        blk(ctx, X(E_CX - half), Y(row), w(half * 2), PX, P.body);
+        blk(ctx, X(E_CX - half), Y(row), PX, PX, P.outline);
+        blk(ctx, X(E_CX + half) - PX, Y(row), PX, PX, P.outline);
+        blk(ctx, X(E_CX - half + 1), Y(row), w(2), PX, P.light);   // sol kenar ışığı
+        blk(ctx, X(E_CX + half - 3), Y(row), w(2), PX, P.dark);    // sağ kenar gölgesi
+
+        // Faseler: düz dolgu buzu "plastik" gösteriyordu, kütlenin yüzeyi
+        // kırık kırık olmalı. hash konuma bağlı olduğu için desen her
+        // açılışta AYNI - yoksa kütle her karede kaynardı.
+        for (let c = -half + 3; c < half - 3; c++) {
+            const r = hash(c, row, 51);
+            if (r < 0.09) blk(ctx, X(E_CX + c), Y(row), PX, PX, P.light);
+            else if (r < 0.17) blk(ctx, X(E_CX + c), Y(row), PX, PX, P.dark);
+        }
+
+        // Kristalin İÇİ: göğsün ortasında ELMAS biçimli koyu bir çekirdek.
+        // Dikdörtgen çizince gövdede pencere gibi bir delik duruyordu; uçları
+        // daralınca kütlenin içindeki bir kristal okunuyor.
+        const k = row - E_SHOULDER;
+        if (k >= 3 && k <= 11) {
+            const cc = Math.max(1, Math.round(3 - Math.abs(k - 7) * 0.5));
+            blk(ctx, X(E_CX - cc), Y(row), w(cc * 2), PX, P.deep);
+            blk(ctx, X(E_CX - cc), Y(row), PX, PX, P.glow);
+            // Çekirdeğin içinde yanan damar: koyu elmas tek başına gövdede
+            // oyuk gibi duruyordu, içinde bir şey olmalı.
+            if (k >= 5 && k <= 9) blk(ctx, X(E_CX), Y(row), PX, PX, P.frost);
+        }
+        // Yüzey kırıkları: kısa beyaz hatlar. Elektronun sarı damarı gövdeyi
+        // DOLAŞIR, buzunki gövdeyi KESER - biri canlı, biri kırık.
+        if (k === 1 || k === 6 || k === 11) {
+            blk(ctx, X(E_CX - half + 2), Y(row), w(3), PX, P.frost);
+            blk(ctx, X(E_CX + half - 5), Y(row + (k === 6 ? 1 : 0)), w(3), PX, P.frost);
+        }
+    }
+
+    // Omuzlardan yukarı-dışarı büyüyen iki büyük diken: buzun silueti.
+    // Uzaktan bakınca karakteri elektrodan ayıran şey bu ikisi, o yüzden
+    // KALIN olmalı - ince çizilince kol değil tel gibi duruyorlardı.
+    // --- Kollar ---
+    // side -1 = karakterin sağı (izleyicinin solu).
+    const iceFist = (col, row) => {
+        // Yumruk değil BUZ PENÇESİ: üç sarkıt, ortadaki uzun.
+        blk(ctx, X(col), Y(row), w(5), w(4), P.body);
+        blk(ctx, X(col), Y(row), PX, w(4), P.outline);
+        blk(ctx, X(col + 4), Y(row), PX, w(4), P.outline);
+        blk(ctx, X(col + 1), Y(row), w(3), PX, P.light);
+        for (let i = 0; i < 3; i++) {
+            const len = i === 1 ? 4 : 3;
+            blk(ctx, X(col + i * 2), Y(row + 4), PX, w(len), P.light);
+            blk(ctx, X(col + i * 2), Y(row + 4 + len), PX, PX, P.outline);
+        }
+        return { x: X(col) + w(5) / 2, y: Y(row) };
+    };
+
+    const drawIceArm = (side) => {
+        const armW = 4;
+        const inner = side < 0 ? E_CX - 11 : E_CX + 7;
+
+        if (hug > 0.5) {
+            // Kavuşmuş kollar: omuzdan kısa bir üst kol, sonra göğsün önünden
+            // geçen ön kol. İki ön kol FARKLI satırda - aynı satıra gelince
+            // tek bir çubuk gibi okunuyor, "kavuşmuş" değil "kemer" duruyor.
+            const elbow = E_SHOULDER + 5;
+            for (let row = E_SHOULDER + 1; row < elbow; row++) {
+                blk(ctx, X(inner), Y(row), w(armW), PX, P.body);
+                blk(ctx, X(inner), Y(row), PX, PX, P.outline);
+                blk(ctx, X(inner + armW - 1), Y(row), PX, PX, P.outline);
+            }
+            const fy = elbow + (side < 0 ? 0 : 2);
+            const fx = side < 0 ? inner : inner - 5;
+            blk(ctx, X(fx), Y(fy), w(9), w(3), P.body);
+            blk(ctx, X(fx), Y(fy), w(9), PX, P.light);
+            blk(ctx, X(fx), Y(fy + 2), w(9), PX, P.outline);
+            return { x: X(fx) + w(4), y: Y(fy) };
+        }
+
+        for (let row = E_SHOULDER + 1; row < E_HIP; row++) {
+            blk(ctx, X(inner), Y(row), w(armW), PX, P.body);
+            blk(ctx, X(inner), Y(row), PX, PX, P.outline);
+            blk(ctx, X(inner + armW - 1), Y(row), PX, PX, P.outline);
+            blk(ctx, X(inner + 1), Y(row), PX, PX, P.light);
+            const k = row - E_SHOULDER;
+            if (k === 4 || k === 9) blk(ctx, X(inner + 1), Y(row), w(3), PX, P.frost);
+            if (k === 6 || k === 7) blk(ctx, X(inner + 2), Y(row), w(2), PX, P.deep);
+        }
+        // Ön koldan GERİYE doğru çıkan diken: kol düz bir boru kalmasın.
+        spike(side < 0 ? inner - 3 : inner + armW, E_SHOULDER + 9, 5, side < 0 ? -0.6 : 0.6, -1, 3);
+        return iceFist(inner, E_HIP);
+    };
+
+    drawIceArm(-1);
+    const rightHand = drawIceArm(1);
+
+    // Omuzlardan yukarı-dışarı büyüyen buz. Kollardan SONRA çiziliyor:
+    // önce çizince kolun üst satırları apuletin üstünü kesip yarısını
+    // yutuyordu.
+    //
+    // ASİMETRİK: karakterin SAĞ omzunda (izleyicinin solunda) kalın bir
+    // apulet var, sol omzunda yalnız ince bir diken. Anti-virüsün yalnız bir
+    // yanının kaplı olması gibi - simetrik bir kütle heykel gibi duruyor,
+    // kimliği olmuyor. Sprite aynalanmadığı için bu yan hep aynı yerde kalır.
+    for (let r = 0; r < 6; r++) {
+        const wide = 8 - r;
+        blk(ctx, X(E_CX - 12), Y(E_SHOULDER - 1 + r), w(wide), PX, P.body);
+        blk(ctx, X(E_CX - 12), Y(E_SHOULDER - 1 + r), PX, PX, P.outline);
+        blk(ctx, X(E_CX - 11), Y(E_SHOULDER - 1 + r), PX, PX, P.light);
+        blk(ctx, X(E_CX - 12 + wide - 1), Y(E_SHOULDER - 1 + r), PX, PX, P.dark);
+        if (r === 2) blk(ctx, X(E_CX - 10), Y(E_SHOULDER - 1 + r), w(3), PX, P.frost);
+    }
+    spike(E_CX - 12, E_SHOULDER - 1, 8, -0.25, -1, 6);
+    spike(E_CX - 8, E_SHOULDER - 2, 5, 0.1, -1, 3);
+    spike(E_CX + 7, E_SHOULDER + 2, 5, 0.4, -1, 4);
+
+    // --- Bacaklar ---
+    const legW = 6;
+    for (const col of [-legW - 1, 1]) {
+        blk(ctx, X(E_CX + col), Y(E_HIP), w(legW), w(E_FOOT - E_HIP), P.body);
+        blk(ctx, X(E_CX + col), Y(E_HIP), PX, w(E_FOOT - E_HIP), P.outline);
+        blk(ctx, X(E_CX + col + legW - 1), Y(E_HIP), PX, w(E_FOOT - E_HIP), P.outline);
+        blk(ctx, X(E_CX + col + 1), Y(E_HIP), PX, w(E_FOOT - E_HIP), P.light);
+        blk(ctx, X(E_CX + col + legW - 2), Y(E_HIP), PX, w(E_FOOT - E_HIP), P.dark);
+        blk(ctx, X(E_CX + col + 1), Y(E_KNEE), w(legW - 2), PX, P.frost);
+        blk(ctx, X(E_CX + col + 2), Y(E_KNEE + 2), w(2), PX, P.deep);
+        // Bacakta da fase: gövdeyle aynı yüzey dili
+        for (let row = E_HIP; row < E_FOOT; row++) {
+            for (let c = 2; c < legW - 2; c++) {
+                const r = hash(col + c, row, 52);
+                if (r < 0.10) blk(ctx, X(E_CX + col + c), Y(row), PX, PX, P.light);
+                else if (r < 0.18) blk(ctx, X(E_CX + col + c), Y(row), PX, PX, P.deep);
+            }
+        }
+        // Dizden dışa çıkan küçük diken
+        spike(E_CX + col + (col < 0 ? -1 : legW), E_KNEE - 1, 3, col < 0 ? -0.6 : 0.6, -0.6, 2);
+        // Ayak: buzun kendi kaidesi. Kütle yerde bitmiyor, yere YAPIŞIYOR.
+        blk(ctx, X(E_CX + col), Y(E_FOOT), w(legW), w(E_ROWS - E_FOOT), P.dark);
+        blk(ctx, X(E_CX + col), Y(E_ROWS - 1), w(legW), PX, P.outline);
+    }
+    // İki ayağın altında birleşen kırağı tabanı
+    blk(ctx, X(E_CX - 9), Y(E_ROWS - 1), w(18), PX, P.light);
+
+    return { hand: rightHand };
+}
+
+// Buzun kırağısı. Elektronun kıvılcımı gibi sprite'a gömülmüyor: her karede
+// yeniden çiziliyor. Ama RİTMİ bilerek farklı - elektro 4 karede bir çatırdar,
+// buz süzülür. Aynı hızda olsalar iki karakter de "titriyor" gibi okunurdu;
+// buz titremiyor, üşütüyor.
+export function drawFrostMotes(ctx, x, footY, frame, intensity = 1, unit = PX) {
+    if (intensity <= 0) return;
+    const P = ICE_P;
+    const u = unit;
+    const put = (bx, by, bw, bh, color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(bx), Math.round(by), Math.round(bw), Math.round(bh));
+    };
+    const h = E_ROWS * u;
+    const top = footY - h;
+    const motes = Math.round(9 * intensity);
+
+    for (let i = 0; i < motes; i++) {
+        // x zerreye bağlı ve SABİT, yalnızca y akıyor: x de zıplayınca zerre
+        // süzülmüyor, her an başka yerde yeniden doğuyor gibi duruyor.
+        const mx = x + Math.round((hash(i * 5.1, 0, 31) - 0.5) * 28) * u;
+        const fall = (frame / 3 + i * 9 + hash(i, 1, 32) * 40) % (E_ROWS - 3);
+        put(mx, top + Math.round(fall) * u, u, u, hash(i, 2, 33) < 0.35 ? P.frost : P.glow);
+    }
+
+    // Nefes: üç saniyede bir kafanın önünde biriken ve dağılan buhar
+    const breath = (frame % 180) / 180;
+    if (breath < 0.3) {
+        const k = breath / 0.3;
+        put(x + u * 3, top + Math.round(10 - k * 2) * u,
+            Math.round(2 + k * 5) * u, u * 2, `rgba(223, 244, 251, ${(0.55 * (1 - k)).toFixed(2)})`);
+    }
+
+    // Ayakların dibinde tutan kırağı
+    put(x - u * 8, footY - u, u * 16, u, 'rgba(255, 255, 255, 0.30)');
+}
+
+let iceCache = null;
+
+export function iceSprite() {
+    if (iceCache) return iceCache;
+    const w = PX * E_COLS;
+    const h = PX * E_ROWS;
+    const { canvas, ctx } = newCanvas(w, h);
+    paintIce(ctx, 0, 0, {});
+    iceCache = { canvas, ox: PX * E_CX, oy: h, w, h };
+    return iceCache;
+}
+
+// Giriş animasyonunun kullandığı çizim (ölçekleme sahnede yapılıyor)
+export function paintIntroIce(ctx, x, footY, opts) {
+    return paintIce(ctx, x - PX * E_CX, footY - PX * E_ROWS, opts);
+}
+
 // --- Dışarıya açılan yüz ---
 
 export const FIGHTER_SPRITES = {
     virus: virusSprite,
     antivirus: antivirusSprite,
-    electro: electroSprite
+    electro: electroSprite,
+    ice: iceSprite
 };
 
 // ================= SALDIRI ANİMASYONLARI =================
@@ -891,7 +1225,7 @@ export const FIGHTER_SPRITES = {
 
 // dir çarpanı olanlar karakterin baktığı yöne göre eğilir; atılmalar dünya
 // yönünde olduğu için çarpılmaz.
-const DIR_POSES = new Set(['punch', 'blob', 'grab', 'beam']);
+const DIR_POSES = new Set(['punch', 'blob', 'grab', 'beam', 'shard']);
 
 // Sıfırdan bire çıkıp geri inen yumuşak eğri: uzuvun uzayıp toplanması.
 const swell = (t) => Math.sin(Math.max(0, Math.min(1, t)) * Math.PI);
@@ -924,6 +1258,19 @@ const POSES = {
     orb: (t) => ({ dy: -PX * 2 * swell(t) }),
     // Işınlanma: yeni yerde sönük belirip yerine oturuyor
     blink: (t) => ({ fade: t }),
+    // Buz kırığı: kolu geriye alıp savuruyor. Antinin topu gövdeyi geri
+    // teptiriyor (namludan çıkıyor), buzunki gövdeyi ÖNE atıyor (elle
+    // atılıyor) - iki menzilli karakterin duruşu birbirine benzemesin.
+    shard: (t) => ({
+        lean: t < 0.4 ? -PX * 4 * phase(t, 0, 0.4) : PX * 5 * swell(phase(t, 0.4, 1))
+    }),
+    // Buz duvarı: gövde çöküp iki elini yere basıyor
+    wall: (t) => ({ dy: Math.round(swell(t) * 4) * PX }),
+    // Ayaz: önce kasılıyor, sonra bir anda çevreye açılıyor
+    frost: (t) => ({
+        dy: -Math.round(swell(phase(t, 0, 0.4)) * 2) * PX,
+        flash: phase(t, 0.35, 0.5) * (1 - phase(t, 0.5, 1))
+    }),
     dashUp: (t) => ({ dy: -PX * 2 * (1 - t) }),
     dashLeft: (t) => ({ lean: -PX * 6 * (1 - t) }),
     dashRight: (t) => ({ lean: PX * 6 * (1 - t) })
@@ -1103,12 +1450,101 @@ function electroOrbArms(ctx, x, footY, t) {
     }
 }
 
+// Buzun atış kolu: kırığı avucunda BÜYÜTÜP savuruyor. Elektronun ışın kolu
+// düz uzanıyor, buzunki bir yay çiziyor - biri boşaltma, biri fırlatma.
+function iceThrowArm(ctx, x, footY, t, dir) {
+    const P = ICE_P;
+    const shoulder = footY - PX * 33;
+    // Kol geriden öne bir yay çiziyor: -0.8 rad'dan +0.5 rad'a
+    const k = phase(t, 0.1, 0.75);
+    const a = -0.9 + k * 1.5;
+    const len = PX * 11;
+    const hx = x + dir * Math.round((Math.cos(a) * len) / PX) * PX;
+    const hy = shoulder + Math.round((Math.sin(a) * len) / PX) * PX;
+
+    // Üst kol: omuzdan ele doğru sütun sütun
+    const steps = 9;
+    for (let i = 0; i <= steps; i++) {
+        const p = i / steps;
+        const px = Math.round((x + (hx - x) * p) / PX) * PX;
+        const py = Math.round((shoulder + (hy - shoulder) * p) / PX) * PX;
+        const half = Math.max(1, Math.round(2.5 - p));
+        blk(ctx, px - half * PX, py - half * PX, half * 2 * PX, half * 2 * PX, P.body);
+        blk(ctx, px - half * PX, py - half * PX, PX, half * 2 * PX, P.outline);
+        blk(ctx, px - half * PX + PX, py - half * PX, PX, PX, P.light);
+    }
+
+    // Avuçtaki kırık: t 0.55'te ELDEN AYRILIYOR (combat.js'te de mermi o
+    // civarda doğuyor). Ayrılmadan önce büyüyor, sonra el boş kalıyor.
+    const grow = phase(t, 0.1, 0.55);
+    if (t < 0.6 && grow > 0.05) {
+        const r = Math.round(1 + grow * 2) * PX;
+        blk(ctx, hx - r, hy - r, r * 2, r * 2, P.body);
+        blk(ctx, hx - r, hy - r, r * 2, PX, P.light);
+        blk(ctx, hx - r, hy + r - PX, r * 2, PX, P.outline);
+        blk(ctx, hx - PX, hy - PX, PX * 2, PX * 2, P.frost);
+    } else {
+        // Savurmadan sonra elde kalan kırağı
+        blk(ctx, hx - PX * 2, hy - PX * 2, PX * 4, PX * 4, P.light);
+        blk(ctx, hx - PX * 2, hy - PX * 2, PX * 4, PX, P.frost);
+    }
+}
+
+// Duvarı kurarken iki el yerde: avuçlardan öne doğru yayılan kırağı.
+function iceWallPalms(ctx, x, footY, t) {
+    const P = ICE_P;
+    const k = swell(t);
+    if (k <= 0.05) return;
+    const top = footY - PX * 16;
+
+    for (const side of [-1, 1]) {
+        const ax = x + side * PX * 7 - (side < 0 ? PX * 4 : 0);
+        blk(ctx, ax, top, PX * 4, PX * 14, P.body);
+        blk(ctx, ax, top, PX, PX * 14, P.outline);
+        blk(ctx, ax + PX, top, PX, PX * 14, P.light);
+        // Avuç: yere yapışmış
+        blk(ctx, ax - PX, footY - PX * 3, PX * 6, PX * 3, P.light);
+        blk(ctx, ax - PX, footY - PX, PX * 6, PX, P.outline);
+    }
+
+    // Yerden yükselen kırağı dalgası
+    const reach = Math.round(k * 10);
+    for (let i = 0; i < reach; i++) {
+        const h = Math.round(Math.sin((i / reach) * Math.PI) * 3) + 1;
+        blk(ctx, x - PX * 20 + i * PX * 4, footY - h * PX, PX * 3, h * PX, i % 2 ? P.frost : P.light);
+    }
+}
+
+// Ayaz: karakterin çevresine bir anda açılan soğuk halka. Vuruşun kendisi
+// combat.js'te; bu, halkanın karakterden çıktığı an.
+function frostBurst(ctx, x, footY, t) {
+    const P = ICE_P;
+    const k = phase(t, 0.3, 1);
+    if (k <= 0 || k >= 1) return;
+    const cy = footY - PX * 24;
+    const fade = 1 - k;
+
+    for (let i = 0; i < 14; i++) {
+        const a = (Math.PI * 2 * i) / 14;
+        const d = PX * (5 + k * 30);
+        const bx = Math.round((x + Math.cos(a) * d) / PX) * PX;
+        const by = Math.round((cy + Math.sin(a) * d * 0.75) / PX) * PX;
+        const s = fade > 0.5 ? PX * 2 : PX;
+        ctx.globalAlpha = 0.35 + fade * 0.65;
+        blk(ctx, bx, by, s, s, i % 3 ? P.light : P.frost);
+    }
+    ctx.globalAlpha = 1;
+}
+
 const OVERLAYS = {
     punch: (ctx, x, footY, t, dir) => virusPunchArm(ctx, x, footY, t, dir),
     blob: (ctx, x, footY, t) => coralMuzzle(ctx, x, footY, t),
     burst: (ctx, x, footY, t) => coralBurstSpikes(ctx, x, footY, t),
     beam: (ctx, x, footY, t, dir) => electroBeamArm(ctx, x, footY, t, dir),
-    orb: (ctx, x, footY, t) => electroOrbArms(ctx, x, footY, t)
+    orb: (ctx, x, footY, t) => electroOrbArms(ctx, x, footY, t),
+    shard: (ctx, x, footY, t, dir) => iceThrowArm(ctx, x, footY, t, dir),
+    wall: (ctx, x, footY, t) => iceWallPalms(ctx, x, footY, t),
+    frost: (ctx, x, footY, t) => frostBurst(ctx, x, footY, t)
 };
 
 // Hamlenin arenaya çıktığı nokta: anti-virüsün topu omzundaki borunun
@@ -1118,7 +1554,10 @@ const OVERLAYS = {
 export const MUZZLES = {
     antivirus: { dx: PX * 8, dy: -PX * 45 },
     electro: { dx: PX * 12, dy: -PX * 30, mirror: true },
-    virus: { dx: 0, dy: -PX * 34, mirror: true }
+    virus: { dx: 0, dy: -PX * 34, mirror: true },
+    // Buzun kırığı SAVURAN ELDEN çıkıyor: kol yay çizdiği için el, atış
+    // anında (t≈0.55) omuzun bir tık önünde ve altında oluyor.
+    ice: { dx: PX * 10, dy: -PX * 30, mirror: true }
 };
 
 export function muzzleOf(key, x, footY, dir = 1) {
@@ -1161,6 +1600,13 @@ export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
         // karakterin saldırısı sessiz olamaz.
         const boost = pose && (pose.id === 'beam' || pose.id === 'orb' || pose.id === 'blink') ? 2.4 : 1;
         drawElectroSparks(ctx, Math.round(x), Math.round(y), frame, boost);
+    }
+
+    if (key === 'ice') {
+        // Hamle sırasında kırağı yoğunlaşıyor - ama elektrodaki kadar değil:
+        // buzun saldırısı patlamıyor, soğuğu artıyor.
+        const boost = pose && (pose.id === 'frost' || pose.id === 'wall') ? 1.9 : 1;
+        drawFrostMotes(ctx, Math.round(x), Math.round(y), frame, boost);
     }
 
     if (pose && OVERLAYS[pose.id]) {

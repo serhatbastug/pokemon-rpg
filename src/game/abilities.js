@@ -236,127 +236,106 @@ export const ABILITIES = {
             animFrames: 14
         }
     },
-    // ---- ICE-VİRÜS: üşüten, kontrol eden ----
+    // ---- ICE-VİRÜS: kılıçlı, klonlu, donduran ----
     //
-    // Kadronun dördüncüsü ve en AZ hasar verenı. Kimliği vuruşta değil
-    // BİRİKİMDE: her buz değişi rakibe bir "üşüme" ekliyor, üç üşüme rakibi
-    // kısa süre DONDURUYOR (bkz. CHILL). Buzun kazanma yolu rakibi yavaşlatıp
-    // bir anlığına durdurmak, sonra o boşluğu kullanmak.
+    // Kadronun ikinci yakın dövüşçüsü ama virüsün tersi: virüs kütlesiyle
+    // vurur, buz KESER. Kimliği üç hamlenin üçünde de aynı: buz kendini
+    // ÇOĞALTIR ve rakibi YERİNDE TUTAR.
     //
-    // Diğer üçüyle çakışmıyor: virüs yakın döğüşçü, anti basınç kuruyor,
-    // elektro alan tutuyor - hiçbiri rakibin SIRASINI kesmiyor.
+    // Eski hâlinde (2026-09-04) menzilli bir "üşütücü"ydü - kırık atıyor,
+    // duvar dikiyor, ayaz yayıyordu. Kullanıcı hepsini beğenmedi ve karakteri
+    // baştan tarif etti (2026-09-05): kılıç, klon, buz yolu.
     ice: {
         basic: {
-            id: 'shard',
-            name: 'BUZ KIRIĞI',
-            kind: 'shard',
-            icon: 'shard',
-            cooldown: 26,
-            // DENGE (2026-09-04, oynanarak): 6 hasardı, çok zayıf kaldı.
-            // Yanlış hesabım: üşümeyi "değerli" sayıp vuruşu ucuzlatmıştım,
-            // ama üşümenin kendisi de kısılmış olduğu için karakter iki
-            // yerden birden zayıfladı. Vuruş 9'a çıktı - sürekli hasarda
-            // hâlâ antinin altında (0,346 / 0,350), ama artık kavisli atışı
-            // ıskalamanın bedeli maçı kaybettirmiyor.
-            damage: 9,
-            chill: 1,
-            speed: 11,
-            // Kırık YERÇEKİMİNE tabi: düz gitmiyor, kavis çiziyor. Uzaktan
-            // isabet ettirmek beceri istiyor - buzun menzilli olmasının
-            // bedeli bu. Antinin topu düz ve hızlı, buzunki ağır ve düşüyor;
-            // iki menzilli karakter aynı şeyi yapmasın.
-            gravity: 0.22,
-            radius: 10,
-            life: 150,
-            animFrames: 20
+            id: 'sword',
+            name: 'BUZ KILICI',
+            kind: 'melee',
+            icon: 'sword',
+            // Virüsün savurmasının yanında HAFİF ve HIZLI: virüs tek vuruşta
+            // ağır, buz sık sık kesiyor. Sürekli hasarı yine de virüsünkinin
+            // altında - buzun asıl kazancı klonla İKİ kılıç olması.
+            cooldown: 38,
+            damage: 10,
+            // Kılıç saplanıyor, gövde çarpmıyor: virüsün 34'lük atılmasının
+            // yanında buzunki yalnızca bir adım.
+            lunge: 14,
+            reach: 118,
+            startup: 6,
+            active: 7,
+            recovery: 14,
+            // Vuruş rakibi HAFİFÇE savuruyor. Ağır bir itiş değil - amacı
+            // hasar değil, buzun kendine bir kılıç boyu yer açması.
+            knockback: 11,
+            animFrames: 26
         },
         special: {
-            id: 'wall',
-            name: 'BUZ DUVARI',
-            kind: 'wall',
-            icon: 'wall',
-            cooldown: 420,
-            // Kadronun tek SAVUNMA özeli: hasarı yok, kimseyi vurmuyor.
-            //
-            // DENGE (2026-09-04, oynanarak): duvar önce İKİ TARAFA DA
-            // simetrikti - buzun kendi kırığını da durduruyordu. Sonuç:
-            // özelini kullanan buz dokuz saniye boyunca hiç hasar veremiyor,
-            // yani kendi özeli kendini cezalandırıyordu. Artık duvar
-            // MERMİDE tek yönlü: rakibin atışını durduruyor, sahibininkini
-            // geçiriyor - bu buzun büyüttüğü kendi kalkanı.
-            //
-            // Kamp kurmaya dönüşmesini engelleyen şey YOL: duvar iki
-            // oyuncunun da yolunu kesiyor, buz da onu geçemiyor. Yani
-            // arkasından atış yapmak için buz ilerlemekten vazgeçiyor, ve
-            // duvar üç saniyede sönüyor.
-            offset: 130,
-            width: 28,
-            // Zıplama 140 piksel yükseliyor (13²/2·0,6), yukarı atılma 367.
-            // Duvar 180: zıplamayla AŞILAMIYOR ama L1+ÇARPI ile aşılıyor.
-            // Yani duvarın cevabı oyuncuda zaten var, bekleme süresi olan
-            // bir kombo - aşılamayan duvar denge değil kilit olurdu.
-            height: 180,
-            // Kaç mermi durdurur. Yakın dövüş vuruşu ikisini birden
-            // götürüyor (bkz. combat.meleeHit), yoksa virüs duvarın
-            // arkasındaki buza hiç ulaşamazdı.
-            hp: 5,
-            life: 180,
+            id: 'clone',
+            name: 'KLON',
+            kind: 'clone',
+            icon: 'clone',
+            // BEKLEME KLON YOK OLUNCA BAŞLIYOR (bkz. combat.spawnClone):
+            // klon yaşarken sayaç sonsuz duruyor, öldüğü an buraya düşüyor.
+            // Bu yüzden aynı anda iki klon olamaz - kuralın kendisi bu.
+            cooldown: 300,
+            // Klon GÖRSEL OLARAK AYNI: rakip hangisinin asıl olduğunu
+            // vuruşundan anlıyor. Bu yüzden az vuruyor ve yalnızca normal
+            // saldırı yapıyor - hile değil, ikilem.
+            damage: 5,
+            reach: 110,
+            attackInterval: 60,
+            speed: 3.4,
+            hp: 34,
+            // Kimse öldürmezse kendiliğinden dağılıyor: yoksa buz klonu
+            // arenanın bir köşesinde saklayıp beklemeyi hiç başlatmazdı.
+            life: 600,
+            // Klon doğduğu an görünür şekilde AYRI durmalı: 80 pikselde iki
+            // gövde üst üste binip tek bir geniş kütle gibi okunuyordu.
+            spawnOffset: 130,
             animFrames: 30
         },
         signature: {
-            id: 'frost',
-            name: 'AYAZ',
-            kind: 'frost',
-            icon: 'frost',
+            id: 'path',
+            name: 'BUZ YOLU',
+            kind: 'path',
+            icon: 'path',
             padCombo: ['l1', 'triangle'],
             keySlot: 'attack',
-            cooldown: 240,
-            // Çevreye bir anda yayılan ayaz: İKİ üşüme birden ekliyor, yani
-            // bir kırıkla birleşince donma çıkıyor. Menzili kısa - donma
-            // bedava olmasın, buz yaklaşmayı göze alsın.
-            //
-            // DENGE (2026-09-04): hasarı 3'tü, "sembolik" diye yazmıştım.
-            // Oynanışta bu bir hamle değil bir jest oldu: buz kendini
-            // tehlikeye atıp yaklaşıyor ve karşılığında hiçbir şey almıyordu.
-            // Yakınlaşmanın riski varsa ödülü de olmalı.
-            damage: 12,
-            chill: 2,
-            radius: 180,
+            cooldown: 480,
+            // Yol NORMAL HIZLA uzuyor: yürüyen bir oyuncu ondan kaçabilir,
+            // duran oyuncu kaçamaz. Kaçırılabilir olması şart - ucu değdiği
+            // yeri donduran bir hamle ışınlanma hızında olamaz.
+            speed: 6,
+            width: 26,
+            // Arenanın tamamını (1280) geçmiyor: rakibi köşeye kadar
+            // kovalayan bir yol kaçılamaz olurdu.
+            maxLength: 880,
+            // Rakip yüksekteyse yol onun sütununda YUKARI dönüyor; dikey
+            // parça yataydan yavaş - tırmanmak zaman alır.
+            climbSpeed: 4,
+            // Dikey parçanın sınırı: arenanın en üst basamağını (250) aşıyor,
+            // yani yukarı kaçmak yolun cevabı değil - ama sonsuz da değil.
+            maxClimb: 460,
             animFrames: 26
         }
     }
 
 };
-// ---- ÜŞÜME ve DONMA (yalnız ICE-VİRÜS) ----
+// ---- DONMA (yalnız ICE-VİRÜS) ----
 //
-// Buzun bütün kimliği burada. Her buz değişi bir üşüme ekliyor; üşümeler
-// yavaşlatıyor, üçe ulaşınca rakip KISA SÜRE donuyor.
+// Buzun tek kontrol aracı: BUZ YOLU'nun ucu rakibe değerse rakip donuyor.
+// Eskiden üç üşümelik bir birikimdi; artık tek bir hamlenin sonucu, ama o
+// hamle yavaş ve görünür - rakip yolun geldiğini görüyor ve kaçabiliyor.
 //
-// Dövüş oyununda hareketi kesen bir güç kolayca eziciye dönüşür. Üç fren
-// birden konuldu:
-//   - Donma KISA (yarım saniye): bir hamle penceresi açar, raunt kazandırmaz.
-//   - Donduktan sonra rakip UZUN SÜRE tekrar donmuyor; üşümeler yavaşlatmaya
-//     devam ediyor ama zincirleme donma yok.
-//   - Üşüme birikimi kendiliğinden sönüyor: buz basıncı sürdürmezse sıfırlanır.
-// DENGE (2026-09-04, oynanarak): ilk hâlinde üç fren de fazla sıkıydı ve
-// buz "çok güçsüz" çıktı. Üçü de gevşetildi, ama fren olarak duruyorlar:
-//   - Donma yarım saniyeydi: bir hamle penceresi açmıyordu bile, buz üç
-//     kırık isabet ettirip karşılığında BİR kırıklık zaman kazanıyordu.
-//     Bir saniyeye çıktı - iki kırık ya da bir AYAZ sığıyor.
-//   - Bağışıklık donmanın 8 katıydı, şimdi 3 katı. Zincirleme donma hâlâ
-//     yok ama buz basıncı sürdürünse döngü kapanıyor.
-//   - Üşüme donunca SIFIRLANIYORDU. En büyük hatam buydu: yavaşlatma en
-//     yüksek değerine ulaştığı anda siliniyordu, yani %36'lık yavaşlatma
-//     oyunda hiç yaşanmıyordu. Artık birikim donmadan sonra DURUYOR,
-//     kendiliğinden sönene kadar rakibi yavaşlatmaya devam ediyor.
-export const CHILL = {
-    max: 3,               // kaç üşüme donmaya çevirir
-    slowPerStack: 0.14,   // her üşüme %14 yavaşlatır (en çok %42)
-    decay: 180,           // 3 sn yeni üşüme gelmezse birikim söner
-    freeze: 60,           // donma bir saniye
-    immune: 180           // donduktan sonra 3 sn tekrar donmaz
+// Dövüş oyununda hareketi kesen bir güç kolayca eziciye döner. İki fren:
+//   - Donma bir hamle penceresi kadar: buz yaklaşıp bir iki kılıç sallar,
+//     raunt kazanmaz.
+//   - Donduktan sonra rakip UZUN SÜRE tekrar donmuyor. Yolun beklemesi
+//     (480) bağışıklıktan uzun, yani zincirleme donma zaten mümkün değil;
+//     bağışıklık ikinci fren olarak duruyor.
+export const FREEZE = {
+    duration: 100,   // donma ~1,7 saniye
+    immune: 300      // donduktan sonra 5 saniye tekrar donmaz
 };
-
 
 // Bir dövüşçünün bütün hamleleri, bekleme sayaçlarının kurulacağı sırayla.
 export function abilitiesOf(fighterId) {

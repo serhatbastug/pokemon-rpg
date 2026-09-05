@@ -543,56 +543,70 @@ check('bölünme tek başına rakibi öldüremiyor', splitMax < minHp,
     `en çok ${splitMax} hasar / en az ${minHp} can`);
 
 // ---- ICE-VİRÜS'ün dengesi ----
-// Buz kadroya kontrol getiriyor (yavaşlatma + kısa donma). Dövüş oyununda
-// hareketi kesen bir güç kolayca eziciye döner, o yüzden bedeli ve frenleri
-// burada kurala bağlı.
+// Buz kadronun ikinci yakın dövüşçüsü: kılıç, klon, buz yolu (2026-09-05,
+// kullanıcının tarifi). Kimliği hasar değil ÇOĞALMA ve DURDURMA, o yüzden
+// frenleri de burada kurala bağlı.
 
-// Kontrolün bedeli hasar - ama BEDEL KADAR, daha fazlası değil. İlk turda
-// buzu hem az vuran hem az donduran bir karakter yapmıştım ve oynanışta
-// "çok güçsüz" çıktı. Ölçü şu: buz KADRONUN EN HIZLI ATICISINI geçmemeli.
-// Virüs bu karşılaştırmanın dışında - o yakın dövüşçü, mesafeyi kapatmak
-// zorunda olduğu için sürekli hasarı zaten menzillilerden düşük.
-// Elektro da dışında: ışını tek bir vuruş değil arenada kalan bir hat.
 const dps = (a) => a.damage / a.cooldown;
 const iceBasic = ab.ABILITIES.ice.basic;
-const fastest = ab.ABILITIES.antivirus.basic;
-check('buzun sürekli hasarı en hızlı atıcıyı geçmiyor',
-    dps(iceBasic) < dps(fastest),
-    `kırık ${dps(iceBasic).toFixed(3)} / top ${dps(fastest).toFixed(3)}`);
-check('buzun tek vuruşu virüsün savurmasından hafif',
+const iceClone = ab.ABILITIES.ice.special;
+const icePath = ab.ABILITIES.ice.signature;
+
+// İki yakın dövüşçü aynı şey olmasın: virüs TEK VURUŞTA ağır, buz SIK ama
+// hafif. Yine de buzun sürekli hasarı virüsünkini geçmemeli - buz zaten
+// klonla ikinci bir kılıç çıkarıyor, üstüne tek başına da daha çok vurursa
+// virüsün yakın dövüşte hiçbir üstünlüğü kalmıyor.
+check('buzun kılıcı virüsün savurmasından hafif',
     iceBasic.damage < ab.ABILITIES.virus.basic.damage,
     `${iceBasic.damage} / ${ab.ABILITIES.virus.basic.damage}`);
+check('buzun sürekli hasarı virüsünkini geçmiyor',
+    dps(iceBasic) < dps(ab.ABILITIES.virus.basic),
+    `buz ${dps(iceBasic).toFixed(3)} / virüs ${dps(ab.ABILITIES.virus.basic).toFixed(3)}`);
+// Kılıç saplanıyor, gövde çarpmıyor: virüsün atılması buzunkinden uzun
+// olmalı, yoksa iki yakın dövüşçünün mesafe kapatması aynı şey olur.
+check('buzun atılması virüsünkinden kısa',
+    iceBasic.lunge < ab.ABILITIES.virus.basic.lunge,
+    `${iceBasic.lunge} / ${ab.ABILITIES.virus.basic.lunge}`);
+// Savurma HAFİF: rakibi kılıç boyu kadar açıyor, arenanın öbür ucuna değil.
+check('kılıcın savurması hafif',
+    iceBasic.knockback > 0 && iceBasic.knockback < iceBasic.reach / 5,
+    `${iceBasic.knockback} / menzil ${iceBasic.reach}`);
 
-// Donma bir hamle penceresi kadar olmalı: ne yok sayılacak kadar kısa (ilk
-// hâli yarım saniyeydi, bir kırıklık zaman bile kazandırmıyordu) ne de
-// rakibin sırasını gasbedecek kadar uzun. Bağışıklık hâlâ katbekat uzun:
+// Klon GÖRÜNTÜDE aynı, VURUŞTA değil: rakibin ayırt etmesinin tek yolu bu.
+check('klon asıldan az vuruyor', iceClone.damage < iceBasic.damage,
+    `${iceClone.damage} / ${iceBasic.damage}`);
+// Klon tek başına maçı bitirmemeli: bütün ömrü boyunca vurabileceği en çok
+// hasar bir can barının altında kalmalı.
+const cloneMax = Math.floor(iceClone.life / iceClone.attackInterval) * iceClone.damage;
+const minHpAll = Math.min(...FIGHTERS.map(f => f.stats.hp));
+check('klon tek başına rakibi öldüremiyor', cloneMax < minHpAll,
+    `en çok ${cloneMax} hasar / en az ${minHpAll} can`);
+// Klon kırılabilir olmalı: canı bir kılıç vuruşundan çok, birkaç vuruştan az.
+check('klon birkaç vuruşta kırılıyor',
+    iceClone.hp > iceBasic.damage && iceClone.hp < iceBasic.damage * 5,
+    `klon canı ${iceClone.hp} / kılıç ${iceBasic.damage}`);
+
+// Buz yolu: yavaş ve GÖRÜNÜR olmalı. Kaçılamayan bir dondurma dövüşü
+// kilitler; yolun bütün dengesi rakibin onu görüp kaçabilmesinde.
+check('buz yolu yürüme hızından hızlı değil',
+    icePath.speed <= Math.max(...FIGHTERS.map(f => f.stats.speed)) + 1.5,
+    `yol ${icePath.speed} / en hızlı dövüşçü ${Math.max(...FIGHTERS.map(f => f.stats.speed))}`);
+const ARENA_W = 1280;   // arena tuvali (index.html)
+check('yol arenanın tamamını kaplamıyor', icePath.maxLength < ARENA_W * 0.75,
+    `${icePath.maxLength} / ${ARENA_W}`);
+// Tırmanış yataydan yavaş: basamağa kaçan rakibe bir soluk kalmalı.
+check('yol yukarı tırmanırken yavaşlıyor', icePath.climbSpeed < icePath.speed,
+    `${icePath.climbSpeed} / ${icePath.speed}`);
+
+// Donma bir hamle penceresi kadar olmalı: ne yok sayılacak kadar kısa ne de
+// rakibin sırasını gasbedecek kadar uzun. Bağışıklık katbekat uzun -
 // zincirleme donma yok.
 check('donma bir hamle penceresi kadar, bağışıklık katbekat uzun',
-    ab.CHILL.freeze <= 90 && ab.CHILL.immune >= ab.CHILL.freeze * 2.5,
-    `donma ${ab.CHILL.freeze} / bağışıklık ${ab.CHILL.immune}`);
-
-// Tek isabet dondurmamalı: donma BİRİKİMİN sonucu olmalı, sürprizin değil.
-check('tek isabet dondurmuyor',
-    ab.CHILL.max > 1 && iceBasic.chill < ab.CHILL.max &&
-    ab.ABILITIES.ice.signature.chill < ab.CHILL.max,
-    `en çok ${ab.CHILL.max} · kırık ${iceBasic.chill} · ayaz ${ab.ABILITIES.ice.signature.chill}`);
-
-// Birikim sönmezse buz bir kez vurup rauntun sonuna kadar üstte kalırdı.
-check('üşüme birikimi kendiliğinden sönüyor', ab.CHILL.decay > 0);
-
-// Üşümenin yavaşlatması salgın izinden HAFİF olmalı: iz bir noktada duruyor,
-// üşüme rakibin peşinden geliyor. Peşinden gelen daha sert olamaz.
-const chillSlow = ab.CHILL.max * ab.CHILL.slowPerStack;
-const trailSlow = 1 - ab.ABILITIES.virus.signature.slow;
-check('üşümenin yavaşlatması salgın izinden hafif', chillSlow < trailSlow,
-    `üşüme %${Math.round(chillSlow * 100)} / iz %${Math.round(trailSlow * 100)}`);
-
-// Buz duvarı SAVUNMA: hiç hasar vermiyor.
-const wall = ab.ABILITIES.ice.special;
-check('buz duvarı hasar vermiyor', wall.damage === undefined);
-check('buz duvarı beklemesinden kısa yaşıyor', wall.life < wall.cooldown,
-    `${wall.life} / ${wall.cooldown}`);
-
+    ab.FREEZE.duration <= 120 && ab.FREEZE.immune >= ab.FREEZE.duration * 2.5,
+    `donma ${ab.FREEZE.duration} / bağışıklık ${ab.FREEZE.immune}`);
+// Yolun beklemesi donmadan uzun: iki donma arası hep bir dövüş geçiyor.
+check('yolun beklemesi donmadan uzun', icePath.cooldown > ab.FREEZE.duration * 3,
+    `bekleme ${icePath.cooldown} / donma ${ab.FREEZE.duration}`);
 
 // Kümedeki dört daire: üç atılma + karakterin kendi hamlesi
 for (const f of FIGHTERS) {
@@ -666,13 +680,10 @@ check('üst basamağa alt basamaktan çıkılıyor', LEDGE.low + jumpRise > LEDG
 check('üst basamağa yukarı atılmayla da çıkılıyor', dashRise > LEDGE.high,
     `atılma ${Math.round(dashRise)} / basamak ${LEDGE.high}`);
 
-// Buz duvarının boyu da aynı ölçüyle: zıplamayla AŞILAMAMALI ama yukarı
-// atılmayla aşılmalı. Aşılamayan duvar denge değil kilit olurdu; zıplamayla
-// aşılan duvar da kimseyi durdurmazdı.
-const iceWall = ab.ABILITIES.ice.special;
-check('buz duvarı zıplamayla aşılmıyor, yukarı atılmayla aşılıyor',
-    iceWall.height > jumpRise && iceWall.height < dashRise,
-    `duvar ${iceWall.height} · zıplama ${Math.round(jumpRise)} · atılma ${Math.round(dashRise)}`);
+// Buz yolu basamağa kaçan rakibin peşinden tırmanabilmeli: dikey parçası
+// arenanın en üst basamağını aşmıyorsa 'yukarı çık' yolun tek cevabı olurdu.
+check('buz yolu üst basamağa tırmanabiliyor', ab.ABILITIES.ice.signature.maxClimb > LEDGE.high,
+    `tırmanış ${ab.ABILITIES.ice.signature.maxClimb} / basamak ${LEDGE.high}`);
 
 for (const arena of ARENAS) {
     const ledges = ledgesOf(arena, AW, AH);

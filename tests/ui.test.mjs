@@ -727,41 +727,106 @@ async function main() {
 
     await shot('03b-savas-iki-kol');
 
-    // --- ICE-VİRÜS: üşüme, donma ve buz duvarı ---
-    // Buzun bütün dövüşü üşüme birikiminin etrafında dönüyor. Sayılar
-    // data testinde; burada sınanan şey kuralların arenada İŞLEYİP
+    // --- ICE-VİRÜS: kılıç, klon ve buz yolu ---
+    // Sayılar data testinde; burada sınanan şey kuralların arenada İŞLEYİP
     // işlemediği. Oyun döngüsü elle adımlanıyor, girdi taklit edilmiyor.
     const iceReady = await page.evaluate(() => {
         const { FIGHTERS } = window.__fighters;
         const f = (id) => FIGHTERS.find(x => x.id === id);
         const g = window.__game;
         g.start(f('ice'), f('antivirus'));
-        // Girişleri elle geçiyoruz: burada sınanan şey üşüme, giriş değil.
+        // Girişleri elle geçiyoruz: burada sınanan şey hamleler, giriş değil.
         for (let i = 0; i < 1200 && (g.intro || g.introQueue.length); i++) g.update();
         return { intro: !!g.intro, p1: g.p1.fighter.id, can: g.p1.maxHp };
     });
     check('Buz arenaya cikiyor', !iceReady.intro && iceReady.p1 === 'ice',
         JSON.stringify(iceReady));
 
-    const chill = await page.evaluate(() => {
+    // Kılıç: vuruyor ve rakibi HAFİFÇE savuruyor. Savurma hasarın kendisi
+    // kadar önemli - buz kendine bir kılıç boyu yer açıyor.
+    const kilic = await page.evaluate(() => {
         const g = window.__game;
-        g.p2.chill = 0;
-        g.p2.frozenFrames = 0;
-        g.p2.freezeImmune = 0;
-        const adimlar = [];
-        for (let i = 0; i < 3; i++) {
-            g.p2.addChill(1);
-            adimlar.push({ chill: g.p2.chill, donma: g.p2.frozenFrames });
-        }
-        return adimlar;
+        g.combat.reset();
+        g.p1.x = 500; g.p2.x = 500 + 90;
+        g.p1.y = g.p1.groundY; g.p2.y = g.p2.groundY;
+        g.p1.dir = 1; g.p2.vx = 0;
+        const can0 = g.p2.hp;
+        g.p1.cooldowns.sword = 0;
+        g.p1.useAbility('basic');
+        for (let i = 0; i < 20; i++) g.p1.stepAction();
+        return { hasar: can0 - g.p2.hp, savurma: g.p2.vx };
     });
-    check('Uc usume rakibi donduruyor',
-        chill[0].donma === 0 && chill[1].donma === 0 && chill[2].donma > 0,
-        JSON.stringify(chill));
-    // Birikim donunca SIFIRLANMAMALI: sıfırlanırsa yavaşlatma en yüksek
-    // değerine ulaştığı anda siliniyor ve oyunda hiç yaşanmıyor.
-    check('Donduktan sonra usume birikimi duruyor', chill[2].chill === 3,
-        JSON.stringify(chill[2]));
+    check('Buz kilici vuruyor ve rakibi savuruyor',
+        kilic.hasar > 0 && kilic.savurma > 0, JSON.stringify(kilic));
+
+    // Klon: bir tane doğuyor, bekleme SONSUZ duruyor (klon yaşarken sayaç
+    // işlemiyor), klon kırılınca bekleme başlıyor. "Aynı anda iki klon
+    // olmaz" kuralı bunun kendiliğinden sonucu.
+    const klon = await page.evaluate(() => {
+        const g = window.__game;
+        g.combat.reset();
+        g.p1.cooldowns.clone = 0;
+        g.p1.useAbility('special');
+        const bir = g.combat.entities.filter(e => e.type === 'clone').length;
+        const bekleme = g.p1.cooldowns.clone;
+        // İkinci kez denemek yeni klon çıkarmamalı
+        g.p1.useAbility('special');
+        const iki = g.combat.entities.filter(e => e.type === 'clone').length;
+        // Klonu kır: bekleme ancak şimdi saymaya başlamalı
+        const c = g.combat.entities.find(e => e.type === 'clone');
+        c.hp = 0;
+        g.combat.update();
+        return {
+            bir, iki,
+            beklemeYasarken: bekleme === Infinity,
+            kalan: g.combat.entities.filter(e => e.type === 'clone').length,
+            beklemeSonra: g.p1.cooldowns.clone
+        };
+    });
+    check('Klon tek ve beklemesi ancak kirilinca basliyor',
+        klon.bir === 1 && klon.iki === 1 && klon.beklemeYasarken &&
+        klon.kalan === 0 && klon.beklemeSonra > 0 && klon.beklemeSonra < Infinity,
+        JSON.stringify(klon));
+
+    // Klon rakibin vuruşunu YİYOR: "hangisi asıl" sorusunun bedeli bu.
+    const klonVurus = await page.evaluate(() => {
+        const g = window.__game;
+        g.combat.reset();
+        g.p1.cooldowns.clone = 0;
+        g.p1.useAbility('special');
+        const c = g.combat.entities.find(e => e.type === 'clone');
+        c.x = 600; c.footY = g.p2.footY;
+        g.p2.x = 600 - 60; g.p2.y = g.p2.groundY; g.p2.dir = 1;
+        const can0 = c.hp;
+        const p2can0 = g.p1.hp;
+        // Yakın dövüş hamlesi evreli: gerçek oyunda action Player'da kuruluyor
+        g.p2.action = { ability: null, frame: 0 };
+        g.combat.meleeHit(g.p2, { reach: 120, damage: 9 });
+        return { klonCan: can0 - c.hp, asilaGitmedi: g.p1.hp === p2can0 };
+    });
+    check('Klon rakibin vurusunu yiyor', klonVurus.klonCan > 0 && klonVurus.asilaGitmedi,
+        JSON.stringify(klonVurus));
+
+    // Buz yolu: ucu rakibe DENK GELİRSE donduruyor. Yolun ortası değil UCU -
+    // yolun üstünden atlayan rakip donmuyor.
+    const yol = await page.evaluate(() => {
+        const g = window.__game;
+        g.combat.reset();
+        g.p1.x = 300; g.p2.x = 700;
+        g.p1.y = g.p1.groundY; g.p2.y = g.p2.groundY;
+        g.p1.dir = 1;
+        g.p2.frozenFrames = 0; g.p2.freezeImmune = 0;
+        g.p1.cooldowns.path = 0;
+        g.p1.useAbility('signature');
+        const yolVar = g.combat.entities.some(e => e.type === 'path');
+        // Yol yavaş: bir karede rakibe ulaşmamalı
+        g.combat.update();
+        const ilkKare = g.p2.frozenFrames;
+        for (let i = 0; i < 200 && g.p2.frozenFrames === 0; i++) g.combat.update();
+        return { yolVar, ilkKare, donma: g.p2.frozenFrames };
+    });
+    check('Buz yolu uzayip rakibi donduruyor',
+        yol.yolVar && yol.ilkKare === 0 && yol.donma > 0, JSON.stringify(yol));
 
     const donmus = await page.evaluate(() => {
         const g = window.__game;
@@ -778,49 +843,54 @@ async function main() {
     check('Donmus oyuncu ne hamle cikariyor ne yuruyor',
         !donmus.hamle && donmus.kayma < 1, JSON.stringify(donmus));
 
+    // Bağışıklık: zincirleme donma yok.
     const bagisik = await page.evaluate(() => {
         const g = window.__game;
         g.p2.frozenFrames = 0;
-        g.p2.chill = 0;
         const bagisiklik = g.p2.freezeImmune;
-        for (let i = 0; i < 3; i++) g.p2.addChill(1);
-        return { bagisiklik, donma: g.p2.frozenFrames, chill: g.p2.chill };
+        const dondu = g.p2.freeze();
+        return { bagisiklik, dondu, donma: g.p2.frozenFrames };
     });
     check('Bagisiklik acikken tekrar donmuyor',
-        bagisik.bagisiklik > 0 && bagisik.donma === 0 && bagisik.chill === 3,
+        bagisik.bagisiklik > 0 && !bagisik.dondu && bagisik.donma === 0,
         JSON.stringify(bagisik));
 
-    // Buz duvarı MERMİDE tek yönlü: rakibin atışını durdurur, sahibininkini
-    // geçirir. İki mermi aynı noktadan aynı hızla gönderiliyor, tek fark
-    // sahipleri.
-    const duvar = await page.evaluate(() => {
+    // Rakip YÜKSEKTEYSE yol yukarı dönüyor: basamağa kaçmak tek cevap olmamalı.
+    const tirmanis = await page.evaluate(() => {
         const g = window.__game;
         g.combat.reset();
-        g.p1.x = 400;
-        g.p2.x = 900;
+        // Arena her açılışta rastgele: buzun yola çıkacağı yeri arenanın
+        // İÇİNDE bırakacak bir basamak seçiliyor. Tuvalin dışından başlayan
+        // yol daha ilk karede sönüyor.
+        const ledge = g.ledges.find(s => s.x > 320) || g.ledges[0];
+        g.p1.x = Math.max(140, ledge.x - 260);
+        g.p1.y = g.p1.groundY;
         g.p1.dir = 1;
-        g.p1.cooldowns.wall = 0;
-        g.p1.useAbility('special');
-        const w = g.combat.entities.find(e => e.type === 'wall');
-        if (!w) return { duvar: false };
-
-        const mermi = (type, owner) => ({
-            type, x: w.x - 30, y: w.y - 60, vx: 12, vy: 0, gravity: 0,
-            r: 7, damage: 1, chill: 1, kind: 'basic', owner, life: 90, seed: 1
-        });
-        g.combat.entities.push(mermi('shot', g.p2));    // rakibin topu
-        g.combat.entities.push(mermi('shard', g.p1));   // buzun kendi kırığı
-        for (let i = 0; i < 6; i++) g.combat.update();
-        return {
-            duvar: true,
-            rakipGecti: g.combat.entities.some(e => e.type === 'shot'),
-            buzGecti: g.combat.entities.some(e => e.type === 'shard'),
-            duvarCani: g.combat.entities.find(e => e.type === 'wall')?.hp
-        };
+        g.p2.x = ledge.x + ledge.w / 2;
+        g.p2.y = ledge.y - g.p2.height / 2;      // basamağın üstünde
+        g.p2.frozenFrames = 0; g.p2.freezeImmune = 0;
+        g.p1.cooldowns.path = 0;
+        g.p1.useAbility('signature');
+        for (let i = 0; i < 300; i++) g.combat.update();
+        const e = g.combat.entities.find(x => x.type === 'path');
+        return { dondu: g.p2.frozenFrames > 0, donduAmaYolBitti: !e };
     });
-    check('Buz duvari rakibin mermisini durduruyor, sahibininkini geciriyor',
-        duvar.duvar && !duvar.rakipGecti && duvar.buzGecti, JSON.stringify(duvar));
-    await shot('03j-buz-duvari');
+    check('Yol basamaktaki rakibin pesinden tirmaniyor', tirmanis.dondu,
+        JSON.stringify(tirmanis));
+
+    await page.evaluate(() => {
+        const g = window.__game;
+        g.combat.reset();
+        g.p1.x = 420; g.p2.x = 820;
+        g.p1.y = g.p1.groundY; g.p2.y = g.p2.groundY;
+        g.p2.frozenFrames = 0; g.p2.freezeImmune = 0;
+        g.p1.cooldowns.clone = 0; g.p1.cooldowns.path = 0;
+        g.p1.dir = 1;
+        g.p1.useAbility('special');
+        g.p1.useAbility('signature');
+        for (let i = 0; i < 30; i++) g.update();
+    });
+    await shot('03j-buz-klon-yol');
 
     // --- Giriş animasyonları: sıra ÖNCE P1, SONRA P2 ---
     // İki dövüşçünün de girişi varsa ikisi de oynar; tur ancak ikisi

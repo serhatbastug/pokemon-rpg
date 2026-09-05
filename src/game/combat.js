@@ -8,11 +8,12 @@
 //
 // Sayılar burada değil, abilities.js'te. Burada yalnızca davranış var.
 
-import { PX } from '../pixel/pixelDraw.js';
+import { PX, hash } from '../pixel/pixelDraw.js';
+import { PHYSICS } from '../config/settings.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import { PAD_GLYPHS } from '../pixel/controlHint.js';
 import { ABILITIES } from './abilities.js';
-import { muzzleOf } from './fighterArt.js';
+import { muzzleOf, drawFighter } from './fighterArt.js';
 
 // 'KeyF' -> 'F', 'Comma' -> ','   (tuş kapağında yazan)
 const KEY_LABELS = { Comma: ',', Period: '.', Slash: '/', Space: 'SPACE' };
@@ -60,9 +61,8 @@ export class Combat {
             case 'trail': return this.spawnTrail(player, ability);
             case 'grab':  return this.spawnArm(player, ability);
             case 'blink': return this.blink(player, ability);
-            case 'shard': return this.spawnShard(player, ability);
-            case 'wall':  return this.spawnWall(player, ability);
-            case 'frost': return this.spreadFrost(player, ability);
+            case 'clone': return this.spawnClone(player, ability);
+            case 'path':  return this.spawnPath(player, ability);
         }
     }
 
@@ -70,21 +70,21 @@ export class Combat {
         this.game.effects.createPulse(player.x, player.footY - 20, player.fighter.themeColor);
     }
 
-    // Virüsün savurması: hazırlık bitince önündeki kutuya bakıyor.
+    // Yakın dövüş vuruşu (virüsün savurması, buzun kılıcı): hazırlık bitince
+    // önündeki kutuya bakıyor.
     meleeHit(player, ability) {
         if (player.action?.landed) return;
 
-        // Önce BUZ DUVARI: araya duvar girmişse savurma duvara iniyor,
-        // arkasındakine değil. Yakın dövüşçünün duvara cevabı bu - iki
-        // savurmada kırılıyor, yoksa virüs duvarın arkasındaki buza hiç
-        // ulaşamazdı (zıplama duvarı aşmıyor, yalnız yukarı atılma aşıyor).
         const front = player.x + player.dir * ability.reach / 2;
-        const wall = this.wallAt(front, player.y);
-        if (wall && wall.owner !== player) {
+
+        // Önce KLON: araya klon girmişse vuruş ona iniyor. Klonun bütün
+        // değeri bu - rakip hangisinin asıl olduğunu bilmediği için vuruşunu
+        // ona harcıyor.
+        const clone = this.cloneAt(front, player.y, player);
+        if (clone) {
             player.action.landed = true;
-            wall.hp -= 2;
-            this.game.effects.createExplosion(wall.x, player.y, '#dff4fb');
-            this.game.effects.triggerShake(6);
+            this.hurtClone(clone, ability.damage);
+            this.game.effects.createExplosion(clone.x, player.y, '#dff4fb');
             return;
         }
 
@@ -97,6 +97,8 @@ export class Combat {
 
         player.action.landed = true;
         enemy.takeDamage(ability.damage, { kind: 'basic', from: player });
+        // Buzun kılıcı rakibi HAFİFÇE savuruyor: hasar değil, kılıç boyu yer.
+        if (ability.knockback) enemy.vx = player.dir * ability.knockback;
         this.game.effects.createExplosion(enemy.x, enemy.y, player.fighter.themeColor);
     }
 
@@ -148,17 +150,7 @@ export class Combat {
         const { canvas } = this.game;
         // Işın ileri uzanan ELDEN çıkıyor (bkz. fighterArt MUZZLES)
         const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
-        // Işın da buz duvarında kesiliyor: duvar mermiyi durdurup ışını
-        // geçirseydi "duvar" değil "kalkan" olurdu, oyuncu neyin geçtiğini
-        // ezberlemek zorunda kalırdı. Yalnızca KURULURKEN bakılıyor - ışın
-        // arenada kalan bir iz, sonradan gelen duvar onu kesmiyor.
-        let end = player.dir > 0 ? canvas.width : 0;
-        for (const w of this.entities) {
-            if (w.type !== 'wall' || w.owner === player) continue;
-            if (m.y < w.y - w.h || m.y > w.y) continue;
-            const edge = w.x - player.dir * w.w / 2;
-            if (player.dir > 0 ? (edge > m.x && edge < end) : (edge < m.x && edge > end)) end = edge;
-        }
+        const end = player.dir > 0 ? canvas.width : 0;
         this.entities.push({
             type: 'beam',
             x0: m.x,
@@ -255,85 +247,199 @@ export class Combat {
 
     // ---- ICE-VİRÜS ----
 
-    // Buz kırığı: topun tersine YERÇEKİMİNE tabi. Düz gitmediği için uzak
-    // mesafede isabet beceri istiyor; karşılığında her isabet rakibe bir
-    // üşüme ekliyor (bkz. Player.addChill).
-    spawnShard(player, ability) {
-        const m = muzzleOf(player.fighter.id, player.x, player.footY, player.dir);
-        this.entities.push({
-            type: 'shard',
-            x: m.x,
-            y: m.y,
-            vx: player.dir * ability.speed,
-            // Hafif yukarı çıkıp düşüyor: kavis "atıldı" der, düz çizgi
-            // "ateşlendi" der - buz atıyor, ateş etmiyor.
-            vy: -2.4,
-            gravity: ability.gravity,
-            r: ability.radius,
-            damage: ability.damage,
-            chill: ability.chill,
-            kind: 'basic',
-            owner: player,
-            life: ability.life,
-            seed: Math.floor(Math.random() * 1000)
-        });
-    }
-
-    // Buz duvarı: iki tarafa da simetrik bir engel. Mermiyi de yolu da
-    // kesiyor, hasar vermiyor.
-    spawnWall(player, ability) {
+    // Klon: buzun kendi kopyası. GÖRSEL OLARAK AYNI - aynı sprite, aynı
+    // duruşlar, hiçbir işaret yok. Rakibin ayırt etmesinin tek yolu vuruşu:
+    // klon az vuruyor ve yalnızca kılıç sallayabiliyor.
+    //
+    // Beklemeyi BURADA sonsuza çekiyoruz. Player.useAbility beklemeyi zaten
+    // yazdı, ama klon yaşarken sayaç işlememeli: bekleme ancak klon yok
+    // olunca başlıyor (bkz. killClone). "Aynı anda iki klon olmaz" kuralı
+    // ayrı bir kontrol değil, bunun kendiliğinden sonucu.
+    spawnClone(player, ability) {
         const { canvas } = this.game;
-        // Arenanın dışına dikilmesin: kenara sıkışan oyuncu duvarı tuvalin
-        // dışına koyup onu görünmez bir engele çevirmesin.
-        const x = Math.max(ability.width, Math.min(canvas.width - ability.width,
-            player.x + player.dir * ability.offset));
+        // Buzun ARKASINDA doğuyor: önünde doğsaydı rakip hangisinin sonradan
+        // geldiğini görürdü. Arkada doğan klon bir an sonra buzu geçip öne
+        // çıkıyor, ikisi karışıyor.
+        const x = Math.max(60, Math.min(canvas.width - 60,
+            player.x - player.dir * ability.spawnOffset));
+
         this.entities.push({
-            type: 'wall',
+            type: 'clone',
             x,
-            y: player.footY,       // duvarın TABANI
-            w: ability.width,
-            h: ability.height,
+            footY: player.footY,
+            vy: 0,
+            dir: player.dir,
+            spec: ability,
             hp: ability.hp,
             maxHp: ability.hp,
+            attackTimer: ability.attackInterval,
+            // Doğarken bir an yerinde duruyor: doğar doğmaz yürümeye başlayan
+            // klon aslın üstünden geçip onunla üst üste biniyor, ikisi tek
+            // gövde gibi okunuyordu. Bu duraklama ikisini birbirinden ayırıyor.
+            birth: 24,
+            anim: null,
             owner: player,
-            life: ability.life,
-            maxLife: ability.life
-        });
-        this.game.effects.createPulse(x, player.footY - ability.height / 2, '#dff4fb');
-    }
-
-    // Ayaz: çevreye bir anda yayılan soğuk. Hasarı sembolik, işi İKİ üşüme
-    // birden eklemek - bir kırıkla birleşince donma çıkıyor.
-    spreadFrost(player, ability) {
-        this.entities.push({
-            type: 'frost',
-            x: player.x,
-            y: player.y,
-            r: ability.radius,
-            owner: player,
-            life: 24,
-            maxLife: 24
+            life: ability.life
         });
 
-        const enemy = this.game.getEnemyOf(player);
-        if (enemy && !enemy.isDead &&
-            Math.hypot(enemy.x - player.x, enemy.y - player.y) <= ability.radius) {
-            enemy.takeDamage(ability.damage, { kind: 'special', from: player });
-            enemy.addChill(ability.chill);
-        }
-        this.game.effects.triggerFlash('rgba(191, 239, 255, 0.16)', 4);
+        player.cooldowns[ability.id] = Infinity;
+        this.game.effects.createPulse(x, player.footY - 60, '#dff4fb');
     }
 
-    // Bir noktada buz duvarı var mı. Duvarın ÜSTÜNDEN geçen mermi durmuyor:
-    // yukarı atılmayla duvarı aşan oyuncu havada atış da yapabilsin.
-    wallAt(x, y) {
+    // Klon yok oldu: bekleme İŞTE ŞİMDİ başlıyor.
+    killClone(e) {
+        e.owner.cooldowns[e.spec.id] = e.spec.cooldown;
+        this.game.effects.createExplosion(e.x, e.footY - 70, '#dff4fb');
+        this.game.effects.spawnText(e.x, e.footY - 130, 'KLON KIRILDI', '#bfefff');
+    }
+
+    hurtClone(e, amount) {
+        e.hp -= amount;
+        e.flash = 8;
+        this.game.effects.createPulse(e.x, e.footY - 70, '#dff4fb');
+    }
+
+    // Bir noktada rakibin klonu var mı. Klon insan gibi vurulabiliyor:
+    // yakın dövüş, mermi ve ışın onu kırıyor - yoksa "hangisi asıl" sorusunun
+    // cevabı yalnızca beklemek olurdu.
+    cloneAt(x, y, attacker) {
         for (const e of this.entities) {
-            if (e.type !== 'wall') continue;
-            if (Math.abs(x - e.x) > e.w / 2) continue;
-            if (y < e.y - e.h || y > e.y) continue;
+            if (e.type !== 'clone' || e.owner === attacker) continue;
+            if (Math.abs(x - e.x) > 44) continue;
+            if (y < e.footY - 190 || y > e.footY + 20) continue;
             return e;
         }
         return null;
+    }
+
+    // Buz yolu: buzun ayağından rakibe doğru uzayan bir buz şeridi. NORMAL
+    // HIZLA uzuyor - yürüyen rakip kaçabilir, duran kaçamaz.
+    //
+    // Rakip yüksekteyse (basamakta) yol onun sütununda YUKARI dönüyor. Ucu
+    // rakibe denk gelirse rakip donuyor; ıskalarsa yol boşa uzayıp sönüyor.
+    spawnPath(player, ability) {
+        this.entities.push({
+            type: 'path',
+            x: player.x,               // yolun başladığı yer
+            y: player.footY,           // yatay parçanın zemini
+            dir: player.dir,
+            len: 0,
+            climb: 0,                  // dikey parçanın boyu
+            turnAt: null,              // yolun yukarı döndüğü x
+            spec: ability,
+            owner: player,
+            done: false,               // ucu bir yere değdi mi (dondurdu ya da bitti)
+            fade: 0
+        });
+        this.game.effects.createPulse(player.x, player.footY, '#dff4fb');
+    }
+
+    // Yolun ucu: yatay parça bitmişse tırmanan uç.
+    pathTip(e) {
+        return {
+            x: e.x + e.dir * e.len,
+            y: e.turnAt !== null ? e.y - e.climb : e.y
+        };
+    }
+
+    stepPath(e) {
+        const spec = e.spec;
+        const enemy = this.game.getEnemyOf(e.owner);
+
+        if (e.done) {
+            e.fade++;
+            return e.fade > 40;
+        }
+
+        if (e.turnAt === null) e.len += spec.speed;
+        else e.climb += spec.climbSpeed;
+
+        const tip = this.pathTip(e);
+
+        // Ucu rakibe DENK GELDİ Mİ. Yalnızca uç dondurur: yolun ortasından
+        // atlayan rakip donmuyor, geçtiği yer artık sıradan buz.
+        if (enemy && !enemy.isDead &&
+            Math.abs(tip.x - enemy.x) < enemy.width / 2 + spec.width / 2 &&
+            tip.y < enemy.footY + 24 && tip.y > enemy.footY - enemy.height) {
+            enemy.freeze();
+            e.done = true;
+            return false;
+        }
+
+        // Rakibin sütununa gelindi ve rakip YÜKSEKTE: yol yukarı dönüyor.
+        if (e.turnAt === null && enemy && !enemy.isDead &&
+            Math.abs(tip.x - enemy.x) < spec.width &&
+            enemy.footY < e.y - 40) {
+            e.turnAt = tip.x;
+        }
+
+        if (e.turnAt !== null && e.climb > spec.maxClimb) e.done = true;
+        if (e.len > spec.maxLength) e.done = true;
+        if (tip.x < 0 || tip.x > this.game.canvas.width) e.done = true;
+        return false;
+    }
+
+    // Klonun bir karesi: rakibe yürüyor, menzile girince kılıç sallıyor.
+    // Basamakları da kullanıyor - rakip yukarı kaçınca klon peşinden zıplıyor,
+    // yoksa "yukarıda dur" klonun tek cevabı olurdu.
+    stepClone(e) {
+        const { canvas } = this.game;
+        const spec = e.spec;
+        const enemy = this.game.getEnemyOf(e.owner);
+
+        e.life--;
+        if (e.flash > 0) e.flash--;
+        if (e.anim && ++e.anim.frame >= e.anim.total) e.anim = null;
+
+        if (e.birth > 0) e.birth--;
+
+        if (e.birth <= 0 && enemy && !enemy.isDead) {
+            e.dir = enemy.x >= e.x ? 1 : -1;
+            const gap = Math.abs(enemy.x - e.x);
+            if (gap > spec.reach * 0.7) e.x += e.dir * spec.speed;
+
+            // Rakip yukarıdaysa zıpla
+            if (e.grounded && enemy.footY < e.footY - 60 && gap < 320) {
+                e.vy = PHYSICS.jumpVelocity;
+                e.grounded = false;
+            }
+
+            if (e.attackTimer > 0) e.attackTimer--;
+            if (e.attackTimer <= 0 && gap < spec.reach &&
+                Math.abs(enemy.footY - e.footY) < 120) {
+                enemy.takeDamage(spec.damage, { kind: 'basic', from: e.owner });
+                this.game.effects.createExplosion(enemy.x, enemy.y, '#dff4fb');
+                e.attackTimer = spec.attackInterval;
+                e.anim = { id: 'sword', frame: 0, total: spec.animFrames };
+            }
+        }
+
+        e.x = Math.max(40, Math.min(canvas.width - 40, e.x));
+
+        // Fizik: oyuncununkinin sadeleştirilmiş hâli (basamaklar tek yönlü)
+        const prevFoot = e.footY;
+        e.vy += PHYSICS.gravity;
+        e.footY += e.vy;
+        const floor = canvas.height - PHYSICS.groundOffset;
+        let land = e.footY >= floor ? floor : null;
+        if (e.vy >= 0) {
+            for (const s of this.game.ledges) {
+                if (e.x < s.x || e.x > s.x + s.w) continue;
+                if (prevFoot > s.y + 1 || e.footY < s.y) continue;
+                if (land === null || s.y < land) land = s.y;
+            }
+        }
+        e.grounded = land !== null;
+        if (e.grounded) {
+            e.footY = land;
+            e.vy = 0;
+        }
+
+        if (e.hp <= 0 || e.life <= 0) {
+            this.killClone(e);
+            return true;
+        }
+        return false;
     }
 
     spawnArm(player, ability) {
@@ -383,9 +489,7 @@ export class Combat {
 
             switch (e.type) {
                 case 'shot':
-                case 'mass':
-                case 'shard': {
-                    // Kırık düşüyor; top ve kütle düz gidiyor.
+                case 'mass': {
                     if (e.gravity) e.vy += e.gravity;
                     e.x += e.vx;
                     e.y += e.vy;
@@ -393,21 +497,15 @@ export class Combat {
                     for (const p of players) {
                         if (!this.hitsPlayer(e, p)) continue;
                         p.takeDamage(e.damage, { kind: e.kind, from: e.owner });
-                        // Buz kırığı vurduğu yeri ÜŞÜTÜYOR: hasarı az, biriken
-                        // şey bu (bkz. abilities.js'teki CHILL).
-                        if (e.chill) p.addChill(e.chill);
                         this.game.effects.createPulse(e.x, e.y, e.owner.fighter.themeColor);
                         dead = true;
                     }
-                    // Buz duvarı RAKİBİN mermisini durduruyor, sahibininkini
-                    // geçiriyor: duvar buzun büyüttüğü kendi kalkanı. Önce
-                    // iki tarafı da durduruyordu ve buz kendi özeliyle kendini
-                    // susturuyordu (bkz. abilities.js'teki denge notu).
+                    // Klon mermiyi de yiyor: rakip uzaktan atarken de hangisine
+                    // attığına karar vermek zorunda.
                     if (!dead) {
-                        const blocking = this.wallAt(e.x, e.y);
-                        if (blocking && blocking.owner !== e.owner) {
-                            blocking.hp--;
-                            this.game.effects.createPulse(e.x, e.y, '#dff4fb');
+                        const hitClone = this.cloneAt(e.x, e.y, e.owner);
+                        if (hitClone) {
+                            this.hurtClone(hitClone, e.damage);
                             dead = true;
                         }
                     }
@@ -425,6 +523,15 @@ export class Combat {
                             if (p.x + p.width / 2 < lo || p.x - p.width / 2 > hi) continue;
                             if (Math.abs(p.y - e.y) > p.height / 2 + e.thickness) continue;
                             p.takeDamage(e.damage, { kind: 'basic', from: e.owner });
+                            e.nextTick = frame + e.tickInterval;
+                        }
+                        // Işın klonu da kesiyor: hattın üstünde duran klon
+                        // erimeli, yoksa buz klonu ışının içine park ederdi.
+                        for (const c of this.entities) {
+                            if (c.type !== 'clone' || c.owner === e.owner) continue;
+                            if (c.x < lo || c.x > hi) continue;
+                            if (Math.abs(c.footY - 70 - e.y) > 90) continue;
+                            this.hurtClone(c, e.damage);
                             e.nextTick = frame + e.tickInterval;
                         }
                     }
@@ -475,33 +582,12 @@ export class Combat {
                     if (e.life <= 0) dead = true;
                     break;
                 }
-                case 'wall': {
-                    e.life--;
-                    // Duvar İKİ oyuncunun da yolunu kesiyor - sahibinin de.
-                    // Tek yanlı bir duvar buzu duvarın arkasından rahatça
-                    // saldıran bir karaktere çevirirdi.
-                    for (const p of players) {
-                        if (p.isDead) continue;
-                        // Üstünden aşan oyuncu geçiyor: ayakları duvarın
-                        // tepesinden yukarıdaysa duvar orada yok sayılıyor.
-                        if (p.footY <= e.y - e.h) continue;
-                        if (Math.abs(p.footY - e.y) > e.h) continue;
-                        const overlap = e.w / 2 + p.width / 2 - Math.abs(p.x - e.x);
-                        if (overlap <= 0) continue;
-                        const side = p.x < e.x ? -1 : 1;
-                        p.x = e.x + side * (e.w / 2 + p.width / 2);
-                        if (p.vx * side < 0) p.vx = 0;
-                    }
-                    if (e.hp <= 0 || e.life <= 0) {
-                        this.game.effects.createExplosion(e.x, e.y - e.h / 2, '#dff4fb');
-                        dead = true;
-                    }
+                case 'clone': {
+                    dead = this.stepClone(e);
                     break;
                 }
-                case 'frost': {
-                    // Yalnızca görüntü: vuruşu spreadFrost anında yapıldı.
-                    e.life--;
-                    if (e.life <= 0) dead = true;
+                case 'path': {
+                    dead = this.stepPath(e);
                     break;
                 }
                 case 'arm': {
@@ -576,9 +662,8 @@ export class Combat {
                 case 'orb': this.drawOrb(ctx, e); break;
                 case 'piece': this.drawPiece(ctx, e); break;
                 case 'trail': this.drawTrail(ctx, e); break;
-                case 'shard': this.drawShard(ctx, e); break;
-                case 'wall': this.drawWall(ctx, e); break;
-                case 'frost': this.drawFrost(ctx, e); break;
+                case 'clone': this.drawClone(ctx, e); break;
+                case 'path': this.drawPath(ctx, e); break;
                 case 'arm': this.drawArm(ctx, e); break;
             }
         }
@@ -750,85 +835,75 @@ export class Combat {
         ctx.restore();
     }
 
-    // Buz kırığı: antinin yuvarlakça topunun tersine SİVRİ. Uçtaki blok bir
-    // tık ileride ve dar - hangi yöne gittiği tek karede okunuyor.
-    drawShard(ctx, e) {
-        const r = Math.round(e.r / PX) * PX;
-        const d = Math.sign(e.vx) || 1;
-        const x = Math.round(e.x / PX) * PX;
-        const y = Math.round(e.y / PX) * PX;
-
-        // Gövde: üç satır, uca doğru daralıyor
-        ctx.fillStyle = '#173a4d';
-        ctx.fillRect(x - r, y - r, r * 2, r * 2);
-        ctx.fillStyle = '#8fd4e8';
-        ctx.fillRect(x - r + PX, y - r + PX, r * 2 - PX * 2, r * 2 - PX * 2);
-        ctx.fillStyle = '#dff4fb';
-        ctx.fillRect(x - r + PX, y - r + PX, PX * 2, r * 2 - PX * 2);
-        // Sivri uç
-        ctx.fillStyle = '#dff4fb';
-        ctx.fillRect(x + d * r, y - PX, PX * 2, PX * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - PX, y - PX, PX * 2, PX * 2);
-        // Arkasında bıraktığı kırağı izi
-        ctx.fillStyle = 'rgba(223, 244, 251, 0.45)';
-        ctx.fillRect(x - d * r * 2, y - PX, r * 2, PX);
-    }
-
-    // Buz duvarı: dikey bir kütle. Canı azaldıkça ÇATLIYOR - kaç vuruş
-    // kaldığını ayrı bir çubuk değil duvarın kendisi söylüyor.
-    drawWall(ctx, e) {
-        const w = Math.round(e.w / PX) * PX;
-        const x = Math.round((e.x - w / 2) / PX) * PX;
-        const top = Math.round((e.y - e.h) / PX) * PX;
-        const h = Math.round(e.h / PX) * PX;
-        const fade = Math.min(1, e.life / 45);
-
+    // Klon: buzun kendisiyle AYNI çizim. Renk oynaması, saydamlık, işaret
+    // yok - "hangisi asıl" sorusunun cevabı görüntüde olsaydı klonun hiçbir
+    // anlamı kalmazdı. Tek fark vurulduğunda yanıp sönmesi (asıl da yanıyor).
+    drawClone(ctx, e) {
         ctx.save();
-        ctx.globalAlpha = 0.92 * fade;
-        ctx.fillStyle = '#4a90ad';
-        ctx.fillRect(x, top, w, h);
-        ctx.fillStyle = '#8fd4e8';
-        ctx.fillRect(x + PX, top, w - PX * 2, h);
-        ctx.fillStyle = '#dff4fb';
-        ctx.fillRect(x + PX, top, PX * 2, h);      // ışık soldan
-        ctx.fillStyle = '#2f6c88';
-        ctx.fillRect(x + w - PX * 2, top, PX, h);
-
-        // Çatlaklar: her kayıp can bir çatlak. Hep aynı yerde duruyorlar ki
-        // duvar titremesin - kırılma birikiyor, kaynıyor değil.
-        const cracks = e.maxHp - e.hp;
-        ctx.fillStyle = '#173a4d';
-        for (let i = 0; i < cracks; i++) {
-            const cy = top + Math.round((h * (i + 1)) / (e.maxHp + 1) / PX) * PX;
-            for (let k = 0; k < 4; k++) {
-                ctx.fillRect(x + PX + k * PX * 2, cy + (k % 2 ? PX : 0), PX * 2, PX);
-            }
-        }
-
-        // Tepesindeki sivri uçlar: duvar kesilmiş bir blok değil, büyümüş buz
-        ctx.fillStyle = '#dff4fb';
-        for (let k = 0; k < 4; k++) {
-            const hh = (k % 2 ? 2 : 3) * PX;
-            ctx.fillRect(x + PX + k * PX * 2, top - hh, PX * 2, hh);
-        }
+        ctx.imageSmoothingEnabled = false;
+        if (e.flash > 0 && e.flash % 4 < 2) ctx.globalAlpha = 0.25;
+        const pose = e.anim
+            ? { id: e.anim.id, t: e.anim.frame / e.anim.total, dir: e.dir }
+            : null;
+        drawFighter(ctx, 'ice', e.x, e.footY, this.game.frame, pose);
         ctx.restore();
     }
 
-    // Ayazın halkası: dışa açılıp sönen soğuk. Menzili görünür olmalı -
-    // oyuncu hangi mesafede donduracağını bilmeden oynayamaz.
-    drawFrost(ctx, e) {
-        const k = 1 - e.life / e.maxLife;
-        const rad = e.r * (0.25 + k * 0.75);
+    // Buz yolu: zeminde uzayan bir buz şeridi, ucunda büyüyen kristaller.
+    // Ucu ayrıca vurgulu - dondurmanın yalnızca UÇTA olduğu görüntüden
+    // okunmalı, kural metninden değil.
+    drawPath(ctx, e) {
+        const spec = e.spec;
+        const tip = this.pathTip(e);
+        const half = Math.round(spec.width / 2 / PX) * PX;
+        const fade = e.done ? Math.max(0, 1 - e.fade / 40) : 1;
+
         ctx.save();
-        ctx.globalAlpha = 0.55 * (1 - k);
+        ctx.globalAlpha = 0.9 * fade;
+
+        // Yatay parça: zemine yapışmış buz şeridi
+        const x0 = Math.round(Math.min(e.x, e.x + e.dir * e.len) / PX) * PX;
+        const x1 = Math.round(Math.max(e.x, e.x + e.dir * e.len) / PX) * PX;
+        const top = Math.round((e.y - half) / PX) * PX;
+        ctx.fillStyle = '#2f6c88';
+        ctx.fillRect(x0, top, x1 - x0, half + PX * 2);
+        ctx.fillStyle = '#5fb4e8';
+        ctx.fillRect(x0, top + PX, x1 - x0, half);
         ctx.fillStyle = '#dff4fb';
-        for (let i = 0; i < 18; i++) {
-            const a = (Math.PI * 2 * i) / 18;
-            const bx = Math.round((e.x + Math.cos(a) * rad) / PX) * PX;
-            const by = Math.round((e.y + Math.sin(a) * rad * 0.7) / PX) * PX;
-            ctx.fillRect(bx, by, PX * 2, PX * 2);
+        ctx.fillRect(x0, top + PX, x1 - x0, PX);
+
+        // Şeridin üstünde büyüyen kırıklar: düz bir çubuk "buz" değil "ray"
+        // okunuyordu; buz kendi kendine büyüyen bir şey.
+        for (let x = x0; x < x1; x += PX * 5) {
+            const h = Math.round(hash(x, 3, 61) * 3 + 1) * PX;
+            ctx.fillStyle = hash(x, 4, 62) < 0.4 ? '#ffffff' : '#a8e0f0';
+            ctx.fillRect(x, top - h + PX, PX * 2, h);
         }
+
+        // Dikey parça: rakip yukarıdaysa sütun hâlinde tırmanıyor
+        if (e.turnAt !== null) {
+            const cx = Math.round(e.turnAt / PX) * PX;
+            const ct = Math.round((e.y - e.climb) / PX) * PX;
+            ctx.fillStyle = '#2f6c88';
+            ctx.fillRect(cx - half, ct, half * 2, e.y - ct);
+            ctx.fillStyle = '#5fb4e8';
+            ctx.fillRect(cx - half + PX, ct, half * 2 - PX * 2, e.y - ct);
+            ctx.fillStyle = '#dff4fb';
+            ctx.fillRect(cx - half + PX, ct, PX, e.y - ct);
+        }
+
+        // Uç: dondurmayı yapan yer. Yıldız gibi açılan kristal.
+        const tx = Math.round(tip.x / PX) * PX;
+        const ty = Math.round(tip.y / PX) * PX;
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI * 2 * i) / 6 + this.game.frame * 0.04;
+            ctx.fillStyle = i % 2 ? '#ffffff' : '#dff4fb';
+            ctx.fillRect(Math.round((tx + Math.cos(a) * spec.width * 0.7) / PX) * PX,
+                Math.round((ty - half + Math.sin(a) * spec.width * 0.5) / PX) * PX,
+                PX * 2, PX * 2);
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(tx - PX * 2, ty - half - PX * 2, PX * 4, PX * 4);
         ctx.restore();
     }
 

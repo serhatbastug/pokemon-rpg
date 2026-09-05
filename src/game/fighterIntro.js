@@ -52,11 +52,16 @@ const ZOOM_OUT = [0.90, 1.00];
 // Alt sınıflar dört şey verir: süre, o andaki duruş (state), adamın ve
 // virüsün çizimi, bir de figürün üstüne binen efektler (overlay).
 class BaseIntro {
-    constructor({ x, footY, canvas, size, reveal }) {
+    constructor({ x, footY, canvas, size, reveal, erase = false }) {
         this.x = x;
         this.footY = footY;
         this.canvas = canvas;
         this.reveal = reveal;         // 'top' = yukarıdan iner · 'bottom' = aşağıdan çıkar
+        // Dönüşüm cephesinin gerisinde adam SİLİNSİN mi? Kaplayan virüsler
+        // (elektro, anti) adamı örttüğü için gerek yok. ICE-VİRÜS'ün gövdesi
+        // adamınkinden dar - kafası ve bacakları buzun yanından görünüyordu,
+        // dönüşüm "kaplandı" değil "buz tutmuş adam" gibi duruyordu.
+        this.erase = erase;
         this.frame = 0;
 
         this.figW = size.cols * size.px;
@@ -119,6 +124,7 @@ class BaseIntro {
             octx.beginPath();
             octx.rect(0, top, this.figW, cut);
             octx.clip();
+            if (this.erase) octx.clearRect(0, top, this.figW, cut);
             this.paintVirus(octx, s);
             octx.restore();
             if (s.turn < 1) this.paintFront(octx, this.reveal === 'top' ? cut : top);
@@ -522,11 +528,61 @@ function shatter(ctx, x, footY, k, u, frame) {
     }
 }
 
+// Adamı saran kabuk: ayaklardan yukarı büyüyen, yarı saydam bir buz kütlesi.
+// İçindeki adam GÖRÜNÜYOR - dönüşümün bu evresi "kaplandı" değil "dondu".
+//
+// Diğer üç girişte dönüşüm bir kırpma cephesiyle açılır: virüs hâli adamın
+// üstünü satır satır kaplar. Buzda bu yürümüyor - yeni gövdenin kafası ve
+// bacakları yok, cephenin gerisinde adamın kafası buzun yanından çıkıyordu.
+// Bu yüzden buzda iki evre var: önce kabuk (adam hâlâ orada), sonra çatlama
+// (kabuk kırılır, içinden bambaşka bir kütle çıkar).
+function iceShell(ctx, x, footY, k, u, frame) {
+    if (k <= 0) return;
+    const put = (bx, by, bw, bh, color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(bx), Math.round(by), Math.round(bw), Math.round(bh));
+    };
+    const rows = FIGURE_SIZE.rows;
+    const grown = Math.round(rows * easeOut(k));
+
+    ctx.save();
+    for (let i = 0; i < grown; i++) {
+        const row = rows - 1 - i;                 // aşağıdan yukarı
+        const up = i / rows;                      // 0 = ayak, 1 = tepe
+        // Gövde profili: bacaklarda dar, gövdede geniş, kafada yine dar
+        const base = up < 0.32 ? 6 : up < 0.72 ? 9 : 7;
+        const half = base + Math.round(hash(0, row, 91) * 2);
+        const y = footY - (rows - row) * u;
+
+        ctx.globalAlpha = 0.42;
+        put(x - half * u, y, half * 2 * u, u, '#8fd4f5');
+        ctx.globalAlpha = 0.85;
+        put(x - half * u, y, u, u, '#c9ecff');
+        put(x + (half - 1) * u, y, u, u, '#2f7fc4');
+        if (hash(1, row, 92) < 0.22) {
+            put(x - half * u + Math.round(hash(2, row, 93) * half) * u, y, u * 2, u, '#ffffff');
+        }
+    }
+    // Kabuğun tepesindeki taze buz: büyümenin ucu parlak
+    if (grown < rows) {
+        ctx.globalAlpha = 1;
+        const y = footY - grown * u;
+        for (let c = -8; c <= 8; c += 2) {
+            const h = hash(c, Math.floor(frame / 6), 94) < 0.45 ? u * 2 : u;
+            put(x + c * u, y - h, u * 2, h, '#ffffff');
+        }
+    }
+    ctx.restore();
+}
+
 export class IceIntro extends BaseIntro {
     constructor(opts) {
-        super({ ...opts, size: FIGURE_SIZE, reveal: 'bottom' });
+        // erase: yeni gövde adamınkinden dar, cephenin gerisinde adam
+        // silinmeli. Zaten dönüşüm tek karede oluyor (bkz. state.turn),
+        // silme de o karede gerçekleşiyor.
+        super({ ...opts, size: FIGURE_SIZE, reveal: 'bottom', erase: true });
         this.key = 'ice';
-        this.frontColors = ['#4a90ad', '#ffffff'];
+        this.frontColors = ['#2f7fc4', '#ffffff'];
     }
 
     get frames() {
@@ -539,29 +595,36 @@ export class IceIntro extends BaseIntro {
             // Titreme kaplama başlayınca SÖNÜYOR: donan şey titremez.
             shake: span(t, I_SHIVER[0], I_SHIVER[1]) * (1 - span(t, I_COVER[0], I_COVER[0] + 0.12)),
             ring: span(t, I_RING[0], I_RING[1]),
-            // Kaplama AŞAĞIDAN çıkıyor; easeIn ile kafa en sona kalıyor,
-            // böylece yatık kafa kaplanmadan önce düzelmiş oluyor.
-            turn: easeIn(span(t, I_COVER[0], I_COVER[1])),
+            // Kabuk AŞAĞIDAN çıkıyor: soğuk yerden geliyor.
+            shell: span(t, I_COVER[0], I_COVER[1]),
+            // Dönüşüm KADEMELİ DEĞİL: kabuk çatladığı anda adam gidiyor,
+            // yerine buz kütlesi geliyor. Kademeli açılan bir cephe burada
+            // yarısı adam yarısı kütle olan bir figür bırakıyordu.
+            turn: t >= I_CRACK[0] ? 1 : 0,
             headTilt: span(t, I_COVER[0], I_COVER[0] + 0.08) - span(t, 0.80, 0.88),
             crack: span(t, I_CRACK[0], I_CRACK[1])
         };
     }
 
     paintMan(octx, s) {
-        // Kollar kavuşmuş: üşüyen adamın duruşu. Buz hâli de aynı duruşu
-        // alıyor, yoksa dönüşüm sırasında kollar yer değiştirmiş görünürdü.
+        // Kollar kavuşmuş: üşüyen adamın duruşu.
         return paintIntroFigure(octx, this.figW / 2, this.figH,
             { mode: 'man', manPalette: 'd', hug: 1, headTilt: s.headTilt });
     }
 
     paintVirus(octx, s) {
-        paintIntroIce(octx, this.figW / 2, this.figH, { hug: 1, headTilt: s.headTilt });
+        paintIntroIce(octx, this.figW / 2, this.figH, { headTilt: s.headTilt });
     }
 
     overlay(ctx, s, geo) {
         if (s.ring > 0) frostRing(ctx, geo.drawX, geo.drawFootY, s.ring, geo.unit);
-        if (s.turn > 0.05) {
-            drawFrostMotes(ctx, geo.drawX, geo.drawFootY, this.frame, s.turn, geo.unit);
+        // Kabuk yalnızca ÇATLAYANA KADAR duruyor: çatladıktan sonra sahnede
+        // kalan şey kabuk değil, içinden çıkan kütle.
+        if (s.shell > 0 && s.crack <= 0) {
+            iceShell(ctx, geo.drawX, geo.drawFootY, s.shell, geo.unit, this.frame);
+        }
+        if (s.shell > 0.05) {
+            drawFrostMotes(ctx, geo.drawX, geo.drawFootY, this.frame, s.shell, geo.unit);
         }
         if (s.crack > 0) shatter(ctx, geo.drawX, geo.drawFootY, s.crack, geo.unit, this.frame);
     }

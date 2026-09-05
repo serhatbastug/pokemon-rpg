@@ -47,16 +47,14 @@ export const FIGHTERS = [
         name: 'ICE-VİRÜS',
         themeColor: '#8fd4e8',
         // Can ve hız ortada: buz ne virüs kadar ağır ne anti kadar ince.
-        // Dengesi statlarında değil hamlelerinde - kadronun en az hasar veren
-        // dövüşçüsü, karşılığında rakibi yavaşlatıp donduran tek karakter
-        // (bkz. abilities.js'teki CHILL).
-        // DENGE (2026-09-04): can 110'du. Buz yakınlaşmak zorunda olan ama
-        // yavaş bir karakter; yaklaşırken yediği hasarı taşıyamıyordu.
+        // Dengesi statlarında değil hamlelerinde - kılıcı virüsünkinden hafif,
+        // karşılığında kendini çoğaltan ve rakibi yerinde donduran tek
+        // karakter (bkz. abilities.js).
         stats: { hp: 118, speed: 4.5 },
         intro: 'ice',
-        description: 'Yayılmayı yavaşlatan değil DURDURAN sap. Taşıyıcısını yutmuyor, ' +
-            'olduğu yerde donduruyor: gövde artık ne akar ne dinlenir, kristal kristal ' +
-            'büyür. Dokunduğu her şeyin ısısını alır; en az vuran, en çok bekleten.'
+        description: 'Yayılmayı yavaşlatan değil DURDURAN sap. Taşıyıcısından geriye bir ' +
+            'gövde bile kalmamış: yerin biraz üstünde süzülen, iki gözü yanan bir buz ' +
+            'kütlesi. Kolları kılıç, kendisi iki kişi - hangisinin asıl olduğu belli değil.'
     }
 ];
 

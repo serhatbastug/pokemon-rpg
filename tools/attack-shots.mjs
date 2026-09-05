@@ -69,5 +69,11 @@ await pose('basic', 13, 'electro-isin');
 await pose('special', 22, 'electro-kure');
 await pose('signature', 4, 'electro-isinlanma');
 
+await setup('ice', 'antivirus');
+await pose('basic', 8, 'buz-kilic-hazirlik');
+await pose('basic', 15, 'buz-kilic-vurus');
+await pose('special', 30, 'buz-klon');
+await pose('signature', 40, 'buz-yolu');
+
 await browser.close();
 console.log('bitti');

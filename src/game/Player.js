@@ -3,7 +3,8 @@ import {
     PAD_JUMP_BUTTON, PAD_ATTACK_BUTTON, PAD_SPECIAL_BUTTON, PAD_BLOCK_BUTTON, PAD_COMBO_BUTTON
 } from '../config/settings.js';
 import { drawFighter, FIGHTER_SPRITES } from './fighterArt.js';
-import { abilitiesOf, abilityOf, DASHES, CHILL } from './abilities.js';
+import { hash } from '../pixel/pixelDraw.js';
+import { abilitiesOf, abilityOf, DASHES, FREEZE } from './abilities.js';
 
 // Bir karenin girdi anlık görüntüsü. Basılı tutmayı da, "yeni basıldı"yı da
 // buradan okuyoruz: kol tuşları için tarayıcıda olay yok, klavye ile aynı
@@ -61,12 +62,9 @@ export class Player {
         this.invulnFrames = 0;
         this.isDead = false;
 
-        // ICE-VİRÜS'ün üşütmesi. Buz değişleri burada birikiyor; üç üşüme
-        // kısa bir donmaya dönüşüyor, sonra uzun bir bağışıklık başlıyor.
+        // ICE-VİRÜS'ün BUZ YOLU'nun ucu değerse buraya düşüyor.
         // `frozen`den AYRI tutuluyor: `frozen`ı Game raunt aralarında her
-        // karede yazıyor, üşüme oraya karışırsa dövüş sırasında siliniyor.
-        this.chill = 0;
-        this.chillTimer = 0;       // birikimin sönmesine kalan kare
+        // karede yazıyor, donma oraya karışırsa dövüş sırasında siliniyor.
         this.frozenFrames = 0;     // donmuş kalan kare
         this.freezeImmune = 0;     // tekrar donmaya bağışık kalan kare
 
@@ -183,51 +181,79 @@ export class Player {
 
         ctx.restore();
 
-        if (this.chill > 0 || this.frozenFrames > 0) this.drawChill(ctx);
+        if (this.frozenFrames > 0) this.drawFrozen(ctx);
         if (this.isBlocking) this.drawShield(ctx);
     }
 
-    // Üşümenin ve donmanın görüntüsü. Oyuncu kaç üşümede olduğunu GÖRMELİ:
-    // görünmeyen bir sayaç yüzünden donmak "oyun beni dondurdu" olur, oysa
-    // buzun bütün dövüşü bu sayacın etrafında dönüyor.
-    drawChill(ctx) {
+    // Donmanın görüntüsü. KUTU DEĞİL: gövdeyi saran, düzensiz bir buz kütlesi.
+    // Dikdörtgen bir kabuk "oyun bir kutu koydu" gibi duruyordu; buz gövdenin
+    // biçimini alıp üstünden taşmalı - satırlar gövde profiline göre daralıp
+    // genişliyor, kenarlardan dışarı kırıklar çıkıyor.
+    //
+    // Şekil KONUMA BAĞLI değil oyuncuya: hash'in tohumu gövdenin satırı, yani
+    // desen donma boyunca sabit kalıyor. Her karede yeniden çekilse buz
+    // kaynardı - donan şey kımıldamaz.
+    drawFrozen(ctx) {
         const PXL = 4;
+        const h = Math.round(this.height * 0.92 / PXL) * PXL;
+        const top = this.footY - h;
+        const rows = h / PXL;
+        const k = 1 - this.frozenFrames / FREEZE.duration;   // 0 = yeni dondu
+
         ctx.save();
 
-        // Donmuşken gövdenin üstünde buz kabuğu
-        if (this.frozenFrames > 0) {
-            const h = Math.round(this.height * 0.9 / PXL) * PXL;
-            const w = Math.round(this.width * 1.25 / PXL) * PXL;
-            const top = this.footY - h;
-            ctx.globalAlpha = 0.42;
+        // Gövdeyi saran kütle: her satırın kendi genişliği. Omuz hizasında
+        // en geniş, tepede ve tabanda daralıyor - insan silueti gibi.
+        for (let r = 0; r < rows; r++) {
+            const t = r / rows;
+            const profile = 0.42 + 0.58 * Math.sin(Math.min(1, t * 1.15) * Math.PI);
+            const jitter = Math.round(hash(0, r, 71) * 2) * PXL;
+            const half = Math.round((this.width * 0.62 * profile) / PXL) * PXL + jitter;
+            if (half < PXL * 2) continue;
+            const y = top + r * PXL;
+
+            ctx.globalAlpha = 0.40;
             ctx.fillStyle = '#8fd4e8';
-            ctx.fillRect(this.x - w / 2, top, w, h);
+            ctx.fillRect(this.x - half, y, half * 2, PXL);
+
+            // Kenar ışığı: buzun dış yüzeyi. Solda parlak, sağda koyu -
+            // sahnenin ışığı hep soldan.
             ctx.globalAlpha = 0.85;
             ctx.fillStyle = '#dff4fb';
-            ctx.fillRect(this.x - w / 2, top, w, PXL);
-            ctx.fillRect(this.x - w / 2, this.footY - PXL, w, PXL);
-            ctx.fillRect(this.x - w / 2, top, PXL, h);
-            ctx.fillRect(this.x + w / 2 - PXL, top, PXL, h);
-            // Kabuktaki çatlak: donma bitmek üzereyken çoğalıyor
-            ctx.fillStyle = '#ffffff';
-            const cracks = Math.round((1 - this.frozenFrames / CHILL.freeze) * 4);
-            for (let i = 0; i < cracks; i++) {
-                ctx.fillRect(this.x - w / 4 + i * PXL * 3, top + PXL * (4 + i * 6), PXL * 4, PXL);
+            ctx.fillRect(this.x - half, y, PXL, PXL);
+            ctx.fillStyle = '#4a90ad';
+            ctx.fillRect(this.x + half - PXL, y, PXL, PXL);
+
+            // İçerideki fase: kütleyi "cam" değil "buz" yapan şey
+            if (hash(1, r, 72) < 0.3) {
+                ctx.globalAlpha = 0.55;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(this.x - half + PXL * 2 + Math.round(hash(2, r, 73) * 4) * PXL,
+                    y, PXL * 2, PXL);
             }
         }
 
-        // Üşüme işaretleri: kafanın üstünde küçük buz taneleri, kaç tane
-        // biriktiyse o kadar. Üçüncüsü dolduğu an donma geliyor.
+        // Dışarı büyüyen kırıklar: kütle düz bir siluet kalmasın
+        ctx.globalAlpha = 0.9;
+        for (let i = 0; i < 7; i++) {
+            const side = i % 2 ? 1 : -1;
+            const ry = top + Math.round(hash(i, 3, 74) * rows) * PXL;
+            const len = (2 + Math.round(hash(i, 4, 75) * 3)) * PXL;
+            const rx = this.x + side * Math.round(this.width * 0.5 / PXL) * PXL;
+            ctx.fillStyle = i % 3 ? '#dff4fb' : '#ffffff';
+            ctx.fillRect(side > 0 ? rx : rx - len, ry, len, PXL);
+        }
+
+        // Çatlaklar: donma bitmek üzereyken çoğalıyor. Oyuncu ne zaman
+        // çözüleceğini kabuğun kendisinden görmeli.
         ctx.globalAlpha = 1;
-        for (let i = 0; i < CHILL.max; i++) {
-            const bx = this.x - PXL * 7 + i * PXL * 6;
-            const by = this.footY - this.height - PXL * 5;
-            ctx.fillStyle = i < this.chill ? '#dff4fb' : 'rgba(223, 244, 251, 0.18)';
-            ctx.fillRect(bx, by, PXL * 4, PXL * 4);
-            if (i < this.chill) {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(bx + PXL, by + PXL, PXL * 2, PXL * 2);
-            }
+        ctx.fillStyle = '#ffffff';
+        const cracks = Math.round(k * 5);
+        for (let i = 0; i < cracks; i++) {
+            const cy = top + PXL * (6 + i * 9);
+            const cx = this.x - PXL * 5 + Math.round(hash(i, 5, 76) * 6) * PXL;
+            ctx.fillRect(cx, cy, PXL * 4, PXL);
+            ctx.fillRect(cx + PXL * 3, cy + PXL, PXL * 3, PXL);
         }
         ctx.restore();
     }
@@ -300,45 +326,31 @@ export class Player {
             if (this.invulnFrames === 0) this.invulnerable = false;
         }
 
-        // Üşüme kendiliğinden söner: buz basıncı sürdürmezse birikim sıfırdan
-        // başlar. Yoksa tek bir kırık bütün rauntta üstte kalırdı.
         if (this.frozenFrames > 0) this.frozenFrames--;
         if (this.freezeImmune > 0) this.freezeImmune--;
-        if (this.chillTimer > 0 && --this.chillTimer === 0) this.chill = 0;
     }
 
-    // Buz değdi: üşüme ekle, üç olunca dondur.
-    addChill(amount) {
-        if (this.isDead || this.game.isGameOver) return;
+    // Buz yolunun ucu değdi: rakip donuyor. Bağışıklık açıkken hiçbir şey
+    // olmuyor - zincirleme donma yok, dövüş tek bir hamlenin etrafında
+    // kilitlenemez.
+    freeze() {
+        if (this.isDead || this.game.isGameOver) return false;
         const { effects } = this.game;
 
-        this.chillTimer = CHILL.decay;
-        this.chill = Math.min(CHILL.max, this.chill + amount);
-        if (this.chill < CHILL.max || this.freezeImmune > 0) {
-            effects.spawnText(this.x, this.y - 90, 'ÜŞÜME', '#bfefff');
-            return;
+        if (this.freezeImmune > 0) {
+            effects.spawnText(this.x, this.y - 90, 'ÇÖZÜLDÜ', '#bfefff');
+            return false;
         }
 
-        // Donma: bir saniye. Bir hamle penceresi açıyor, raunt kazandırmıyor.
-        // Ardından bağışıklık geliyor - zincirleme donma yok.
-        //
-        // Birikim SIFIRLANMIYOR: sıfırlayınca yavaşlatma en yüksek değerine
-        // ulaştığı anda siliniyordu, yani %42'lik yavaşlatma oyunda hiç
-        // yaşanmıyordu. Artık donmadan sonra da rakip yavaş kalıyor;
-        // bağışıklık biterken buz basıncı sürdürdüyse döngü tekrar kapanır.
-        this.frozenFrames = CHILL.freeze;
-        this.freezeImmune = CHILL.immune;
+        this.frozenFrames = FREEZE.duration;
+        this.freezeImmune = FREEZE.duration + FREEZE.immune;
         this.action = null;
         this.anim = null;
+        this.vx = 0;
         effects.spawnText(this.x, this.y - 90, 'DONDU!', '#eaffff', true);
         effects.triggerFlash('rgba(191, 239, 255, 0.22)', 5);
         effects.createPulse(this.x, this.y, '#dff4fb');
-    }
-
-    // Üşümenin yavaşlatması. Salgın izinden ayrı çarpan: ikisi de aynı anda
-    // olabilir, biri diğerini silmemeli.
-    get chillSlow() {
-        return 1 - this.chill * CHILL.slowPerStack;
+        return true;
     }
 
     ready(ability) {
@@ -420,7 +432,7 @@ export class Player {
         }
 
         const { input, canvas } = this.game;
-        const moveSpeed = this.speed * this.speedMultiplier * this.chillSlow;
+        const moveSpeed = this.speed * this.speedMultiplier;
 
         // Yatay hareket: klavye tuşları ile kolun sol analogu aynı işi görür.
         // Klavyede iki yön birden basılıysa birbirini götürür; kolda analog
@@ -555,8 +567,6 @@ export class Player {
         this.anim = null;
         this.grabbedBy = null;
         this.escapePresses = 0;
-        this.chill = 0;
-        this.chillTimer = 0;
         this.frozenFrames = 0;
         this.freezeImmune = 0;
         for (const id of Object.keys(this.cooldowns)) this.cooldowns[id] = 0;

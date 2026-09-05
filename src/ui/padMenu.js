@@ -20,10 +20,11 @@ const REPEAT_NEXT = 9;
 const SCROLL_SPEED = 16;
 
 export class PadMenu {
-    constructor({ gamepad, characterSelect, onStart, onBack, onRestart }) {
+    constructor({ gamepad, characterSelect, onStart, onStartAi, onBack, onRestart }) {
         this.gamepad = gamepad;
         this.select = characterSelect;
         this.onStart = onStart;
+        this.onStartAi = onStartAi;
         this.onBack = onBack;
         this.onRestart = onRestart;
 
@@ -94,6 +95,7 @@ export class PadMenu {
         if (button === 'cross') this.select.openFocused();
         else if (button === 'circle') this.onBack?.();
         else if (button === 'triangle') this.onStart?.();
+        else if (button === 'square') this.onStartAi?.();
     }
 
     step() {
@@ -171,7 +173,7 @@ export class PadMenu {
         this.gameoverHint?.classList.toggle('hidden', !onGameOver);
 
         if (!onSelection || !this.padHint) return;
-        const text = `Kol - Oyuncu ${this.select.selectionTurn} seçiyor: sol analog gez · sağ analog kaydır · ÇARPI seç · DAİRE geri · ÜÇGEN başlat`;
+        const text = `Kol - Oyuncu ${this.select.selectionTurn} seçiyor: sol analog gez · sağ analog kaydır · ÇARPI seç · DAİRE geri · ÜÇGEN 2 kişilik · KARE yapay zekâ`;
         if (text !== this.hintText) {
             this.padHint.textContent = text;
             this.hintText = text;

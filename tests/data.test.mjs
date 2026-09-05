@@ -707,6 +707,49 @@ for (const arena of ARENAS) {
             i === j || a.y !== b.y || a.x + a.w <= b.x || b.x + b.w <= a.x)));
 }
 
+
+// ---- Yapay zekânın zorluk seviyeleri ----
+// Zorluk SAYILARDAN değil OYNAYIŞTAN gelmeli: zor seviyedeki AI daha çok
+// hasar veren bir karakter değil, daha hızlı tepki veren ve daha az hata
+// yapan bir oyuncu. Bu kural burada duruyor ki sonra "zoru güçlendirelim"
+// diye hasara dokunulmasın.
+const ai = await import('../src/game/ai.js');
+const levels = ['kolay', 'normal', 'zor'];
+
+check('üç zorluk seviyesi var', levels.every(k => ai.AI_LEVELS[k]),
+    Object.keys(ai.AI_LEVELS).join(','));
+check('varsayılan zorluk tanımlı', !!ai.AI_LEVELS[ai.DEFAULT_AI_LEVEL], ai.DEFAULT_AI_LEVEL);
+check('bilinmeyen zorluk varsayılana düşüyor',
+    ai.aiLevel('yok-böyle-bir-şey') === ai.DEFAULT_AI_LEVEL);
+
+// Tepki süresi = kaç karede bir karar. Zorlaştıkça KISALMALI.
+const react = levels.map(k => ai.AI_LEVELS[k].react);
+check('zorluk arttıkça tepki süresi kısalıyor',
+    react[0] > react[1] && react[1] > react[2], react.join(' > '));
+
+// Hata payı: kararın boşa gitme olasılığı. Kusursuz oynayan bir rakiple
+// dövüşmek eğlenceli değil, o yüzden zorda bile SIFIR olmamalı.
+const mistake = levels.map(k => ai.AI_LEVELS[k].mistake);
+check('zorluk arttıkça hata azalıyor',
+    mistake[0] > mistake[1] && mistake[1] > mistake[2], mistake.join(' > '));
+check('en zor seviye bile hata yapıyor', mistake[2] > 0, `${mistake[2]}`);
+
+// Blok ve kombo kullanımı zorlukla artıyor: zoru zor yapan şey bunlar.
+const block = levels.map(k => ai.AI_LEVELS[k].block);
+check('zorluk arttıkça blok artıyor',
+    block[0] < block[1] && block[1] < block[2], block.join(' < '));
+const combo = levels.map(k => ai.AI_LEVELS[k].combo);
+check('zorluk arttıkça kombo kullanımı artıyor',
+    combo[0] < combo[1] && combo[1] < combo[2], combo.join(' < '));
+
+// Tepki süresi hiçbir seviyede insanüstü olmamalı: 6 kare = 0,1 saniye,
+// iyi bir oyuncunun tepkisi. Bir karelik tepki oyunu okumak değil hile olur.
+check('en zor seviyede bile tepki insani sınırda', react[2] >= 5,
+    `${react[2]} kare`);
+
+// Her seviyenin ekranda yazan bir adı var (HUD'da rozette görünüyor)
+check('her seviyenin adı var', levels.every(k => !!ai.AI_LEVELS[k].label),
+    levels.map(k => ai.AI_LEVELS[k].label).join(','));
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

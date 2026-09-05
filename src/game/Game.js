@@ -2,6 +2,7 @@ import { Player } from './Player.js';
 import { EffectsManager } from './effects.js';
 import { Combat } from './combat.js';
 import { randomArena, ledgesOf } from './arenas.js';
+import { FighterAi, aiLevel } from './ai.js';
 import { PLAYERS, SCROLL_KEYS, FRAME_RATE, COMBAT } from '../config/settings.js';
 import { introFor } from './fighterIntro.js';
 import { drawPixelText } from '../pixel/pixelFont.js';
@@ -32,6 +33,7 @@ export class Game {
         this.combat = new Combat(this);
         this.p1 = null;
         this.p2 = null;
+        this.aiLevel = null;      // dolu ise 2. oyuncuyu yapay zekâ oynatıyor
         this.currentArena = null;
         // Arenanın basamakları: maç boyunca değişmiyor, bir kez hesaplanıp
         // burada duruyor. Oyuncular her karede buradan okuyor.
@@ -68,8 +70,11 @@ export class Game {
         return null;
     }
 
-    start(fighter1, fighter2) {
+    // ai: ikinci oyuncuyu yapay zekâ oynatsın mı ('kolay' | 'normal' | 'zor').
+    // null ise iki kişilik: ikinci oyuncu klavye/kol.
+    start(fighter1, fighter2, { ai = null } = {}) {
         this.isGameOver = false;
+        this.aiLevel = ai ? aiLevel(ai) : null;
         this.effects.reset();
         this.combat.reset();
         // Arena maç boyunca SABİT: raunt başına değiştirmek, basamakları
@@ -101,6 +106,10 @@ export class Game {
             padSlot: PLAYERS[2].padSlot,
             game: this
         });
+        // Yapay zekâ oyuncunun kendisine değil TUŞLARINA bağlanıyor:
+        // ikinci oyuncu her şeyiyle sıradan bir oyuncu, yalnızca tuşlara
+        // basan başka biri (bkz. ai.js).
+        if (this.aiLevel) this.p2.brain = new FighterAi(this.p2, this.aiLevel);
 
         // Girişi olan dövüşçüler maç başında sırayla oynar: ÖNCE P1, SONRA P2.
         this.introQueue = [this.p1, this.p2]

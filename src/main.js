@@ -16,6 +16,7 @@ import { ComicScene } from './comic/ComicScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
+import { AI_LEVELS, DEFAULT_AI_LEVEL } from './game/ai.js';
 
 const characterSelect = new CharacterSelect();
 const hud = new Hud();
@@ -32,6 +33,7 @@ const padMenu = new PadMenu({
     gamepad,
     characterSelect,
     onStart: () => document.getElementById('start-battle-btn').click(),
+    onStartAi: () => document.getElementById('start-ai-btn').click(),
     onBack: () => returnToMenu(),
     onRestart: () => document.getElementById('restart-btn').click()
 });
@@ -42,7 +44,10 @@ const game = new Game({
     gamepad,
     hud,
     onGameOver: (winnerNum, winner) => {
-        showGameOver(`Oyuncu ${winnerNum} (${winner.fighter.name}) Kazandı!`);
+        // Yapay zekâya karşı oynanıyorsa "Oyuncu 2 kazandı" demek yanlış:
+        // kaybeden oyuncu kime kaybettiğini görmeli.
+        const who = (game.aiLevel && winnerNum === 2) ? 'YAPAY ZEKÂ' : `Oyuncu ${winnerNum}`;
+        showGameOver(`${who} (${winner.fighter.name}) Kazandı!`);
         // Savaş döngüsü durdu; kolu artık PadMenu tarıyor (ÇARPI = yeniden oyna)
         padMenu.start('gameover');
     }
@@ -127,23 +132,40 @@ window.__characterSelect = characterSelect;
 window.__introInfo = { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES };
 window.__fighters = { FIGHTERS };
 window.__abilities = { ABILITIES };
+window.__ai = { AI_LEVELS };
 
-document.getElementById('start-battle-btn').addEventListener('click', () => {
+// Seçilen zorluk. Yapay zekâ maçı dışında kullanılmıyor.
+let aiLevelKey = DEFAULT_AI_LEVEL;
+const levelButtons = [...document.querySelectorAll('.ai-level-btn')];
+for (const btn of levelButtons) {
+    btn.addEventListener('click', () => {
+        aiLevelKey = btn.dataset.level;
+        for (const other of levelButtons) other.classList.toggle('active', other === btn);
+    });
+}
+
+// İki mod da aynı yerden başlıyor: tek fark ikinci oyuncuyu kimin oynattığı.
+function startMatch(ai) {
     const { p1, p2 } = characterSelect.getSelection();
     if (!p1 || !p2) {
         const hint = document.getElementById('mode-hint');
-        if (hint) hint.textContent = 'Önce aşağıdan iki karakter seçin (P1 ve P2).';
+        if (hint) hint.textContent = 'Önce iki dövüşçü seçin: ilki sizin, ikincisi rakibiniz.';
         return;
     }
 
     padMenu.stop();   // taramayı savaş döngüsü devralıyor
     showBattleScreen();
-    game.start(p1, p2);
-});
+    game.start(p1, p2, { ai });
+}
+
+document.getElementById('start-battle-btn').addEventListener('click', () => startMatch(null));
+document.getElementById('start-ai-btn').addEventListener('click', () => startMatch(aiLevelKey));
 
 document.getElementById('restart-btn').addEventListener('click', () => {
     hideGameOver();
     padMenu.stop();
     const { p1, p2 } = characterSelect.getSelection();
-    game.start(p1, p2);
+    // Yeniden başlatırken mod korunuyor: yapay zekâya karşı oynayan oyuncu
+    // ÇARPI'ya basınca kendini iki kişilik maçta bulmasın.
+    game.start(p1, p2, { ai: game.aiLevel });
 });

@@ -33,7 +33,7 @@
         <!-- Header -->
         <header class="main-header hidden" id="main-header">
             <h1 class="game-title">VİRÜS<span> ARENA</span></h1>
-            <p class="game-subtitle">2 Kişilik Gerçek Zamanlı Arena Savaşı</p>
+            <p class="game-subtitle">Gerçek Zamanlı Arena Savaşı — yapay zekâya karşı ya da 2 kişilik</p>
             <div id="selection-status" class="selection-status">
                 <span class="p1-status-badge">Oyuncu 1: Seçim Yapıyor...</span>
                 <span class="p2-status-badge">Oyuncu 2: Beklemede...</span>
@@ -46,9 +46,18 @@
                  iki kişilik modun karakter seçimidir. -->
             <div class="mode-buttons">
                 <button id="selection-back-btn" class="back-btn">&larr; Ana Menü</button>
+                <button id="start-ai-btn" class="start-battle-btn not-ready">YAPAY ZEKÂYA KARŞI</button>
                 <button id="start-battle-btn" class="start-battle-btn not-ready">2 KİŞİLİK OYNA</button>
             </div>
-            <p id="mode-hint" class="mode-hint">Aşağıdan iki karakter seçin (P1 ve P2).</p>
+            <!-- Zorluk yalnızca yapay zekâ maçında işe yarıyor: iki kişilik
+                 oyunda kimse bu satıra bakmasın diye düğmenin hemen altında -->
+            <div id="ai-levels" class="ai-levels">
+                <span class="ai-levels-label">Zorluk</span>
+                <button class="ai-level-btn" data-level="kolay">KOLAY</button>
+                <button class="ai-level-btn active" data-level="normal">NORMAL</button>
+                <button class="ai-level-btn" data-level="zor">ZOR</button>
+            </div>
+            <p id="mode-hint" class="mode-hint">İki dövüşçü seçin: ilki sizin, ikincisi rakibiniz.</p>
             <!-- Kol takılıyken beliren öğretme (metni padMenu.js yazar) -->
             <p id="pad-hint" class="mode-hint pad-hint hidden"></p>
             <h2 class="section-title">Dövüşçünüzü Seçin</h2>

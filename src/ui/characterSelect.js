@@ -19,7 +19,12 @@ export class CharacterSelect {
         this.grid = document.getElementById('character-grid');
         this.status = document.getElementById('selection-status');
         this.overlay = document.getElementById('detail-overlay');
-        this.startBtn = document.getElementById('start-battle-btn');
+        // İki başlatma düğmesi de aynı anda açılıyor: iki dövüşçü seçilince
+        // hem iki kişilik hem yapay zekâ maçı oynanabilir.
+        this.startButtons = [
+            document.getElementById('start-battle-btn'),
+            document.getElementById('start-ai-btn')
+        ].filter(Boolean);
 
         document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
         this.overlay.addEventListener('click', (e) => {
@@ -125,11 +130,11 @@ export class CharacterSelect {
             badge.textContent = `P2: ${fighter.name}`;
             badge.classList.add('selected');
 
-            // İki oyuncu da seçildi: 2 kişilik mod düğmesi aktifleşir
-            this.startBtn.classList.remove('not-ready');
+            // İki dövüşçü de seçildi: iki mod düğmesi de aktifleşir
+            for (const btn of this.startButtons) btn.classList.remove('not-ready');
             const hint = document.getElementById('mode-hint');
-            if (hint) hint.textContent = 'Her iki oyuncu da hazır — 2 kişilik oyna!';
-            this.startBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (hint) hint.textContent = 'İkisi de hazır — yapay zekâya karşı ya da 2 kişilik oyna!';
+            this.startButtons[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         this.closeModal();

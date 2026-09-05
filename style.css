@@ -324,10 +324,62 @@ body.battle-active {
     margin-bottom: 2rem;
 }
 
+/* Zorluk satırı: yalnızca yapay zekâ maçını ilgilendiriyor, o yüzden mod
+   düğmelerinin altında ve onlardan sönük duruyor. */
+.ai-levels {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.ai-levels-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    margin-right: 0.25rem;
+}
+
+.ai-level-btn {
+    padding: 0.35rem 0.9rem;
+    font-family: var(--font-header);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ai-level-btn:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+
+.ai-level-btn.active {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    border-color: transparent;
+    color: #fff;
+}
+
 /* Mod düğmeleri satır içinde durur; eski alt boşlukları sıfırlanır */
 .mode-buttons .start-adventure-btn,
 .mode-buttons .start-battle-btn {
     margin: 0;
+}
+
+/* Yapay zekâ düğmesi: iki kişilikten ayrılsın diye mor */
+#start-ai-btn {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    animation: none;
+}
+
+#start-ai-btn:hover {
+    box-shadow: 0 15px 25px rgba(99, 102, 241, 0.5);
 }
 
 /* Henüz iki karakter seçilmedi */

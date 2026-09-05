@@ -23,7 +23,7 @@ const ACTIONS = [
 // hamle ne zaman çıkabilir" kararı var. Bölünme, ışın, küre gibi şeylerin
 // arenada yaşayan parçaları var, onları Game tutuyor.
 export class Player {
-    constructor({ x, y, fighter, playerNum, color, controls, actionKeys, padSlot = null, game }) {
+    constructor({ x, y, fighter, playerNum, color, controls, actionKeys, padSlot = null, game, brain = null }) {
         this.x = x;
         this.y = y;
         this.spawnX = x;
@@ -33,6 +33,8 @@ export class Player {
         this.controls = controls;
         this.actionKeys = actionKeys;
         this.padSlot = padSlot;   // bu oyuncunun kolu (yoksa klavye)
+        // Yapay zekâ: doluysa tuşlara bu basıyor, klavye/kol okunmuyor.
+        this.brain = brain;
         this.game = game;
 
         // Çarpışma kutusu sprite'ın kendi ölçüsü: virüs anti-virüsten hem
@@ -289,23 +291,37 @@ export class Player {
     }
 
     // Bu oyuncunun kolunun sol analogu. Kolu yoksa nötr döner.
+    // Yapay zekâ oynatıyorsa kol HİÇ okunmuyor: takılı bir kol AI'nın
+    // oynattığı karakteri de sürüklerdi.
     padStick() {
-        if (this.padSlot === null) return { x: 0, y: 0, magnitude: 0 };
+        if (this.brain || this.padSlot === null) return { x: 0, y: 0, magnitude: 0 };
         return this.game.gamepad?.stickAt(this.padSlot) || { x: 0, y: 0, magnitude: 0 };
     }
 
     // Bu oyuncunun kolunda bir tuş basılı mı
     padDown(button) {
-        if (this.padSlot === null) return false;
+        if (this.brain || this.padSlot === null) return false;
         return !!this.game.gamepad?.isDownAt(this.padSlot, button);
     }
 
     // Klavye ve kol tek bir tabloya indirgeniyor; "yeni basıldı" da burada
     // üretiliyor, böylece iki cihaz aynı kodu kullanıyor.
+    // Girdinin geldiği tek kapı. Yapay zekâ da buradan giriyor: kendi
+    // tablosunu üretiyor ve gerisi bire bir aynı yoldan gidiyor (bkz. ai.js).
+    // Ayrı bir yol açsaydık AI oyuncunun oynayamadığı bir oyun oynardı.
     readInput() {
+        const now = this.brain ? this.brain.decide() : this.deviceInput();
+        for (const name of ACTIONS) {
+            this.pressed[name] = now[name] && !this.held[name];
+            this.held[name] = now[name];
+        }
+    }
+
+    // Klavye + kol: iki cihaz tek tabloya iniyor.
+    deviceInput() {
         const { input } = this.game;
         const k = this.actionKeys;
-        const now = {
+        return {
             jump:    input.isDown(this.controls.up) || this.padDown(PAD_JUMP_BUTTON),
             attack:  input.isDown(k.attack) || this.padDown(PAD_ATTACK_BUTTON),
             special: input.isDown(k.special) || this.padDown(PAD_SPECIAL_BUTTON),
@@ -319,10 +335,6 @@ export class Player {
             padCircle:   this.padDown(PAD_SPECIAL_BUTTON),
             padTriangle: this.padDown('triangle')
         };
-        for (const name of ACTIONS) {
-            this.pressed[name] = now[name] && !this.held[name];
-            this.held[name] = now[name];
-        }
     }
 
     tickTimers() {
@@ -442,7 +454,7 @@ export class Player {
             return;
         }
 
-        const { input, canvas } = this.game;
+        const { canvas } = this.game;
         const moveSpeed = this.speed * this.speedMultiplier;
 
         // Yatay hareket: klavye tuşları ile kolun sol analogu aynı işi görür.
@@ -450,10 +462,13 @@ export class Player {
         // yarım itilirse karakter daha yavaş yürür.
         // Kombo tuşu basılıyken yürüme kapanmıyor - yalnızca tuşlar kombo
         // okuyor; oyuncu atılmayı beklerken yerinde çakılı kalmasın.
+        // Yürüme de bu karenin GİRDİ TABLOSUNDAN okunuyor, klavyeden değil:
+        // tek bir girdi kapısı olmalı, yoksa yapay zekânın bastığı yön tuşu
+        // hiçbir işe yaramıyor (bir kez bu yüzden AI yerinde saydı).
         let dx = 0;
         if (!this.action) {
-            if (input.isDown(this.controls.left)) dx -= 1;
-            if (input.isDown(this.controls.right)) dx += 1;
+            if (this.held.left) dx -= 1;
+            if (this.held.right) dx += 1;
             if (dx === 0) dx = this.padStick().x;
         }
 

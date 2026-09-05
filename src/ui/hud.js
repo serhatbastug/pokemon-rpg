@@ -50,6 +50,15 @@ export class Hud {
         for (const num of [1, 2]) {
             const el = this.controls[num];
             if (!el) continue;
+            // Yapay zekâ oynatıyorsa tuş yazmanın anlamı yok: o oyuncunun
+            // tuşu yok. Zorluk da burada yazıyor - oyuncu kime karşı
+            // oynadığını maç boyunca görebilmeli.
+            const brain = this.players?.[num]?.brain;
+            if (brain) {
+                el.textContent = `YAPAY ZEKÂ · ${brain.level.label}`;
+                el.classList.remove('pad-badge-text');
+                continue;
+            }
             const onPad = PLAYERS[num].padSlot < padCount;
             el.textContent = onPad ? PAD_CONTROL_LABEL : PLAYERS[num].keyLabel;
             el.classList.toggle('pad-badge-text', onPad);
@@ -59,6 +68,8 @@ export class Hud {
     setPlayers(p1, p2) {
         this.p1Name.textContent = p1.fighter.name;
         this.p2Name.textContent = p2.fighter.name;
+        this.players = { 1: p1, 2: p2 };
+        this.badgePadCount = null;   // rozetler yeniden yazılsın
     }
 
     updateHealth(p1, p2) {

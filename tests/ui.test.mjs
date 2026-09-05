@@ -892,6 +892,104 @@ async function main() {
     });
     await shot('03j-buz-klon-yol');
 
+    // --- YAPAY ZEKÂ: ikinci oyuncuyu bilgisayar oynatıyor ---
+    // Sınanan şey AI'nın iyi oynayıp oynamadığı değil (o oynanarak ayarlanır),
+    // KURALLARA UYUP UYMADIĞI: tuşlara basıyor mu, klavye ondan bağımsız mı,
+    // zorluk gerçekten fark ediyor mu.
+    const aiMac = await page.evaluate(() => {
+        const { FIGHTERS } = window.__fighters;
+        const f = (id) => FIGHTERS.find(x => x.id === id);
+        const g = window.__game;
+        g.start(f('virus'), f('ice'), { ai: 'normal' });
+        for (let i = 0; i < 1200 && (g.intro || g.introQueue.length); i++) g.update();
+        g.phaseTimer = 0;
+
+        const x0 = g.p2.x;
+        const can0 = g.p1.hp;
+        let hamle = 0;
+        let yurudu = 0;
+        let sonX = g.p2.x;
+        for (let i = 0; i < 600; i++) {
+            g.update();
+            if (g.p2.anim) hamle++;
+            if (Math.abs(g.p2.x - sonX) > 0.5) yurudu++;
+            sonX = g.p2.x;
+        }
+        return {
+            seviye: g.aiLevel,
+            beyin: !!g.p2.brain,
+            insanBeyni: !!g.p1.brain,
+            yurudu,
+            hamle,
+            yaklasti: Math.abs(g.p2.x - g.p1.x) < Math.abs(x0 - g.p1.x),
+            hasar: can0 - g.p1.hp
+        };
+    });
+    check('Yapay zeka ikinci oyuncuyu oynatiyor',
+        aiMac.beyin && !aiMac.insanBeyni && aiMac.seviye === 'normal', JSON.stringify(aiMac));
+    check('Yapay zeka yuruyor, yaklasiyor ve vuruyor',
+        aiMac.yurudu > 60 && aiMac.hamle > 20 && aiMac.yaklasti && aiMac.hasar > 0,
+        JSON.stringify(aiMac));
+
+    // AI ayrı bir yol açmıyor: TUŞA basıyor. Beyni durdurunca karakter de
+    // durmalı - durmuyorsa bir yerde doğrudan hamle çağrılıyor demektir.
+    const aiDurdu = await page.evaluate(() => {
+        const g = window.__game;
+        const beyin = g.p2.brain;
+        g.p2.brain = null;
+        g.p2.held = Object.fromEntries(Object.keys(g.p2.held).map(k => [k, false]));
+        // Başlamış olan hamle ve atılma hızı temizleniyor: beyin alındığı an
+        // devam eden bir savurma zaten vuracaktı, sınanan şey o değil.
+        g.p2.action = null;
+        g.p2.anim = null;
+        g.p2.vx = 0;
+        // Arenada yaşayan şeyler de temizleniyor: buzun klonu beyinden
+        // bağımsız, kendi başına vurmaya devam ediyor (öyle de olmalı).
+        g.combat.reset();
+        const x0 = g.p2.x;
+        const can0 = g.p1.hp;
+        for (let i = 0; i < 180; i++) g.update();
+        const sonuc = { kayma: Math.abs(g.p2.x - x0), hasar: can0 - g.p1.hp };
+        g.p2.brain = beyin;
+        return sonuc;
+    });
+    check('Beyin alininca yapay zeka duruyor',
+        aiDurdu.kayma < 2 && aiDurdu.hasar === 0, JSON.stringify(aiDurdu));
+
+    // Zorluk gerçekten fark etmeli: aynı karakterle zor, kolayı yenmeli.
+    const zorluk = await page.evaluate(async () => {
+        const { FighterAi } = await import('/src/game/ai.js');
+        const { FIGHTERS } = window.__fighters;
+        const f = (id) => FIGHTERS.find(x => x.id === id);
+        const g = window.__game;
+        let zor = 0;
+        let kolay = 0;
+        for (let m = 0; m < 3; m++) {
+            g.start(f('virus'), f('virus'), { ai: 'zor' });
+            g.p1.brain = new FighterAi(g.p1, 'kolay');
+            for (let i = 0; i < 1200 && (g.intro || g.introQueue.length); i++) g.update();
+            for (let i = 0; i < 3600 && !g.isGameOver; i++) g.update();
+            zor += g.wins[2];
+            kolay += g.wins[1];
+        }
+        return { zor, kolay };
+    });
+    check('Zor seviye kolayi yeniyor', zorluk.zor > zorluk.kolay, JSON.stringify(zorluk));
+
+    // HUD'da tuş yerine "YAPAY ZEKÂ" yazmalı: o oyuncunun tuşu yok.
+    const aiRozet = await page.evaluate(() => {
+        const { FIGHTERS } = window.__fighters;
+        const g = window.__game;
+        g.start(FIGHTERS[0], FIGHTERS[1], { ai: 'zor' });
+        g.hud.updateControlBadges(0);
+        const p2 = document.getElementById('p2-controls').textContent;
+        g.start(FIGHTERS[0], FIGHTERS[1]);
+        g.hud.updateControlBadges(0);
+        return { yapay: p2, insan: document.getElementById('p2-controls').textContent };
+    });
+    check('HUD yapay zekayi ve zorlugu yaziyor',
+        aiRozet.yapay.includes('YAPAY ZEK') && aiRozet.yapay.includes('ZOR') &&
+        !aiRozet.insan.includes('YAPAY'), JSON.stringify(aiRozet));
     // --- Giriş animasyonları: sıra ÖNCE P1, SONRA P2 ---
     // İki dövüşçünün de girişi varsa ikisi de oynar; tur ancak ikisi
     // bitince başlar ve o ana kadar kimse hareket edemez.

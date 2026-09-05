@@ -611,7 +611,7 @@ const E_ARM_TOP = 4;
 // hug: 0 = kollar yanda, 1 = kollar göğüste kavuşmuş (üşüyen adam - buzun
 // giriş animasyonu). Buzun kendi çizimi de aynı duruşu alabiliyor, yoksa
 // dönüşüm sırasında kollar yer değiştirmiş gibi görünürdü.
-function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0, hug = 0, manPalette = 'a' } = {}) {
+function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0, hug = 0, manPalette = 'a', hideArm = 0 } = {}) {
     const on = mode === 'electro';
     const P = ELECTRO_P;
     const H = manPalette === 'c' ? HUMAN_C : manPalette === 'd' ? HUMAN_D : HUMAN_P;
@@ -793,8 +793,12 @@ function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0
         return fist(inner + 1, top - (on ? 5 : 4), side);
     };
 
-    drawArm(-1, 0);
-    const raisedHand = drawArm(1, armRaise);
+    // hideArm: o kol sprite'ta çizilmiyor - hamlede üstüne çizilecek
+    // (bkz. electroSprite). 2 = ikisi birden (küreyi iki elle kuruyor).
+    if (hideArm !== -1 && hideArm !== 2) drawArm(-1, 0);
+    const raisedHand = (hideArm !== 1 && hideArm !== 2)
+        ? drawArm(1, armRaise)
+        : { x: X(E_CX + 9), y: Y(E_HIP) };
 
     // --- Bacaklar ve ayaklar ---
     // Elektro hâlinde bacaklar bir tık kalın: kütle aşağıda toplanıyor.
@@ -861,16 +865,29 @@ export function drawElectroSparks(ctx, x, footY, frame, intensity = 1, unit = PX
     }
 }
 
-let electroCache = null;
+// Sprite'lar bir kez çizilip saklanıyor, ama artık TEK bir hâl değil:
+// saldıran uzuv üstüne ayrıca çizildiği için (bkz. OVERLAYS) o uzvun
+// sprite'taki hâli gizlenmeli, yoksa karakterin o yanında iki kol oluyor -
+// biri yerinde asılı duran, biri savuran.
+//
+// Uzvu her karede yeniden boyamak da olurdu (paintFigure zaten açı alıyor),
+// ama arenada iki oyuncu + klon var; figür başına kare başına iki bin küsur
+// fillRect demek. Saklanan tuvali DÖNDÜRMEK de olmuyor: ctx.rotate piksel
+// ızgarasını kaydırıyor (ctx.scale ile aynı tuzak). Kalan yol bu: gizlenmiş
+// hâli AYRI BİR TUVAL olarak saklamak - kare başına ek maliyet sıfır.
+const electroCaches = new Map();
 
-export function electroSprite() {
-    if (electroCache) return electroCache;
+// hideArm: 0 yok · -1 karakterin sağ kolu · 1 sol kolu · 2 ikisi birden
+export function electroSprite(hideArm = 0) {
+    const cached = electroCaches.get(hideArm);
+    if (cached) return cached;
     const w = PX * E_COLS;
     const h = PX * E_ROWS;
     const { canvas, ctx } = newCanvas(w, h);
-    paintFigure(ctx, 0, 0, { mode: 'electro', armRaise: 0 });
-    electroCache = { canvas, ox: PX * E_CX, oy: h, w, h };
-    return electroCache;
+    paintFigure(ctx, 0, 0, { mode: 'electro', armRaise: 0, hideArm });
+    const sprite = { canvas, ox: PX * E_CX, oy: h, w, h };
+    electroCaches.set(hideArm, sprite);
+    return sprite;
 }
 
 // Giriş animasyonunun kullandığı çizim: adam / elektro, kolu istenen kadar
@@ -912,16 +929,19 @@ export function paintIntroCarrier(ctx, x, footY, opts) {
 // Palet doğrudan tasarım sayfasından: koyu lacivertten beyaza giden bir buz
 // merdiveni, üstüne tek bir soğuk mor. Gövde ORTA tonda - açık mavi bir
 // gövdenin üstünde beyaz kırıklar okunmuyor, karakter soluk kalıyor.
+// Palet doğrudan tasarım sayfasından: koyu laciverten beyaza giden bir buz
+// merdiveni, üstüne tek bir soğuk mor. Gövde ORTA tonda - açık mavi bir
+// gövdenin üstünde beyaz kırıklar okunmuyor, karakter soluk kalıyor.
 const ICE_P = {
-    deep: '#0b2440',        // kontur ve göz oyuğu
-    dark: '#1c4d86',        // gölgede kalan yüzler
-    mid: '#2f7fc4',
-    body: '#4aa3e0',
-    light: '#8fd4f5',
-    pale: '#c9ecff',
+    deep: '#0a1e3c',        // kontur ve göz oyuğu
+    dark: '#1b4c8f',        // gölgede kalan yüzler, göz maskesi
+    mid: '#2d7fd0',
+    body: '#4aa8ea',
+    light: '#8fd0f7',
+    pale: '#cfeaff',
     frost: '#ffffff',
-    eye: '#eafcff',
-    glow: '#7df0ff',
+    eye: '#e6feff',
+    glow: '#6ee8ff',
     lilac: '#8f9ce8'        // paletteki tek kırık renk: birkaç fase
 };
 
@@ -937,18 +957,22 @@ const HUMAN_D = {
     y: '#22303a'
 };
 
-// Gövdenin yarı genişliği (sütun cinsinden), satıra göre. Biçim tasarım
-// sayfasındaki gibi: yuvarlakça bir virüs kütlesi, altı sivri. En geniş yeri
-// GÖZ HİZASI - kütlenin ağırlığı yukarıda olunca "yüzüyor" gibi duruyor.
-const ICE_TOP = 9;
-const ICE_BOTTOM = 36;
+// Gövdenin yarı genişliği (sütun cinsinden), satır satır. FORMÜLLE DEĞİL
+// ELLE yazılı: tasarım sayfasındaki biçim bir kalp/kalkan - üstte iki
+// yuvarlak omuz, ortada bir çentik, altta sivri uç. Sinüs eğrisi bunu
+// vermiyor, düzgün bir damla veriyor ve karakter "yumurta" gibi duruyordu.
+const ICE_TOP = 17;
+const ICE_BOTTOM = 38;
+const ICE_HALF = [
+    6, 8, 10, 11, 11, 11, 11, 10, 10, 9, 9, 8, 8, 7, 6, 5, 4, 3, 3, 2, 1, 1
+];
+// Üstteki çentik: ilk üç satırda gövdenin ORTASI boş. Tepedeki kristal
+// oradan çıkıyor - kütle kristali "takmış" değil, kristal kütleden BÜYÜMÜŞ.
+const ICE_NOTCH = 3;
+
 function iceHalf(row) {
     if (row < ICE_TOP || row > ICE_BOTTOM) return 0;
-    const t = (row - ICE_TOP) / (ICE_BOTTOM - ICE_TOP);
-    // Göz hizasında açılıp altta sivrilen bir eğri. Üs 0,75: daha küçük bir
-    // üsle tepe hemen açılıyor ve kütle "yuvarlak" değil "yassı" duruyordu.
-    const w = Math.sin(Math.pow(t, 0.75) * Math.PI) * 12;
-    return Math.max(0, Math.round(w));
+    return ICE_HALF[row - ICE_TOP];
 }
 
 // Gövde HAFİF ASİMETRİK: karakterin sağ yanı (izleyicinin solu) göz hizasında
@@ -956,22 +980,26 @@ function iceHalf(row) {
 // kütle heykel gibi duruyor, kimliği olmuyor - diğer üçünde de aynı kural var.
 function iceHalfL(row) {
     const h = iceHalf(row);
-    return h > 0 && row >= 13 && row <= 24 ? h + 1 : h;
+    return h > 0 && row >= 20 && row <= 28 ? h + 1 : h;
 }
 function iceHalfR(row) {
     const h = iceHalf(row);
-    return h > 0 && row >= 25 ? Math.max(0, h - 1) : h;
+    return h > 0 && row >= 29 ? Math.max(0, h - 1) : h;
 }
 
 // Buz hâli. ox, oy: sprite kutusunun sol üst köşesi (canvas pikseli).
 //
 // Tasarım kullanıcının verdiği sayfadan (2026-09-05): AYRI KAFA YOK - gövdenin
-// üstünde iki parlak göz var. Kol yok, yerlerinde uçları keskinleşen buz
-// yaprakları (kılıçlar) duruyor. Ayak yok: kütle yerin BİRAZ ÜSTÜNDE.
-// Gövde yarı saydam - arkasındaki arena ondan geçiyor.
+// üst yarısında koyu bir maskenin içinde yanan iki iri göz. Kol yok, yerlerinde
+// uçları keskinleşen buz YAPRAKLARI (kılıçlar) - gövdeden AÇIK renkteler.
+// Ayak yok: kütle yerin biraz üstünde. Tepede kütlenin yarısı boyunda tek bir
+// kristal. Gövde yarı saydam.
 //
-// headTilt: giriş animasyonunun kütleyi hafifçe yatırması.
-function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
+// hideBlade: -1 / 1 - o yandaki UZUN yaprağı çizme. Kılıç sallanırken sprite'ın
+// yaprağı yerinde kalırsa karakterin o yanında iki kılıç oluyor: biri asılı
+// duran, biri savuran. Gizlenmiş hâl ayrı bir tuvale saklanıyor, kare başına
+// ek maliyet yok (bkz. iceSprite).
+function paintIce(ctx, ox, oy, { headTilt = 0, hideBlade = 0 } = {}) {
     const P = ICE_P;
     const X = (col) => ox + col * PX;
     const Y = (row) => oy + row * PX;
@@ -980,7 +1008,7 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
     // Kafa yok, ama giriş animasyonu kütleyi yatırabiliyor: eğim yukarı
     // doğru artıyor, taban yerinde kalıyor.
     const tiltAt = (row) => {
-        const k = Math.max(0, Math.min(1, (ICE_BOTTOM - row) / (ICE_BOTTOM - ICE_TOP)));
+        const k = Math.max(0, Math.min(1, (ICE_BOTTOM - row) / ICE_BOTTOM));
         return -Math.round(headTilt * 2 * k) * PX;
     };
     const put = (col, row, cols, rows, color) => {
@@ -1004,7 +1032,7 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
     // --- Buz yaprağı (kılıç) ---
     // Kolların yerinde duran şey. Ortası şişip ucu sivrilen bir yaprak:
     // ortasında parlak bir omurga, iki yanında koyu kenar. Uzaktan bakınca
-    // karakteri tanıtan siluet bunlar - o yüzden UZUN ve KESKİN.
+    // karakteri tanıtan siluet bunlar - o yüzden UZUN, KALIN ve gövdeden AÇIK.
     const bladeAt = (col, row, len, dx, dy, maxHalf) => {
         let tip = { col, row };
         for (let i = 0; i < len; i++) {
@@ -1015,44 +1043,50 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
             const r = Math.round(row + dy * i);
             tip = { col: c, row: r };
             if (half <= 0) {
-                put(c, r, 1, 1, t > 0.75 ? P.frost : P.light);
+                put(c, r, 1, 1, P.pale);
                 continue;
             }
-            put(c - half, r, half * 2 + 1, 1, t > 0.6 ? P.light : P.mid);
-            put(c - half, r, 1, 1, P.deep);
+            put(c - half, r, half * 2 + 1, 1, P.light);
+            put(c - half, r, 1, 1, P.mid);
             put(c + half, r, 1, 1, P.deep);
-            put(c - half + 1, r, 1, 1, P.light);           // ışık soldan
-            // Omurga: yaprağın ORTASINDA parlak, ucunda değil. Ucu da beyaz
-            // yapınca yaprak değil İĞNE okunuyordu.
-            put(c, r, 1, 1, t > 0.2 && t < 0.7 ? P.pale : P.light);
+            // Omurga yaprağın ORTASINDA parlak, ucunda değil: ucu da beyaz
+            // yapınca yaprak değil İĞNE okunuyor.
+            put(c, r, 1, 1, t > 0.2 && t < 0.75 ? P.frost : P.pale);
+            // Damarlar: yaprağı bölen kısa eğik hatlar
+            if (i % 4 === 2) put(c - half + 1, r, 2, 1, P.pale);
         }
-        // Ucun son parlaması: yaprağın bittiği yer beyaz olmalı, yoksa
-        // "sivrildi" değil "kesildi" duruyor.
         put(tip.col, tip.row, 1, 1, P.frost);
         return tip;
     };
 
     // ---- 1) Arkada duran yapraklar ----
-    // Uzun ikisi gövdenin ARKASINDAN çıkıyor: gövdeden sonra çizilirse
-    // kökleri kütlenin üstüne biniyor ve yapraklar yapıştırılmış duruyor.
-    //
-    // KALIN olmalılar: ilk denemede yarı kalınlık 2'ydi ve dört yaprak da
-    // gövdenin yanından çıkan bıyıklar gibi duruyordu. Silueti taşıyan şey
-    // bunlar - ince çizilince karakter yalnızca "yuvarlak bir kütle".
-    // KÖK GÖVDENİN KENARINDA olmalı: kökü kütlenin ortasına koyunca yaprağın
-    // en kalın yeri gövdenin altında kalıyor ve dışarıya yalnızca sivrilmiş
-    // ucu çıkıyordu - dört kılıç da çubuk gibi duruyordu.
-    bladeAt(E_CX - 7, 20, 20, -0.72, 0.70, 4);   // sol büyük kılıç
-    bladeAt(E_CX + 7, 19, 21, 0.70, 0.72, 4);    // sağ büyük kılıç
-    bladeAt(E_CX - 6, 27, 14, -0.80, 0.60, 3);   // sol alt kılıç
-    bladeAt(E_CX + 6, 26, 12, 0.82, 0.58, 3);    // sağ alt kılıç (daha kısa)
+    // Gövdeden ÖNCE çiziliyor: sonra çizilirse kökleri kütlenin üstüne binip
+    // yapraklar yapıştırılmış duruyor.
+    if (hideBlade !== -1) bladeAt(E_CX - 4, 27, 19, -0.76, 0.66, 4);   // sol uzun kılıç
+    if (hideBlade !== 1) bladeAt(E_CX + 4, 26, 19, 0.75, 0.67, 4);     // sağ uzun kılıç
+    bladeAt(E_CX - 6, 24, 11, -0.95, 0.30, 3);                          // sol yatık kılıç
+    bladeAt(E_CX + 6, 23, 10, 0.96, 0.28, 3);                           // sağ yatık kılıç
 
-    // ---- 2) Tepedeki taç kristalleri ----
-    // Üç diken, boyları ve açıları farklı: eşit boyda üç diken taç değil
-    // tarak gibi duruyor.
-    spike(E_CX - 1, ICE_TOP + 1, 9, 0, -1, 3);        // ortadaki uzun
-    spike(E_CX - 6, ICE_TOP + 3, 5, -0.4, -1, 3);
-    spike(E_CX + 4, ICE_TOP + 2, 6, 0.35, -1, 3);
+    // ---- 2) Tepedeki kristal ----
+    // Tasarım sayfasında kütlenin YARISI boyunda tek bir kristal var; kısa
+    // çizilince karakter tepesi düz bir yumru gibi duruyor. Üç kısa diken
+    // yerine BİR uzun kristal + yanında küçükler.
+    for (let row = ICE_TOP - 1; row >= 4; row--) {
+        const up = ICE_TOP - 1 - row;
+        // Kökte 5, ortada 3, tepede 1 sütun. Boydan boya tek sütun çizince
+        // kristal değil ANTEN duruyordu.
+        const half = up < 3 ? 2 : up < 8 ? 1 : 0;
+        put(E_CX - half, row, half * 2 + 1, 1, P.light);
+        put(E_CX - half, row, 1, 1, P.pale);      // ışık soldan
+        if (half > 0) put(E_CX + half, row, 1, 1, P.mid);
+        if (half > 1) put(E_CX + half - 1, row, 1, 1, P.dark);
+        if (up === 3 || up === 8) put(E_CX - half, row, half * 2 + 1, 1, P.frost);
+    }
+    put(E_CX, 4, 1, 1, P.frost);
+    spike(E_CX - 6, ICE_TOP + 1, 6, -0.35, -1, 3);
+    spike(E_CX + 4, ICE_TOP, 5, 0.35, -1, 3);
+    spike(E_CX - 9, ICE_TOP + 4, 3, -0.5, -1, 2);
+    spike(E_CX + 8, ICE_TOP + 3, 3, 0.5, -1, 2);
 
     // ---- 3) Gövde ----
     // YARI SAYDAM: alfa yalnızca dolgu satırında açılıyor, kontur ve gözler
@@ -1062,10 +1096,16 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
         const hl = iceHalfL(row);
         const hr = iceHalfR(row);
         if (hl + hr < 2) continue;
+        const notch = row < ICE_TOP + ICE_NOTCH ? 2 : 0;   // üstteki çentik
 
         ctx.save();
-        ctx.globalAlpha *= 0.74;
-        put(E_CX - hl, row, hl + hr + 1, 1, P.body);
+        ctx.globalAlpha *= 0.86;
+        if (notch) {
+            put(E_CX - hl, row, hl - notch + 1, 1, P.body);
+            put(E_CX + notch, row, hr - notch + 1, 1, P.body);
+        } else {
+            put(E_CX - hl, row, hl + hr + 1, 1, P.body);
+        }
         ctx.restore();
 
         // Kenarlar ve hacim
@@ -1073,13 +1113,14 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
         put(E_CX + hr, row, 1, 1, P.deep);
         put(E_CX - hl + 1, row, 2, 1, P.light);
         put(E_CX + hr - 2, row, 2, 1, P.dark);
+        if (notch) {
+            put(E_CX - notch, row, 1, 1, P.deep);
+            put(E_CX + notch, row, 1, 1, P.deep);
+        }
 
-        // Faseler: düz dolgu buzu "plastik" gösteriyor. hash konuma bağlı
-        // olduğu için desen her açılışta AYNI - yoksa kütle her karede kaynar.
-        //
-        // SEYREK olmalı: ilk denemede her satırın dörtte biri fase idi ve
-        // gövde buz değil KARLI PARAZİT gibi okunuyordu. Gözlerin okunması
-        // için yüzeyin sakin kalması şart.
+        // Faseler: düz dolgu buzu "plastik" gösteriyor. SEYREK olmalı - sık
+        // olunca gövde buz değil karlı parazit gibi okunuyor ve gözler
+        // içinde kayboluyor. hash konuma bağlı, desen her açılışta AYNI.
         for (let c = -hl + 3; c < hr - 2; c++) {
             const r = hash(c, row, 51);
             if (r < 0.05) put(E_CX + c, row, 1, 1, P.light);
@@ -1087,60 +1128,57 @@ function paintIce(ctx, ox, oy, { headTilt = 0 } = {}) {
             else if (r < 0.10) put(E_CX + c, row, 1, 1, P.lilac);
         }
 
-        // Kütlenin içindeki çekirdek: gövdeyi boydan boya kesen koyu bir
-        // elmas. Dikdörtgen çizilince gövdede pencere gibi bir delik
-        // duruyordu; uçları daralınca kütlenin İÇİNDEKİ kristal okunuyor.
-        // Gövdenin ortasına koyu bir çekirdek koymuştum: gözlerin hemen
-        // altında durduğu için yüze AÇIK BİR AĞIZ takıyordu. Kafası olmayan
-        // bir karakterde gövdenin ortası boş kalmalı - yüzü gözler taşıyor.
-        const k = row - ICE_TOP;
-
-        // Yüzeyi kesen beyaz kırık. Elektronun sarı damarı gövdeyi DOLAŞIR,
-        // buzunki gövdeyi KESER - biri canlı, biri kırık. Gözlerin ALTINDA
-        // duruyor: üstünde kalanlar bakışla yarışıyordu.
-        if (k === 16 || k === 21) {
-            put(E_CX - hl + 3, row, 3, 1, P.frost);
-            put(E_CX + hr - 5, row + 1, 3, 1, P.frost);
-        }
+        // Alt yarının gölgesi: ışık üstten-soldan geliyor, kütlenin alt sağ
+        // yanı koyulaşıyor. Düz aydınlık bir kütle "kâğıttan kesilmiş" duruyor.
+        if (row > 29) put(E_CX + hr - 4, row, 3, 1, P.mid);
     }
 
-    // ---- 4) Gözler ----
-    // Ayrı bir kafa yok: kütlenin üst yarısında yanan iki yarık. İçe doğru
-    // AŞAĞI eğimliler - yukarı eğim şaşkın, aşağı eğim tehditkâr yapıyor.
-    // Önce KOYU OYUK, sonra oyuğun içinde yanan yarık: doğrudan parlak
-    // yazınca gözler açık yüzeyde kaybolup kütle boş duruyor.
-    // Göz BÜYÜK ve KALIN olmalı: ilk denemede tek piksel kalınlığındaydı ve
-    // gövdenin faseleri arasında kayboluyordu - kafası olmayan bir karakterde
-    // gözler yüzün tamamı, yarısı değil.
+    // ---- 4) Maske ve gözler ----
+    // Ayrı bir kafa yok: kütlenin üst yarısında KOYU BİR MASKE ve içinde
+    // yanan iki iri göz. Maske şart - gözleri doğrudan açık gövdeye yazınca
+    // kayboluyorlar; yanan şeyin arkasında karanlık olmalı.
+    // Maske GÖZLERİN ÇEVRESİYLE sınırlı ve hafif olmalı: kalın ve koyu bir
+    // bant gövdenin ortasını yutuyor, karakter buz kütlesi değil koyu bir
+    // yürek gibi duruyordu.
+    for (let row = 22; row <= 26; row++) {
+        const reach = row < 24 ? 10 : 9;
+        ctx.save();
+        ctx.globalAlpha *= 0.34;
+        put(E_CX - reach, row, reach * 2 + 1, 1, P.deep);
+        ctx.restore();
+    }
+
+    // Göz: dıştan içe doğru AŞAĞI iniyor (yukarı eğim şaşkın, aşağı eğim
+    // tehditkâr yapıyor). İki satır kalın - tek piksellik bir yarık faseler
+    // arasında kayboluyor.
+    // Göz DIŞTAN İÇE İNCELİYOR: baştan sona aynı kalınlıkta çizince göz değil
+    // ÇUBUK oluyor, iki çubuk da yüzde bıyık gibi duruyordu. Kalın dış uç +
+    // sivri iç uç badem biçimini veriyor.
     const eye = (outerCol, dir) => {
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 7; i++) {
             const c = outerCol + dir * i;
-            const r = 17 + Math.round(i * 0.55);   // içe doğru AŞAĞI iniyor
-            put(c, r - 2, 1, 2, P.deep);           // kaş: gözün üstünü gölgeliyor
-            put(c, r, 1, 2, P.deep);               // oyuk
-            // Yanan yarık: dışta soğuk mavi, içe doğru beyazlaşıyor
-            put(c, r, 1, 1, i < 2 ? P.glow : P.eye);
-            if (i >= 3) put(c, r + 1, 1, 1, P.glow);
+            const r = 23 + Math.round(i * 0.45);
+            const thick = i < 2 ? 3 : i < 4 ? 2 : 1;
+            put(c, r - 1, 1, 1, P.deep);                     // üstündeki gölge
+            put(c, r, 1, thick, i < 2 ? P.glow : P.eye);     // yanan yarık
+            put(c, r + thick, 1, 1, P.dark);                 // altındaki gölge
         }
     };
-    eye(E_CX - 10, 1);
-    eye(E_CX + 10, -1);
-    // İki gözün arasında kalan alnın çatlağı: yüz boş kalmasın
-    put(E_CX - 1, 14, 2, 1, P.pale);
-    put(E_CX, 15, 1, 1, P.frost);
+    eye(E_CX - 9, 1);
+    eye(E_CX + 9, -1);
+    // İki gözün arasında yükselen sırt: yüzün ortası boş kalmasın
+    put(E_CX - 1, 21, 2, 1, P.light);
+    put(E_CX, 22, 1, 2, P.pale);
 
     // ---- 5) Kütlenin alt ucu ----
     // Sivrilerek bitiyor ve ucunda tek bir saçak var. İki saçak koymuştum,
     // uzaktan BACAK okunuyorlardı - oysa bu karakterin ayağı yok.
-    put(E_CX - 1, ICE_BOTTOM + 1, 2, 2, P.mid);
-    put(E_CX - 1, ICE_BOTTOM + 1, 1, 2, P.light);
-    put(E_CX, ICE_BOTTOM + 3, 1, 2, P.pale);
-    put(E_CX, ICE_BOTTOM + 5, 1, 1, P.frost);
+    put(E_CX, ICE_BOTTOM + 1, 1, 2, P.mid);
+    put(E_CX, ICE_BOTTOM + 3, 1, 1, P.pale);
 
     // Vuran bir el yok; kılıcın çıktığı yer gövdenin omuz hizası.
-    return { hand: { x: X(E_CX) + w(6), y: Y(20) } };
+    return { hand: { x: X(E_CX) + w(6), y: Y(26) } };
 }
-
 // Buzun kırağısı. Elektronun kıvılcımı gibi sprite'a gömülmüyor: her karede
 // yeniden çiziliyor. Ama RİTMİ bilerek farklı - elektro 4 karede bir çatırdar,
 // buz süzülür. Aynı hızda olsalar iki karakter de "titriyor" gibi okunurdu;
@@ -1194,16 +1232,21 @@ export function drawFrostMotes(ctx, x, footY, frame, intensity = 1, unit = PX) {
         put(rx, ry, u, u, P.frost);
     }
 }
-let iceCache = null;
+// Elektrodaki gerekçenin aynısı: kılıç sallanırken o yandaki UZUN yaprak
+// sprite'ta durmamalı, yoksa karakterin bir yanında iki kılıç oluyor.
+const iceCaches = new Map();
 
-export function iceSprite() {
-    if (iceCache) return iceCache;
+// hideBlade: 0 yok · -1 karakterin sağındaki uzun yaprak · 1 solundaki
+export function iceSprite(hideBlade = 0) {
+    const cached = iceCaches.get(hideBlade);
+    if (cached) return cached;
     const w = PX * E_COLS;
     const h = PX * E_ROWS;
     const { canvas, ctx } = newCanvas(w, h);
-    paintIce(ctx, 0, 0, {});
-    iceCache = { canvas, ox: PX * E_CX, oy: h, w, h };
-    return iceCache;
+    paintIce(ctx, 0, 0, { hideBlade });
+    const sprite = { canvas, ox: PX * E_CX, oy: h, w, h };
+    iceCaches.set(hideBlade, sprite);
+    return sprite;
 }
 
 // Giriş animasyonunun kullandığı çizim (ölçekleme sahnede yapılıyor)
@@ -1293,16 +1336,19 @@ const POSES = {
 
 // Karakterin beyaz silueti: parlama için. Sprite gibi bir kez üretilip
 // saklanıyor - her karede yeniden boyamanın anlamı yok.
+// Anahtar SPRITE'IN KENDİSİ, karakterin adı değil: aynı karakterin uzvu
+// gizlenmiş hâlleri de var (bkz. spriteFor), ada göre saklarsak hepsi ilk
+// üretilen siluetle parlıyor.
 const silhouettes = new Map();
-function silhouetteOf(key, sprite) {
-    const cached = silhouettes.get(key);
+function silhouetteOf(sprite) {
+    const cached = silhouettes.get(sprite);
     if (cached) return cached;
     const { canvas, ctx } = newCanvas(sprite.w, sprite.h);
     ctx.drawImage(sprite.canvas, 0, 0);
     ctx.globalCompositeOperation = 'source-atop';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, sprite.w, sprite.h);
-    silhouettes.set(key, canvas);
+    silhouettes.set(sprite, canvas);
     return canvas;
 }
 
@@ -1475,7 +1521,10 @@ function iceSwordArm(ctx, x, footY, t, dir) {
     // Yay: yukarı-geriden öne-aşağı. -1.15 rad'dan +0.30 rad'a
     const k = phase(t, 0.15, 0.62);
     const a = -1.15 + k * 1.45;
-    const root = { x: x + dir * PX * 3, y: footY - PX * 30 };
+    // Kök, sprite'taki uzun yaprağın kökünün TA KENDİSİ (bkz. bladeAt
+    // çağrıları): o yaprak bu hamlede gizleniyor ve yerini bu alıyor.
+    // Başka bir noktadan çıkarsa kılıç kütlenin yanında ayrı bir şey olur.
+    const root = { x: x + dir * PX * 4, y: footY - PX * 26 };
     const len = PX * 27;
     const dxu = Math.cos(a) * dir;
     const dyu = Math.sin(a);
@@ -1513,10 +1562,13 @@ function iceSwordArm(ctx, x, footY, t, dir) {
         const half = Math.max(1, Math.round(5 * Math.sin(Math.pow(p, 0.5) * Math.PI)));
         const px = Math.round((root.x + dxu * len * p) / PX) * PX;
         const py = Math.round((root.y + dyu * len * p) / PX) * PX;
-        blk(ctx, px, py - half * PX, PX, half * 2 * PX, p > 0.6 ? P.light : P.mid);
-        blk(ctx, px, py - half * PX, PX, PX, P.deep);              // üst kenar
+        // Renkler sprite'taki yapraklarla AYNI: kılıç gövdeden koyu olursa
+        // "kütlenin yaprağı" değil, eline tutuşturulmuş başka bir nesne
+        // gibi duruyor.
+        blk(ctx, px, py - half * PX, PX, half * 2 * PX, P.light);
+        blk(ctx, px, py - half * PX, PX, PX, P.mid);               // üst kenar
         blk(ctx, px, py + (half - 1) * PX, PX, PX, P.deep);        // alt kenar
-        blk(ctx, px, py, PX, PX, p > 0.25 && p < 0.85 ? P.pale : P.light);   // omurga
+        blk(ctx, px, py, PX, PX, p > 0.2 && p < 0.75 ? P.frost : P.pale);   // omurga
     }
 
     // Ucun parlaması
@@ -1582,6 +1634,30 @@ const OVERLAYS = {
     path: (ctx, x, footY, t, dir) => icePour(ctx, x, footY, t, dir)
 };
 
+// Hangi hamlede sprite'ın hangi uzvu GİZLENECEK. Saldıran uzuv üstüne
+// ayrıca çiziliyor (OVERLAYS); uzuv sprite'ta da dururken çizilirse
+// karakterin o yanında iki tane oluyor - biri yerinde asılı, biri savuran.
+//
+// Virüsün savurması bu tabloda YOK ve olmamalı: o kütlenin sabit bir kolu
+// yok, kol savurma anında var oluyor (bkz. virusPunchArm).
+//
+// Yön: hamle karakterin baktığı yanda çıkıyor, o yüzden gizlenecek uzuv da
+// dir'e bağlı. dir > 0 ise karakterin SOL yanı (izleyicinin sağı) gizleniyor.
+const HIDDEN_LIMB = {
+    beam: (dir) => (dir > 0 ? 1 : -1),
+    orb: () => 2,                        // küreyi iki elle kuruyor
+    sword: (dir) => (dir > 0 ? 1 : -1)
+};
+
+// Bu duruş için kullanılacak sprite. Gizlenmiş hâller ayrı tuvallerde
+// saklanıyor, yani seçim kare başına bir Map aramasından ibaret.
+function spriteFor(key, pose) {
+    const build = FIGHTER_SPRITES[key];
+    if (!build) return null;
+    const rule = pose && HIDDEN_LIMB[pose.id];
+    return rule ? build(rule(pose.dir ?? 1)) : build();
+}
+
 // Hamlenin arenaya çıktığı nokta: anti-virüsün topu omzundaki borunun
 // ucundan, elektronun ışını ileri uzanan elinden çıkmalı - ikisi de
 // gövdenin ortasından çıkarsa hamlenin kimden geldiği okunmuyor.
@@ -1605,7 +1681,7 @@ export function muzzleOf(key, x, footY, dir = 1) {
 // frame: arenanın kare sayacı - yalnızca hareketli çizimler (elektrik) kullanır.
 // pose: { id, t, dir } - oynayan saldırı animasyonu (yoksa null).
 export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
-    const sprite = FIGHTER_SPRITES[key]?.();
+    const sprite = spriteFor(key, pose);
     if (!sprite) return;
 
     const shape = pose && POSES[pose.id] ? POSES[pose.id](pose.t) : null;
@@ -1630,7 +1706,7 @@ export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
     // arka plan zaten opak, beyaz sahnenin üstüne kutu gibi düşüyor.
     if (shape?.flash > 0.02) {
         ctx.globalAlpha *= Math.min(0.6, shape.flash);
-        ctx.drawImage(silhouetteOf(key, sprite), px, py);
+        ctx.drawImage(silhouetteOf(sprite), px, py);
     }
     ctx.restore();
 

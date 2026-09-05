@@ -131,10 +131,14 @@ function virusHalf(row) {
     return 10;
 }
 
-let virusCache = null;
+const virusCaches = new Map();
 
-export function virusSprite() {
-    if (virusCache) return virusCache;
+// hideArm: 0 yok · -1 karakterin sağ kolu · 1 sol kolu. Savururken o kol
+// sprite'ta durmamalı - üstüne çizilen kolla birlikte karakterin üç kolu
+// oluyordu (bkz. spriteFor).
+export function virusSprite(hideArm = 0) {
+    const cached = virusCaches.get(hideArm);
+    if (cached) return cached;
 
     const w = PX * V_COLS;
     const h = PX * V_ROWS;
@@ -228,8 +232,8 @@ export function virusSprite() {
         drip(ctx, Math.round(c - half) + 1, bottom - 9, 3, P);
         drip(ctx, Math.round(c + half) - 2, bottom - 6, 2, P);
     };
-    drawArm(-1, 11, 40, 91);
-    drawArm(1, 14, 37, 97);
+    if (hideArm !== -1) drawArm(-1, 11, 40, 91);
+    if (hideArm !== 1) drawArm(1, 14, 37, 97);
 
     // --- 4) Bacaklar ve altındaki birikinti ---
     // Ayak yok: bacaklar aşağı indikçe yayılıp tek bir kütlede birleşiyor.
@@ -250,8 +254,9 @@ export function virusSprite() {
 
     skinTexture(ctx, w, h, P, 401);
 
-    virusCache = { canvas, ox: cx, oy: h, w, h };
-    return virusCache;
+    const sprite = { canvas, ox: cx, oy: h, w, h };
+    virusCaches.set(hideArm, sprite);
+    return sprite;
 }
 
 // ================= ANTİ-VİRÜS =================
@@ -421,10 +426,14 @@ export function paintCarrier(ctx, ox, oy, { legLift = 0, headTilt = 0 } = {}) {
     }
 }
 
-let antivirusCache = null;
+const antivirusCaches = new Map();
 
-export function antivirusSprite() {
-    if (antivirusCache) return antivirusCache;
+// hideArm: -1 = mercan kol (karakterin SAĞ kolu) çizilmiyor. Enfekte kol
+// fırlatılırken o kol sprite'ta duramaz - fırlatılan kolun ta kendisi.
+// Sağlam insan kolu taşıyıcıda kalıyor, o hiç gitmiyor.
+export function antivirusSprite(hideArm = 0) {
+    const cached = antivirusCaches.get(hideArm);
+    if (cached) return cached;
 
     const w = PX * A_COLS;
     const h = PX * A_ROWS;
@@ -497,14 +506,17 @@ export function antivirusSprite() {
         if (t < 0.6) return 3;          // dirsek yumrusu
         return 2;                       // ön kol
     };
-    limb(ctx, A_SHOULDER + 1, A_HIP, armCenter, armHalf, C);
-    for (let row = A_SHOULDER + 4; row < A_HIP; row += 4) {
-        blk(ctx, B(Math.round(armCenter(row) - 1)), R(row), B(2), PX, C.dark);
+    if (hideArm !== -1) {
+        limb(ctx, A_SHOULDER + 1, A_HIP, armCenter, armHalf, C);
+        for (let row = A_SHOULDER + 4; row < A_HIP; row += 4) {
+            blk(ctx, B(Math.round(armCenter(row) - 1)), R(row), B(2), PX, C.dark);
+        }
+        claw(ctx, Math.round(armCenter(A_HIP) - 2), 4, A_HIP, C);
     }
-    // Omuz kapağı: kolu gövdeye bağlayan tek yer
+    // Omuz kapağı: kolu gövdeye bağlayan tek yer. Kol gizlenince de duruyor -
+    // kol fırlamış olsa da omzu yerinde, kütle oradan çıkıyor.
     blk(ctx, B(7), R(A_SHOULDER - 1), B(7), R(3), C.body);
     blk(ctx, B(7), R(A_SHOULDER - 1), B(7), PX, C.light);
-    claw(ctx, Math.round(armCenter(A_HIP) - 2), 4, A_HIP, C);
 
     // --- 3) OMUZDAN yukarı uzanan boru ve ucundaki küçük kafa ---
     //
@@ -560,8 +572,9 @@ export function antivirusSprite() {
     blk(ctx, cx + B(footCol), R(A_FOOT), PX, PX, C.light);
     blk(ctx, cx + B(footCol + 3), R(A_FOOT + 1), B(2), PX, C.dark);
 
-    antivirusCache = { canvas, ox: cx, oy: h, w, h };
-    return antivirusCache;
+    const sprite = { canvas, ox: cx, oy: h, w, h };
+    antivirusCaches.set(hideArm, sprite);
+    return sprite;
 }
 
 // ================= ELECTRO-VİRÜS =================
@@ -1373,18 +1386,23 @@ function drawSplit(ctx, sprite, px, py, gap) {
 
 // --- saldıran uzuvlar ---
 
-// Virüsün savurduğu kol: omuzdan çıkıp ileri uzanan kalın bir kütle, ucunda
-// yumru bir pençe. Kolun kendisi sprite'ta yok - savurma anında var oluyor,
-// çünkü kütlenin sabit bir kolu yok, uzatınca oluyor.
+// Virüsün savurduğu kol. Sprite'ta iki kol yanda sarkıyor; savuran kol
+// SPRITE'TAN GİZLENİYOR (bkz. HIDDEN_LIMB) ve yerine bu çiziliyor - yoksa
+// kütlenin üç kolu oluyordu. Kütle uzattıkça kol uzuyor: gergin bir boru
+// değil, kendi ağırlığıyla sarkan bir uzantı.
 function virusPunchArm(ctx, x, footY, t, dir) {
     const reach = swell(phase(t, 0.2, 0.8));
     if (reach <= 0.02) return;
 
     const P = VIRUS_P;
-    const cols = 10 + Math.round(reach * 26);
+    // Kök OMUZDA: gizlenen kolun sarktığı yerde. Gövdenin ortasından
+    // çıkarken kol kütleye ait değil, önünden geçen ayrı bir şey gibiydi.
+    // Kök dışa alındığı için taban uzunluk kısaldı - görünen uç yerinde
+    // kalsın, menzille (120) ayrışmasın.
+    const cols = 6 + Math.round(reach * 24);
     const shoulderY = footY - PX * 36;
     const step = dir > 0 ? PX : -PX;
-    const rootX = x + dir * PX * 6;
+    const rootX = x + dir * PX * 11;
 
     // Kol SÜTUN SÜTUN çiziliyor: uca doğru hem inceliyor hem SARKIYOR.
     // Gergin dik bir boru bu kütlenin dili değil - kendi ağırlığıyla düşen
@@ -1635,25 +1653,32 @@ const OVERLAYS = {
 };
 
 // Hangi hamlede sprite'ın hangi uzvu GİZLENECEK. Saldıran uzuv üstüne
-// ayrıca çiziliyor (OVERLAYS); uzuv sprite'ta da dururken çizilirse
-// karakterin o yanında iki tane oluyor - biri yerinde asılı, biri savuran.
+// ayrıca çiziliyor (OVERLAYS ve combat.js); uzuv sprite'ta da dururken
+// çizilirse karakterin bir fazla kolu oluyor - biri yerinde asılı duran,
+// biri savuran. Dördünde de aynı kural: saldıran kol karakterin KENDİ kolu.
 //
-// Virüsün savurması bu tabloda YOK ve olmamalı: o kütlenin sabit bir kolu
-// yok, kol savurma anında var oluyor (bkz. virusPunchArm).
-//
-// Yön: hamle karakterin baktığı yanda çıkıyor, o yüzden gizlenecek uzuv da
-// dir'e bağlı. dir > 0 ise karakterin SOL yanı (izleyicinin sağı) gizleniyor.
+// Yön: hamle karakterin baktığı yanda çıkıyor, o yüzden çoğunda gizlenecek
+// uzuv dir'e bağlı - dir > 0 ise karakterin SOL yanı (izleyicinin sağı).
+// Anti-virüs istisna: fırlattığı şey MERCAN kolu, o hep aynı yanda
+// (sprite'lar aynalanmıyor).
 const HIDDEN_LIMB = {
+    punch: (dir) => (dir > 0 ? 1 : -1),
     beam: (dir) => (dir > 0 ? 1 : -1),
     orb: () => 2,                        // küreyi iki elle kuruyor
-    sword: (dir) => (dir > 0 ? 1 : -1)
+    sword: (dir) => (dir > 0 ? 1 : -1),
+    grab: () => -1                       // enfekte kol = mercan kol
 };
 
 // Bu duruş için kullanılacak sprite. Gizlenmiş hâller ayrı tuvallerde
 // saklanıyor, yani seçim kare başına bir Map aramasından ibaret.
+//
+// pose.hide duruştan ÖNCE geliyor: enfekte kol animasyonu bittikten sonra da
+// arenada duruyor (uzanmış, hatta rakibi tutuyor olabilir), o yüzden onu
+// hamlenin animasyonu değil oyuncunun kendisi bildiriyor (Player.limbOut).
 function spriteFor(key, pose) {
     const build = FIGHTER_SPRITES[key];
     if (!build) return null;
+    if (pose?.hide) return build(pose.hide);
     const rule = pose && HIDDEN_LIMB[pose.id];
     return rule ? build(rule(pose.dir ?? 1)) : build();
 }

@@ -445,6 +445,12 @@ export class Combat {
     spawnArm(player, ability) {
         // Kol ıskalarsa bekleme süresi YOK (abilities.js'te cooldown 0);
         // bedeli yakaladığında ödeniyor.
+        //
+        // Fırlatılan şey MERCAN kolu: gövdede de durmasın diye sprite'ın o
+        // kolu gizleniyor (bkz. Player.limbOut). Animasyon 30 kare, ama kol
+        // dört saniyeye kadar arenada kalabiliyor - o yüzden gizleme
+        // animasyona değil kolun ömrüne bağlı.
+        player.limbOut = -1;
         this.entities.push({
             type: 'arm',
             x: player.x,
@@ -592,6 +598,8 @@ export class Combat {
                 }
                 case 'arm': {
                     dead = this.stepArm(e);
+                    // Kol döndü: gövdedeki kolu geri getir.
+                    if (dead) e.owner.limbOut = 0;
                     break;
                 }
             }
@@ -911,6 +919,16 @@ export class Combat {
         const len = e.length;
         const x0 = e.x;
         const step = PX * 3;
+
+        // Kolun KÖKÜ omuzda. Sprite'ta mercan kol karakterin sağ omzunda
+        // (izleyicinin solunda) duruyor ve fırlatılırken oradan gizleniyor;
+        // buradan çıkmazsa kol gövdenin ortasından biten ayrı bir şey gibi
+        // duruyor. Vuran kutu değişmiyor - uç hesabı hâlâ e.x'ten.
+        const shoulder = e.owner.x - PX * 10;
+        ctx.fillStyle = '#7f2a20';
+        ctx.fillRect(Math.min(shoulder, x0), e.y - PX * 2, Math.abs(x0 - shoulder) + PX, PX * 4);
+        ctx.fillStyle = '#f2795c';
+        ctx.fillRect(Math.min(shoulder, x0), e.y - PX, Math.abs(x0 - shoulder) + PX, PX * 2);
         for (let d = 0; d < len; d += step) {
             const x = x0 + e.dir * d;
             const wob = ((d / step) | 0) % 2 === 0 ? 0 : PX;

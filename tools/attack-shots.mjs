@@ -63,6 +63,7 @@ await pose('signature', 11, 'virus-iz');
 await setup('antivirus', 'virus');
 await pose('basic', 4, 'anti-top');
 await pose('special', 12, 'anti-sacilma');
+await pose('signature', 14, 'anti-enfekte-kol');
 
 await setup('electro', 'antivirus');
 await pose('basic', 13, 'electro-isin');

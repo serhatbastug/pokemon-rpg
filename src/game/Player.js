@@ -84,6 +84,11 @@ export class Player {
         // Duruşu ve uzuvu fighterArt.js çiziyor.
         this.anim = null;
 
+        // Arenada duran bir uzvu var mı (anti-virüsün fırlattığı enfekte kol).
+        // Varsa o kol sprite'ta çizilmiyor - bkz. pose ve fighterArt.spriteFor.
+        // combat.js kolu doğururken yazıyor, kol dönünce sıfırlıyor.
+        this.limbOut = 0;
+
         // Anti-virüsün koluna yakalanınca: kurtulmak için kendi saldırı
         // tuşuna basmak gerekiyor.
         this.grabbedBy = null;
@@ -107,12 +112,18 @@ export class Player {
     }
 
     // Çizime giden duruş: hangi hamle, ne kadarı geçti, hangi yöne dönük.
+    //
+    // hide: sprite'ta ÇİZİLMEYECEK uzuv. Arenada duran bir uzuv varsa
+    // (anti-virüsün fırlattığı enfekte kol) o kol gövdede de durmamalı, ve
+    // bu hamlenin ANİMASYONUNDAN uzun sürüyor - o yüzden duruş, animasyon
+    // bitmiş olsa bile üretiliyor.
     get pose() {
-        if (!this.anim) return null;
+        if (!this.anim) return this.limbOut ? { id: null, t: 0, dir: this.dir, hide: this.limbOut } : null;
         return {
             id: this.anim.id,
             t: this.anim.frame / this.anim.total,
-            dir: this.dir
+            dir: this.dir,
+            hide: this.limbOut
         };
     }
 
@@ -567,6 +578,7 @@ export class Player {
         this.anim = null;
         this.grabbedBy = null;
         this.escapePresses = 0;
+        this.limbOut = 0;
         this.frozenFrames = 0;
         this.freezeImmune = 0;
         for (const id of Object.keys(this.cooldowns)) this.cooldowns[id] = 0;

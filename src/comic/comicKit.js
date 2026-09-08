@@ -139,7 +139,12 @@ export const VIRUS_COLOR = '#3f9a28';
 export const VIRUS_LIGHT = '#f2fff4';
 
 // Hücre düzleminde oval. wob: kenarın dalgalanması (akışkanlık).
-export function ellipseCells(ctx, cam, x, y, rx, ry, color, wob = 0) {
+//
+// sag: kütlenin AĞIRLIĞI. 0 = düzgün oval (havada uçan parça), 1 = ağırlığı
+// dibe çökmüş kütle - alt yarı genişleyip yere yayılıyor, üst yarı hafifçe
+// daralıyor. Top gibi duran bir kütlenin zeminle teması bir noktaya
+// iniyor; akışkan bir şey öyle durmaz.
+export function ellipseCells(ctx, cam, x, y, rx, ry, color, wob = 0, sag = 0) {
     if (rx <= 0.05 || ry <= 0.05) return;
     const rows = Math.max(4, Math.ceil(ry * 3.2));
     const rowH = (ry * 2) / rows;
@@ -147,6 +152,11 @@ export function ellipseCells(ctx, cam, x, y, rx, ry, color, wob = 0) {
         const dy = -ry + (i + 0.5) * rowH;
         const k = dy / ry;
         let half = rx * Math.sqrt(Math.max(0, 1 - k * k));
+        if (sag > 0) {
+            half = k > 0
+                ? lerp(half, rx * (1 - 0.12 * k * k * k), sag)      // dibe yayılıyor
+                : half * (1 - 0.16 * sag * -k);                     // tepe daralıyor
+        }
         // Dalga sayısı kütlenin boyundan BAĞIMSIZ: mutlak dy ile hesaplanınca
         // büyük kütlede kenar tırtıklı bir çentik dizisine dönüyor.
         // Genlik de kısık: fazlası ovali köşeli bir lekeye çeviriyor.
@@ -159,7 +169,7 @@ export function ellipseCells(ctx, cam, x, y, rx, ry, color, wob = 0) {
 // x, y = kütlenin MERKEZİ. r taban yarıçap, wide yatay genişleme,
 // stretch/dirX/dirY hareketin uzattığı yön, light beyaz ışığın gücü.
 export function drawBlob(ctx, cam, {
-    x, y, r = 4, wide = 1.25, wob = 0, stretch = 0, dirX = 1, dirY = 0, light = 1
+    x, y, r = 4, wide = 1.25, wob = 0, stretch = 0, dirX = 1, dirY = 0, light = 1, sag = 0
 }) {
     const ax = Math.abs(dirX);
     const ay = Math.abs(dirY);
@@ -168,9 +178,11 @@ export function drawBlob(ctx, cam, {
     if (rx <= 0.05 || ry <= 0.05) return;
 
     if (light > 0) cam.glow(ctx, x, y, Math.max(rx, ry) * 3, 'rgba(255,255,255,ALPHA)', 0.2 * light);
-    ellipseCells(ctx, cam, x, y, rx, ry, VIRUS_LIGHT, wob);
-    ellipseCells(ctx, cam, x + rx * 0.1, y + ry * 0.13, rx * 0.93, ry * 0.89, VIRUS_COLOR, wob);
-    cam.rect(ctx, x - rx * 0.5, y - ry * 0.52, Math.max(0.7, rx * 0.22), Math.max(0.6, ry * 0.16), VIRUS_LIGHT);
+    ellipseCells(ctx, cam, x, y, rx, ry, VIRUS_LIGHT, wob, sag);
+    ellipseCells(ctx, cam, x + rx * 0.1, y + ry * 0.13, rx * 0.93, ry * 0.89, VIRUS_COLOR, wob, sag);
+    // Parıltı ağırlık çökünce yukarı kayıyor: kütlenin tepesi orada kalıyor
+    cam.rect(ctx, x - rx * (0.5 - sag * 0.12), y - ry * (0.52 - sag * 0.08),
+        Math.max(0.7, rx * 0.22), Math.max(0.6, ry * 0.16), VIRUS_LIGHT);
 }
 
 // Akarken arkada kalan damlalar: kütle katı değil

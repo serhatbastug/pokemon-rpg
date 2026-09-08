@@ -803,6 +803,9 @@ async function main() {
         // Yakın dövüş hamlesi evreli: gerçek oyunda action Player'da kuruluyor
         g.p2.action = { ability: null, frame: 0 };
         g.combat.meleeHit(g.p2, { reach: 120, damage: 9 });
+        // Hemen geri al: bu sahte action oyun döngüsüne kalırsa stepAction
+        // bir sonraki karede null hamlenin lunge'ını okuyup patlıyor.
+        g.p2.action = null;
         return { klonCan: can0 - c.hp, asilaGitmedi: g.p1.hp === p2can0 };
     });
     check('Klon rakibin vurusunu yiyor', klonVurus.klonCan > 0 && klonVurus.asilaGitmedi,

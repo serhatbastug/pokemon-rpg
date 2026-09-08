@@ -387,9 +387,11 @@ function stream(ctx, cam, fromX, fromY, phase) {
 // kabın dibindeki yayvan gölcük, 1 = toparlanmış oval. tendrils artık
 // uzantı değil, kütlenin ne kadar kıpırdadığı.
 function ooze(ctx, cam, { x, y, w, h, form = 1, wob = 0, tendrils = 1 }) {
-    // Biçimsizken yayvan ve alçak, toparlandıkça dikleşiyor
-    const ry = Math.max(0.4, h * 0.5 * lerp(0.6, 1, form));
-    const rx = Math.max(0.4, w * 0.6 * lerp(1.5, 1, form));
+    // Biçimsizken yayvan ve alçak, toparlandıkça dikleşiyor. Ama hiçbir
+    // zaman top gibi durmuyor: ağırlığı dibe çöküyor (sag), yere yayılarak
+    // oturuyor - akışkan bir kütlenin zeminle teması bir noktaya inmez.
+    const ry = Math.max(0.4, h * 0.46 * lerp(0.62, 1, form));
+    const rx = Math.max(0.4, w * 0.66 * lerp(1.5, 1, form));
 
     blobDrops(ctx, cam, x, y - ry * 0.5, 0, 1, ry * 0.4, tendrils * 0.3);
     drawBlob(ctx, cam, {
@@ -397,7 +399,8 @@ function ooze(ctx, cam, { x, y, w, h, form = 1, wob = 0, tendrils = 1 }) {
         wob,
         stretch: Math.sin(wob) * 0.05 * tendrils,
         dirX: 1, dirY: 0,
-        light: 0.75 + 0.25 * tendrils
+        light: 0.75 + 0.25 * tendrils,
+        sag: lerp(1, 0.82, form)
     });
 }
 

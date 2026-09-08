@@ -29,6 +29,11 @@ import {
 const SCENE = { w: 232, h: 122 };
 const WIDE = { u: PX, cx: SCENE.w / 2, cy: SCENE.h / 2 };
 
+// Karenin saati: kalabalığın yürüdüğü "zaman" birimi = t * CLOCK.
+// Yaya hızları hücre/zaman-birimi cinsinden; bu çarpan gerçek yürüme
+// hızını veriyor (kadrajı ~7 saniyede geçiyorlar).
+const CLOCK = 22;
+
 const CORNICE = 20;        // üst katla dükkân arası silme
 const SHOP_Y = 26;         // tentelerin bandı
 const WALK_Y = 46;         // kaldırımın arka kenarı
@@ -184,6 +189,73 @@ function roadDetails(ctx, cam) {
     cam.rect(ctx, cx + 7, 115, 6, 3, '#767f89');
 }
 
+// --- Geçen araçlar ---
+//
+// Arada bir, HIZLA. Kadrajın alt şeridinden geçiyorlar; kamerayla kaldırım
+// arasında oldukları için bordürü ve ön sıranın ayaklarını örtüyorlar.
+// Geçişler mazgalın önemli anlarına denk GELMİYOR: kütle mazgalda ya da
+// olukta iken (0.14-0.40) araba yok, yoksa olan biteni kapatıyor.
+const PASSES = [
+    { at: 0.045, dur: 0.040, dir: 1, kind: 0 },
+    { at: 0.435, dur: 0.034, dir: -1, kind: 1 },
+    { at: 0.665, dur: 0.038, dir: 1, kind: 2 },
+    { at: 0.905, dur: 0.033, dir: -1, kind: 0 }
+];
+
+const CAR_PAINT = [
+    { body: '#7b3b33', top: '#9d5647', dark: '#4e241f' },
+    { body: '#2f4a63', top: '#436a86', dark: '#1d2f40' },
+    { body: '#5c6b52', top: '#7c8d70', dark: '#38412f' }
+];
+
+const ROOF_Y = 90;
+const CAR_Y = 102;
+const CAR_LEN = 92;
+
+function vehicle(ctx, cam, x, dir, kind) {
+    const p = CAR_PAINT[kind % CAR_PAINT.length];
+    const front = dir > 0 ? x + CAR_LEN : x;
+
+    // Hız çizgileri: aracın arkasında kalan sürtme izleri
+    for (let i = 0; i < 4; i++) {
+        const ly = CAR_Y + 3 + i * 5;
+        const lx = dir > 0 ? x - 26 - i * 7 : x + CAR_LEN + 12 + i * 7;
+        cam.rect(ctx, lx, ly, 22 + i * 5, 1, '#79828c');
+    }
+
+    cam.rect(ctx, x - 3, CAR_Y + 16, CAR_LEN + 6, SCENE.h - CAR_Y - 16, '#1b1f24');   // altındaki karanlık
+    // Kabin
+    cam.rect(ctx, x + 20, ROOF_Y, CAR_LEN - 42, CAR_Y - ROOF_Y + 2, p.top);
+    cam.rect(ctx, x + 20, ROOF_Y, CAR_LEN - 42, 1.4, '#c3ccd4');
+    cam.rect(ctx, x + 24, ROOF_Y + 3, CAR_LEN - 50, 7, '#33404c');                    // camlar
+    cam.rect(ctx, x + CAR_LEN / 2 - 1, ROOF_Y + 3, 2.5, 7, p.top);                    // orta direk
+    // Gövde
+    cam.rect(ctx, x, CAR_Y, CAR_LEN, 18, p.body);
+    cam.rect(ctx, x, CAR_Y, CAR_LEN, 1.6, p.top);
+    cam.rect(ctx, x, CAR_Y + 11, CAR_LEN, 3, p.dark);
+    cam.rect(ctx, x, CAR_Y + 15, CAR_LEN, 3, '#2b3138');                              // tampon
+    // Tekerlekler (kadrajın altı kesiyor)
+    for (const wx of [x + 14, x + CAR_LEN - 32]) {
+        cam.rect(ctx, wx - 2, CAR_Y + 8, 22, SCENE.h - CAR_Y - 8, p.dark);
+        cam.rect(ctx, wx, CAR_Y + 10, 18, SCENE.h - CAR_Y - 10, '#14171b');
+        cam.rect(ctx, wx + 5, CAR_Y + 13, 8, 6, '#525a63');
+    }
+    // Farlar / stoplar
+    cam.rect(ctx, front - (dir > 0 ? 6 : 0), CAR_Y + 4, 6, 4, dir > 0 ? '#f4e9c4' : '#a8412f');
+    cam.rect(ctx, dir > 0 ? x : x + CAR_LEN - 6, CAR_Y + 4, 6, 4, dir > 0 ? '#a8412f' : '#f4e9c4');
+}
+
+function vehicles(ctx, cam, t) {
+    for (const pass of PASSES) {
+        const k = span(t, pass.at, pass.at + pass.dur);
+        if (k <= 0 || k >= 1) continue;
+        const from = -CAR_LEN - 40;
+        const to = SCENE.w + 40;
+        const x = pass.dir > 0 ? lerp(from, to, k) : lerp(to, from, k);
+        vehicle(ctx, cam, x, pass.dir, pass.kind);
+    }
+}
+
 // Yağmur mazgalı. bars=true ise yalnızca demirler çiziliyor: kütle
 // aralıklardan çıkarken demirlerin ARKASINDA kalsın diye iki kez çağrılıyor.
 function grate(ctx, cam, { bars = false, glint = 0 } = {}) {
@@ -259,9 +331,9 @@ function shoulder(p, side) {
 // Yürüyüşün fazı: alınan YOLA bağlı. Zamana bağlı olursa ayaklar yerde
 // kayıyor - adım atıyor gibi değil, sallanıyor gibi duruyor.
 function gaitPhase(p, time) {
-    if (p.still) return { swing: Math.sin(time * 1.4 + p.phase) * 0.08, bob: 0, k: 0, moving: false };
+    if (!p.moving) return { swing: Math.sin(time * 0.7 + p.phase) * 0.1, bob: 0, k: 0, moving: false };
     const stride = p.h * 0.55;
-    const k = (time * p.speed) / stride * Math.PI + p.phase;
+    const k = (p.dist / stride) * Math.PI + p.phase;
     return { swing: Math.sin(k), bob: Math.abs(Math.cos(k)) * p.h * 0.012, k, moving: true };
 }
 
@@ -278,10 +350,23 @@ function person(ctx, cam, p, time) {
 
     const { swing, bob, k: gait, moving } = gaitPhase(p, time);
     const y0 = -bob;
-    const px = (v) => p.x + v;
+
+    // BEKLEYEN AMA CANLI. Duran biri hiç kıpırdamazsa donmuş gibi duruyor,
+    // "virüsün gelmesini bekliyor" gibi. Üç küçük hareket yetiyor:
+    //   lean   ağırlık bir ayaktan diğerine kayıyor (gövde, bacaklar değil)
+    //   look   arada bir başını çeviriyor
+    //   fidget arada bir ayağını oynatıyor
+    const idle = moving ? 0 : 1;
+    const lean = idle * Math.sin(time * 0.42 + p.phase) * a.h * 0.012;
+    const look = idle * Math.sin(time * 0.27 + p.phase * 2);
+    const fidget = idle * Math.max(0, Math.sin(time * 0.55 + p.phase * 3) - 0.86) * 7;
+
+    // Bacaklar yerde duruyor, gövde ağırlıkla kayıyor
+    const px = (v) => p.x + lean + v;
+    const legX = (v) => p.x + v;
 
     // Yere değdiği yer: gölge olmadan kalabalık zeminin üstünde yüzüyor
-    cam.rect(ctx, px(-a.coatW * 0.8), a.feet - 0.6, a.coatW * 1.6, 1.4,
+    cam.rect(ctx, legX(-a.coatW * 0.8), a.feet - 0.6, a.coatW * 1.6, 1.4,
         ground);
 
     // --- Bacaklar: KALÇADAN dönüyorlar. Gövdeden ayrı kaydırılınca
@@ -293,8 +378,8 @@ function person(ctx, cam, p, time) {
         const sw = swing * s;
         // Öne SALINAN ayak yerden kesiliyor ve dizi bükülüyor. İkisi de
         // yerde kalırsa yürüme değil, ayrık duruş oluyor.
-        const lift = moving ? Math.max(0, Math.cos(gait) * s) : 0;
-        const hx = px(s * hipGap);
+        const lift = moving ? Math.max(0, Math.cos(gait) * s) : (s > 0 ? fidget : 0);
+        const hx = legX(s * hipGap);
         const hy = a.hipY + y0;
         const kx = hx + sw * stepX * (0.55 + lift * 0.25) * dir;
         const ky = hy + legLen * (0.5 - lift * 0.06);
@@ -352,7 +437,7 @@ function person(ctx, cam, p, time) {
 
     // --- Boyun, kafa, YÜZ
     // Yüz hatları gidilen yöne kayık: gövde yandan, yüz dörtte üç.
-    const hx = px(dir * a.h * 0.008);
+    const hx = px(dir * a.h * 0.008 + look * a.h * 0.01);
     const hy = a.top + y0;
     cam.rect(ctx, px(-a.h * 0.03), a.shoulderY - a.h * 0.045 + y0, a.h * 0.06, a.h * 0.06, skinShade);   // boyun
     cam.rect(ctx, hx - a.headW / 2, hy, a.headW, a.headH, skin);
@@ -363,7 +448,7 @@ function person(ctx, cam, p, time) {
     const eyeW = Math.max(0.8, a.headW * 0.2);
     const eyeH = Math.max(0.7, a.headH * 0.14);
     const gap = a.headW * 0.17;
-    const fx = dir * a.headW * 0.06;
+    const fx = dir * a.headW * 0.06 + look * a.headW * 0.14;
     for (const s of [-1, 1]) {
         cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY - eyeH * 1.5, eyeW * 1.2, eyeH * 0.7, hair);  // kaş
         cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY, eyeW, eyeH, '#20242a');                      // göz
@@ -468,30 +553,32 @@ const CROWD = buildCrowd();
 // yetişemez, giriş anında adam kadrajdan kaçardı.
 function stander(x, lane, opts) {
     return bakeTones({
-        x, lane, still: true, dir: opts.dir || 1,
+        x, lane, dir: opts.dir || 1,
         h: LANES[lane].h * (opts.s || 1),
         dy: opts.dy || 0,
         coat: opts.coat, trouser: opts.trouser || TROUSERS[0],
         skin: opts.skin, hair: opts.hair,
         scarf: opts.scarf || null, longCoat: opts.longCoat || false,
         phase: opts.phase || 0, bag: opts.bag || false, hat: opts.hat || false,
-        speed: 0, mark: 0
+        // Yerine ne zaman varıyor, işi bitince ne zaman gidiyor (kare zamanı)
+        arriveAt: opts.arrive, leaveAt: opts.leave,
+        speed: 22 + (opts.phase || 0), mark: 0
     });
 }
 
 const HOST = stander(76, 2, {
     coat: '#41505f', skin: '#a8825f', hair: '#241f1b', trouser: '#2c3138',
-    longCoat: true, phase: 1.2, dir: 1
+    longCoat: true, phase: 1.2, dir: 1, arrive: 0.12, leave: 0.68
 });
 const CATCHERS = [
-    stander(96, 2, { coat: '#6d564a', skin: '#c39c74', hair: '#3f2c1e', trouser: '#3b3630', bag: true, phase: 2.4, dir: -1, s: 0.95 }),
-    stander(112, 1, { coat: '#4c5b52', skin: '#7d5b40', hair: '#161514', trouser: '#243040', scarf: '#8c4a42', phase: 0.6, dir: 1 }),
-    stander(132, 2, { coat: '#48566a', skin: '#d0aa84', hair: '#5a4326', trouser: '#333a33', longCoat: true, phase: 3.1, dir: -1, s: 0.92 }),
-    stander(56, 1, { coat: '#7b7062', skin: '#8f6a4c', hair: '#241f1b', trouser: '#43392f', hat: true, phase: 1.9, dir: 1, s: 1.05 }),
-    stander(150, 1, { coat: '#5a4a55', skin: '#a8825f', hair: '#6b6560', trouser: '#2c3138', phase: 4.2, dir: -1 }),
-    stander(168, 2, { coat: '#3d4a42', skin: '#c39c74', hair: '#3f2c1e', trouser: '#243040', scarf: '#4a6d72', phase: 5.1, dir: 1, s: 0.9 }),
-    stander(192, 1, { coat: '#8a5f4a', skin: '#7d5b40', hair: '#161514', trouser: '#3b3630', bag: true, phase: 2.8, dir: -1 }),
-    stander(210, 2, { coat: '#3f4f66', skin: '#d0aa84', hair: '#5a4326', trouser: '#333a33', phase: 0.3, dir: 1, s: 0.94 })
+    stander(96, 2, { coat: '#6d564a', skin: '#c39c74', hair: '#3f2c1e', trouser: '#3b3630', bag: true, phase: 2.4, dir: -1, s: 0.95, arrive: 0.07, leave: 0.73 }),
+    stander(112, 1, { coat: '#4c5b52', skin: '#7d5b40', hair: '#161514', trouser: '#243040', scarf: '#8c4a42', phase: 0.6, dir: 1, arrive: 0.16, leave: 0.79 }),
+    stander(132, 2, { coat: '#48566a', skin: '#d0aa84', hair: '#5a4326', trouser: '#333a33', longCoat: true, phase: 3.1, dir: -1, s: 0.92, arrive: 0.22, leave: 0.84 }),
+    stander(56, 1, { coat: '#7b7062', skin: '#8f6a4c', hair: '#241f1b', trouser: '#43392f', hat: true, phase: 1.9, dir: 1, s: 1.05, arrive: 0.04, leave: 0.70 }),
+    stander(150, 1, { coat: '#5a4a55', skin: '#a8825f', hair: '#6b6560', trouser: '#2c3138', phase: 4.2, dir: -1, arrive: 0.28, leave: 0.89 }),
+    stander(168, 2, { coat: '#3d4a42', skin: '#c39c74', hair: '#3f2c1e', trouser: '#243040', scarf: '#4a6d72', phase: 5.1, dir: 1, s: 0.9, arrive: 0.19, leave: 0.93 }),
+    stander(192, 1, { coat: '#8a5f4a', skin: '#7d5b40', hair: '#161514', trouser: '#3b3630', bag: true, phase: 2.8, dir: -1, arrive: 0.33, leave: 0.96 }),
+    stander(210, 2, { coat: '#3f4f66', skin: '#d0aa84', hair: '#5a4326', trouser: '#333a33', phase: 0.3, dir: 1, s: 0.94, arrive: 0.25, leave: 0.98 })
 ];
 const STANDING = [HOST, ...CATCHERS];
 
@@ -516,9 +603,24 @@ const MARK_AT = [0.55, ...CATCHERS.map((c) => {
 
 function walkerAt(p, time) {
     const width = SCENE.w + 56;
-    let x = p.x0 + p.dir * p.speed * time;
+    const dist = p.speed * time;
+    let x = p.x0 + p.dir * dist;
     x = ((x + 28) % width + width) % width - 28;
-    return { ...p, x };
+    return { ...p, x, dist, moving: true };
+}
+
+// Bekleyenler kadraja YÜRÜYEREK giriyor, yerinde bekliyor, işi bitince
+// yürüyüp gidiyor. Bölüm boyunca hiç kıpırdamayan bir grup "virüsün
+// gelmesini bekliyor" gibi duruyordu.
+function standerAt(p, time) {
+    const arrive = p.arriveAt * CLOCK;
+    const leave = p.leaveAt * CLOCK;
+    if (time < arrive) {
+        return { ...p, x: p.x - p.dir * p.speed * (arrive - time), dist: p.speed * time, moving: true };
+    }
+    if (time < leave) return { ...p, dist: 0, moving: false };
+    const gone = time - leave;
+    return { ...p, x: p.x + p.dir * p.speed * gone, dist: p.speed * gone, moving: true };
 }
 
 // Kalabalık arkadan öne çiziliyor; bekleyenler kendi şeritlerinde araya
@@ -530,7 +632,7 @@ function crowd(ctx, cam, time, marks) {
             if (p.lane === lane) person(ctx, cam, walkerAt(p, time), time);
         }
         for (const p of STANDING) {
-            if (p.lane === lane) person(ctx, cam, p, time);
+            if (p.lane === lane) person(ctx, cam, standerAt(p, time), time);
         }
     }
 }
@@ -569,6 +671,7 @@ function scene(ctx, cam, s) {
     if (s.draw) s.draw(ctx, cam);
     grate(ctx, cam, { bars: true });
     pole(ctx, cam);
+    vehicles(ctx, cam, s.t);              // en önde: kamerayla kaldırım arasında
     vignette(ctx, 0.28);
 }
 
@@ -606,7 +709,8 @@ function street(ctx, A, t) {
 
     scene(ctx, cam, {
         area: A,
-        time: t * 22,
+        t,
+        time: t * CLOCK,
         glint: Math.max(span(t, 0.06, 0.16) * 0.8, (rise < 1 ? rise : 0) * 0.4),
         marks,
         draw: (c, m) => {
@@ -649,7 +753,12 @@ function street(ctx, A, t) {
                 }
                 if (r > 0.15) {
                     blobDrops(c, m, x, y, dirX, dirY, r, gutter > 0 && enter <= 0 ? 0.7 : 0.25);
-                    drawBlob(c, m, { x, y, r, wide, wob: t * 40, stretch, dirX, dirY, light: rise });
+                    // Yerdeyken ağırlığı dibe çöküyor; bordürü tırmanırken
+                    // yüzeye YAPIŞIYOR, o yüzden orada da çökük.
+                    drawBlob(c, m, {
+                        x, y, r, wide, wob: t * 40, stretch, dirX, dirY,
+                        light: rise, sag: 0.85
+                    });
                 }
             }
 

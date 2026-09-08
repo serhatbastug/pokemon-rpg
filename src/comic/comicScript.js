@@ -48,7 +48,7 @@ const at = (lines, x, y) => lines.map(line => ({ ...line, at: [x, y] }));
 // still yok.
 export const CHAPTERS = [
     { n: 1, title: 'LABORATUVAR', subtitle: 'BİR YIL ÖNCE' },
-    { n: 2, title: 'ÇALIŞMA ALANI', subtitle: 'YAYILMA YOLU', still: true },
+    { n: 2, title: 'CADDE', subtitle: 'ERTESİ SABAH' },
     { n: 3, title: 'KUŞATMA', subtitle: null, still: true },
     { n: 4, title: 'ORMANIN AĞZI', subtitle: null, still: true }
 ];
@@ -132,63 +132,81 @@ export const PANELS = [
         ]
     },
 
-    // ================= BEKLEYEN BÖLÜMLER =================
-    // 2, 3 ve 4. bölümler sırayla yeniden tarif edilip yeniden çizilecek.
-    // O güne kadar hiçbiri OYNAMIYOR: hepsinin motion'ı 0, kareler bitmiş
-    // hâllerini duruk gösteriyor. Aralarındaki "HAREKETLİ" notları eski
-    // hareketi anlatıyor, yenisi yazılınca geri gelecekler.
-
-    // ================= 2. BÖLÜM - ÇALIŞMA ALANI =================
-    // Yayılma yolunu biz buluyoruz: duvardaki şehir haritasına işlenen
-    // vakalar bir hat çiziyor, hat şehrin altındaki su şebekesi.
+    // ================= 2. BÖLÜM - CADDE =================
+    // Virüsün insana geçtiği yer. Başlık kartından sonrası yine TEK ÇEKİM:
+    // kamera kalabalık caddeden sol alttaki yağmur mazgalına iniyor, oradan
+    // bir ayakkabının dibine, oradan omuz hizasına çıkıyor.
+    //
+    // Bölümde TEK BİR YAZI YOK - ne anlatıcı kutusu ne balon. Kimse virüsü
+    // görmüyor, kimse bir şey söylemiyor; anlatan tek şey kamera.
 
     { id: 'baslik-2', chapter: 2, art: 'title', motion: 0, hold: 90 },
 
     {
-        id: 'calisma-tahlil', chapter: 2, art: 'workBench',
-        caption: 'BİR YIL SONRA. ŞEHİRDE HERKES HASTA.',
-        lines: [
-            { speaker: 'biz', text: 'Tahlillerin hepsi temiz. Hepsi.', at: [330, 300] },
-            { speaker: 'arkadas', text: 'Ama insanlar ayakta duramıyor. Aradığımız şey testlerin baktığı yerde değil.', at: [700, 300] }
-        ],
-        motion: 0
+        // HAREKETLİ: kalabalık kaldırımdan akıyor. Sol altta mazgal duruyor;
+        // sonunda karanlığında bir kez beyaz bir şey kıpırdıyor.
+        id: 'cadde-kalabalik', chapter: 2, art: 'streetCrowd',
+        motion: 300, hold: 50,
+        sfx: [
+            { name: 'step', at: 0.08 }, { name: 'step', at: 0.21 },
+            { name: 'step', at: 0.34 }, { name: 'step', at: 0.47 },
+            { name: 'step', at: 0.60 }, { name: 'step', at: 0.73 },
+            { name: 'drip', at: 0.88 }
+        ]
     },
     {
-        id: 'calisma-mikroskop', chapter: 2, art: 'microscope',
-        lines: [
-            { speaker: 'arkadas', text: 'İşte burada. Hücrenin dışında değil, İÇİNDE.', at: [500, 250] },
-            { speaker: 'biz', text: 'O zaman onu öldürmek konağı öldürmek demek.', at: [500, 250] }
-        ],
-        motion: 0
+        // HAREKETLİ: kamera mazgala iniyor, kütle demirlerin arasından çıkıyor
+        id: 'cadde-mazgal', chapter: 2, art: 'drainMouth', cont: true,
+        motion: 320, hold: 30,
+        sfx: [
+            { name: 'drip', at: 0.30 }, { name: 'ooze', at: 0.58 },
+            { name: 'ooze', at: 0.78 }, { name: 'slide', at: 0.92 }
+        ]
     },
     {
-        // HAREKETLİ: vakalar tek tek haritaya iğneleniyor
-        id: 'calisma-harita', chapter: 2, art: 'cityMap',
-        caption: 'ÜÇ GÜN. YÜZ ON DÖRT VAKA.',
-        motion: 0, hold: 60
+        // HAREKETLİ: olukta akıp bordürü tırmanıyor, ayakların arasına giriyor
+        id: 'cadde-tirmanis', chapter: 2, art: 'drainCrawl', cont: true,
+        motion: 320, hold: 20,
+        sfx: [
+            { name: 'ooze', at: 0.10 }, { name: 'slide', at: 0.44 },
+            { name: 'ooze', at: 0.66 }, { name: 'step', at: 0.80 }
+        ]
     },
     {
-        id: 'calisma-hat', chapter: 2, art: 'mapLine',
-        lines: [
-            { speaker: 'biz', text: 'Hepsi tek bir hattın üstünde.', at: [500, 300] },
-            { speaker: 'arkadas', text: 'Burası şebeke. Şehrin altından geçen su.', at: [500, 300] },
-            { speaker: 'biz', text: 'Yani şehirde içmeyen kimse yok.', at: [500, 300] }
-        ],
-        motion: 0
+        // HAREKETLİ: bekleyenin ayakkabısının dibinden içeri akıyor.
+        // Kişi kıpırdamıyor; olan bitenin farkında değil.
+        id: 'cadde-giris', chapter: 2, art: 'footEntry', cont: true,
+        motion: 340, hold: 40,
+        sfx: [
+            { name: 'ooze', at: 0.35 }, { name: 'ooze', at: 0.58 },
+            { name: 'slide', at: 0.74 }, { name: 'drip', at: 0.90 }
+        ]
     },
     {
-        id: 'calisma-asi', chapter: 2, art: 'vaccineLine',
-        caption: 'AŞI BULUNDU. KUYRUK SOKAĞIN UCUNU DÖNÜYORDU.',
-        lines: [
-            { speaker: 'arkadas', text: 'Sıra bize geldi. Kolunu ver.', at: [620, 330] }
-        ],
-        motion: 0
+        // HAREKETLİ: omuzdan omuza. Üç geçiş, üç yeni konak.
+        id: 'cadde-bulasma', chapter: 2, art: 'shoulderChain', cont: true,
+        motion: 380, hold: 40,
+        sfx: [
+            { name: 'ooze', at: 0.26 }, { name: 'ooze', at: 0.50 },
+            { name: 'ooze', at: 0.74 }
+        ]
     },
     {
-        id: 'calisma-gec', chapter: 2, art: 'tooLate',
-        caption: 'GEÇ KALINMIŞTI. AŞININ NE YAPTIĞINI KİMSE BİLMİYORDU.',
-        motion: 0, hold: 90
+        // Kamera açılıyor: kalabalık yürümeye devam ediyor. Hiçbir şey
+        // olmamış gibi - ki zaten kimse bir şey görmedi.
+        id: 'cadde-sonra', chapter: 2, art: 'streetAfter', cont: true,
+        motion: 280, hold: 120,
+        sfx: [
+            { name: 'step', at: 0.30 }, { name: 'step', at: 0.52 },
+            { name: 'step', at: 0.74 }
+        ]
     },
+
+    // ================= BEKLEYEN BÖLÜMLER =================
+    // 3 ve 4. bölümler sırayla yeniden tarif edilip yeniden çizilecek.
+    // O güne kadar hiçbiri OYNAMIYOR: hepsinin motion'ı 0, kareler bitmiş
+    // hâllerini duruk gösteriyor. Aralarındaki "HAREKETLİ" notları eski
+    // hareketi anlatıyor, yenisi yazılınca geri gelecekler.
 
     // ================= 3. BÖLÜM - KUŞATMA =================
     // Tesis avlusu. Bizim dışımızda TAM BEŞ sağlıklı - bu sayı 4. bölümde de

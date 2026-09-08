@@ -15,7 +15,7 @@
 import { PX, hash } from '../../pixel/pixelDraw.js';
 import {
     createCam, vignette, darken, mix,
-    span, clamp01, easeOut, easeIn, lerp, BAND_COLOR
+    span, clamp01, easeOut, easeIn, lerp, BAND_COLOR, drawBlob, blobDrops
 } from '../comicKit.js';
 
 // --- Sahnenin ölçüleri (hücre) ---
@@ -53,9 +53,6 @@ const COAT = '#242e38';
 const COAT_RIM = '#46586a';
 const HEAD = '#1a222a';
 const HEAD_RIM = '#3c4c5c';
-const OOZE_DARK = '#1b3a1a';
-const OOZE_MID = '#2f6f2a';
-const OOZE_RIM = '#7fd049';
 
 // 0 -> 1 -> 0: bir anın gelip geçmesi (kafanın kağıda dönüp geri gelmesi gibi)
 const bump = (t, from, to) => Math.sin(clamp01(span(t, from, to)) * Math.PI);
@@ -381,97 +378,27 @@ function stream(ctx, cam, fromX, fromY, phase) {
 
 // --- Virüs ---
 //
-// Sıvının aldığı biçim: yüzü, gözü, ağzı olmayan bir kütle.
+// TEK RENK, OVALİMSİ, AKIŞKAN, BEYAZ IŞIKLI (kullanıcının 2026-09-08'deki
+// kararı; önceki "serbest bırakılmış el" gibi sarkan, uzantılı kütle bu
+// biçimle değiştirildi). Çizimin kendisi comicKit'te: caddedeki kütleyle
+// birebir aynı şey olmalı, iki yerde ayrı durursa ayrışıyorlar.
 //
-// KURALIN TARİFİ (kullanıcının sözü): elini havaya kaldırıp tamamen serbest
-// bırakarak indirdiğinde elin aldığı biçim. Yani kütle GERGİN DEĞİL: ağırlığı
-// üstte toplanıp öne sarkıyor, oturduğu yere doğru daralıyor, uzantıları
-// gevşek parmaklar gibi kendi ağırlığıyla AŞAĞI düşüyor.
-//
-// Alttan üste yarım genişlikler: dar bilek, yukarı doğru şişen kütle,
-// yuvarlanarak kapanan tepe (sivri uç yok - gevşek bir el sivrilmez).
-const FORM = [0.50, 0.60, 0.71, 0.82, 0.91, 0.98, 1.00, 0.99, 0.93, 0.80, 0.58];
-
-// Kıvrılan, ucu incelen uzantı: (x0,y0) kökten (x1,y1) uca, (cx,cy) kıvrım
-function tendril(ctx, cam, x0, y0, cx, cy, x1, y1, thick) {
-    // Adım sayısı yola göre: seyrek olunca uzantı boncuk dizisi gibi kopuk
-    // görünüyordu, parmak değil.
-    const reach = Math.abs(x1 - x0) + Math.abs(y1 - y0);
-    const steps = Math.max(10, Math.ceil(reach * 2));
-    for (let i = 0; i <= steps; i++) {
-        const k = i / steps;
-        const m = (1 - k) * (1 - k) * x0 + 2 * (1 - k) * k * cx + k * k * x1;
-        const n = (1 - k) * (1 - k) * y0 + 2 * (1 - k) * k * cy + k * k * y1;
-        const tw = thick * (1 - k * 0.45);
-        cam.rect(ctx, m - tw / 2, n - tw / 2, tw, tw, '#0d2410');
-        cam.rect(ctx, m - tw / 2 + tw * 0.25, n - tw / 2 + tw * 0.25, tw * 0.5, tw * 0.5, OOZE_MID);
-    }
-}
-
-// x, y = kütlenin OTURDUĞU nokta (alt orta). form 0 = biçimsiz sütun, 1 = gövde.
+// x, y = kütlenin OTURDUĞU nokta (alt orta). w, h kaba ölçüler; form 0 =
+// kabın dibindeki yayvan gölcük, 1 = toparlanmış oval. tendrils artık
+// uzantı değil, kütlenin ne kadar kıpırdadığı.
 function ooze(ctx, cam, { x, y, w, h, form = 1, wob = 0, tendrils = 1 }) {
-    const rows = FORM.length;
-    const rowH = h / rows;
-    const ink = Math.max(0.5, w * 0.09);      // dış hat: duvardan ayrılsın diye
+    // Biçimsizken yayvan ve alçak, toparlandıkça dikleşiyor
+    const ry = Math.max(0.4, h * 0.5 * lerp(0.6, 1, form));
+    const rx = Math.max(0.4, w * 0.6 * lerp(1.5, 1, form));
 
-    const band = [];
-    for (let i = 0; i < rows; i++) {
-        const k = i / (rows - 1);
-        const shaped = lerp(1 - k * 0.3, FORM[i], form);
-        // Sarkma: üst kütle kendi ağırlığıyla öne (sola) düşüyor. k^2 çünkü
-        // ağırlık aşağıda değil yukarıda birikiyor; dip yerinde duruyor.
-        const droop = -w * 0.20 * k * k * form;
-        const sway = Math.sin(k * 3.2 + wob) * w * 0.07 * form;
-        band.push({ hw: Math.max(0.6, (w / 2) * shaped), cx: x + droop + sway, y: y - rowH * (i + 1) });
-    }
-
-    for (const { hw, cx, y: ry } of band) {
-        cam.rect(ctx, cx - hw, ry, hw * 2, rowH + 0.6, '#0d2410');                     // mürekkep
-        cam.rect(ctx, cx - hw + ink, ry, hw * 2 - ink * 2, rowH + 0.6, OOZE_DARK);
-        cam.rect(ctx, cx - hw * 0.45, ry, hw * 0.9, rowH + 0.6, OOZE_MID);             // iç kütle
-        cam.rect(ctx, cx + hw - ink * 1.6, ry, ink * 0.8, rowH + 0.6, OOZE_RIM);       // sağ kenar ışığı
-    }
-
-    // Islak parıltı: sarkan kütlenin tepesinde, ışığa bakan sırtında
-    const crown = band[Math.min(rows - 2, 9)];
-    cam.rect(ctx, crown.cx - crown.hw * 0.55, crown.y, Math.max(0.8, w * 0.1), rowH * 1.6, '#b6f07a');
-    cam.rect(ctx, crown.cx + crown.hw * 0.25, crown.y + rowH, Math.max(0.6, w * 0.07), rowH, '#9ae35e');
-
-    // Uzantılar: gevşek bırakılmış parmaklar. Kütlenin üst omuzlarından
-    // dışarı çıkıp KENDİ AĞIRLIĞIYLA aşağı düşüyor, ucu hafifçe içeri
-    // kıvrılıyor. Yukarı kalkan uzantı gergin bir el demek olurdu.
-    const HANG = [
-        { side: -1, at: 0.86, reach: 0.52, drop: 0.74 },
-        { side: 1, at: 0.78, reach: 0.46, drop: 0.62 },
-        { side: -1, at: 0.62, reach: 0.62, drop: 0.52 },
-        { side: 1, at: 0.56, reach: 0.54, drop: 0.44 }
-    ];
-    for (let i = 0; i < HANG.length; i++) {
-        const g = HANG[i];
-        const k = clamp01(tendrils * (0.6 + i * 0.22));
-        if (k <= 0.02) continue;
-        const src = band[Math.round(g.at * (rows - 1))];
-        const bx = src.cx + g.side * src.hw * 0.75;
-        const by = src.y;
-        const reach = w * g.reach * k;
-        const drop = h * g.drop * k;
-        // Uç yüzeyin altına inmesin: kütle yerde duruyor, içinden geçmiyor
-        const tipY = Math.min(y - 0.5, by + drop);
-        tendril(ctx, cam,
-            bx, by,
-            bx + g.side * reach * 1.15, by + (tipY - by) * 0.35,
-            bx + g.side * reach * 0.7, tipY,
-            Math.max(1.4, w * 0.17));
-    }
-
-    // Sarkan damlalar: kütle akışkan, katı değil
-    for (let i = 0; i < 2; i++) {
-        const dx = x + (i ? 1 : -1) * w * 0.26;
-        const dh = (0.5 + Math.abs(Math.sin(wob + i * 2)) * 0.5) * h * 0.12;
-        cam.rect(ctx, dx - w * 0.06, y - 0.5, Math.max(0.8, w * 0.12), dh, OOZE_DARK);
-    }
-
-    cam.glow(ctx, x, y - h * 0.5, w * 1.1, 'rgba(120,220,80,ALPHA)', 0.24);
+    blobDrops(ctx, cam, x, y - ry * 0.5, 0, 1, ry * 0.4, tendrils * 0.3);
+    drawBlob(ctx, cam, {
+        x, y: y - ry, r: ry, wide: rx / ry,
+        wob,
+        stretch: Math.sin(wob) * 0.05 * tendrils,
+        dirX: 1, dirY: 0,
+        light: 0.75 + 0.25 * tendrils
+    });
 }
 
 // --- Sahne ---

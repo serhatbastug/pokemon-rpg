@@ -133,72 +133,28 @@ export const PANELS = [
     },
 
     // ================= 2. BÖLÜM - CADDE =================
-    // Virüsün insana geçtiği yer. Başlık kartından sonrası yine TEK ÇEKİM:
-    // kamera kalabalık caddeden sol alttaki yağmur mazgalına iniyor, oradan
-    // bir ayakkabının dibine, oradan omuz hizasına çıkıyor.
+    // Virüsün insana geçtiği yer. Başlık kartından sonra TEK KARE var:
+    // mazgaldan çıkış, ayaktan giriş ve bulaşma zinciri aynı kadrajda,
+    // kesintisiz akıyor. Kamera hiç kıpırdamıyor, araya ilerletme girmiyor.
     //
     // Bölümde TEK BİR YAZI YOK - ne anlatıcı kutusu ne balon. Kimse virüsü
-    // görmüyor, kimse bir şey söylemiyor; anlatan tek şey kamera.
+    // görmüyor, kimse bir şey söylemiyor.
 
     { id: 'baslik-2', chapter: 2, art: 'title', motion: 0, hold: 90 },
 
     {
-        // HAREKETLİ: kalabalık kaldırımdan akıyor. Sol altta mazgal duruyor;
-        // sonunda karanlığında bir kez beyaz bir şey kıpırdıyor.
-        id: 'cadde-kalabalik', chapter: 2, art: 'streetCrowd',
-        motion: 300, hold: 50,
+        id: 'cadde', chapter: 2, art: 'street',
+        motion: 1200, hold: 90,
         sfx: [
-            { name: 'step', at: 0.08 }, { name: 'step', at: 0.21 },
-            { name: 'step', at: 0.34 }, { name: 'step', at: 0.47 },
-            { name: 'step', at: 0.60 }, { name: 'step', at: 0.73 },
-            { name: 'drip', at: 0.88 }
-        ]
-    },
-    {
-        // HAREKETLİ: kamera mazgala iniyor, kütle demirlerin arasından çıkıyor
-        id: 'cadde-mazgal', chapter: 2, art: 'drainMouth', cont: true,
-        motion: 320, hold: 30,
-        sfx: [
-            { name: 'drip', at: 0.30 }, { name: 'ooze', at: 0.58 },
-            { name: 'ooze', at: 0.78 }, { name: 'slide', at: 0.92 }
-        ]
-    },
-    {
-        // HAREKETLİ: olukta akıp bordürü tırmanıyor, ayakların arasına giriyor
-        id: 'cadde-tirmanis', chapter: 2, art: 'drainCrawl', cont: true,
-        motion: 320, hold: 20,
-        sfx: [
-            { name: 'ooze', at: 0.10 }, { name: 'slide', at: 0.44 },
-            { name: 'ooze', at: 0.66 }, { name: 'step', at: 0.80 }
-        ]
-    },
-    {
-        // HAREKETLİ: bekleyenin ayakkabısının dibinden içeri akıyor.
-        // Kişi kıpırdamıyor; olan bitenin farkında değil.
-        id: 'cadde-giris', chapter: 2, art: 'footEntry', cont: true,
-        motion: 340, hold: 40,
-        sfx: [
-            { name: 'ooze', at: 0.35 }, { name: 'ooze', at: 0.58 },
-            { name: 'slide', at: 0.74 }, { name: 'drip', at: 0.90 }
-        ]
-    },
-    {
-        // HAREKETLİ: omuzdan omuza. Üç geçiş, üç yeni konak.
-        id: 'cadde-bulasma', chapter: 2, art: 'shoulderChain', cont: true,
-        motion: 380, hold: 40,
-        sfx: [
-            { name: 'ooze', at: 0.26 }, { name: 'ooze', at: 0.50 },
-            { name: 'ooze', at: 0.74 }
-        ]
-    },
-    {
-        // Kamera açılıyor: kalabalık yürümeye devam ediyor. Hiçbir şey
-        // olmamış gibi - ki zaten kimse bir şey görmedi.
-        id: 'cadde-sonra', chapter: 2, art: 'streetAfter', cont: true,
-        motion: 280, hold: 120,
-        sfx: [
-            { name: 'step', at: 0.30 }, { name: 'step', at: 0.52 },
-            { name: 'step', at: 0.74 }
+            { name: 'step', at: 0.04 }, { name: 'step', at: 0.10 },
+            { name: 'drip', at: 0.13 }, { name: 'ooze', at: 0.20 },
+            { name: 'ooze', at: 0.27 }, { name: 'slide', at: 0.33 },
+            { name: 'ooze', at: 0.40 }, { name: 'step', at: 0.46 },
+            { name: 'slide', at: 0.52 }, { name: 'drip', at: 0.56 },
+            { name: 'ooze', at: 0.60 }, { name: 'ooze', at: 0.66 },
+            { name: 'ooze', at: 0.72 }, { name: 'ooze', at: 0.78 },
+            { name: 'ooze', at: 0.83 }, { name: 'ooze', at: 0.87 },
+            { name: 'ooze', at: 0.91 }, { name: 'step', at: 0.96 }
         ]
     },
 

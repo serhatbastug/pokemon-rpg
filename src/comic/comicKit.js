@@ -125,6 +125,66 @@ export function glow(ctx, x, y, radius, color, strength = 0.5) {
     ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 }
 
+// --- Virüsün biçimi ---
+//
+// TEK RENK, OVALİMSİ, AKIŞKAN, BEYAZ IŞIKLI. Kullanıcının tarifi bu; hem
+// laboratuvarda kaptan çıkan kütle hem caddede mazgaldan çıkan kütle aynı
+// şey, o yüzden çizim tek yerde duruyor.
+//
+// Işık şöyle veriliyor: aynı oval önce BEYAZ basılıyor, üstüne gövde biraz
+// küçültülüp sağ alta kaydırılarak konuyor. Geriye üst-sol kenarda beyaz bir
+// hilal kalıyor - hacim oradan okunuyor. Gövdenin ayrıca dış hattı yok.
+
+export const VIRUS_COLOR = '#3f9a28';
+export const VIRUS_LIGHT = '#f2fff4';
+
+// Hücre düzleminde oval. wob: kenarın dalgalanması (akışkanlık).
+export function ellipseCells(ctx, cam, x, y, rx, ry, color, wob = 0) {
+    if (rx <= 0.05 || ry <= 0.05) return;
+    const rows = Math.max(4, Math.ceil(ry * 3.2));
+    const rowH = (ry * 2) / rows;
+    for (let i = 0; i < rows; i++) {
+        const dy = -ry + (i + 0.5) * rowH;
+        const k = dy / ry;
+        let half = rx * Math.sqrt(Math.max(0, 1 - k * k));
+        // Dalga sayısı kütlenin boyundan BAĞIMSIZ: mutlak dy ile hesaplanınca
+        // büyük kütlede kenar tırtıklı bir çentik dizisine dönüyor.
+        // Genlik de kısık: fazlası ovali köşeli bir lekeye çeviriyor.
+        half *= 1 + Math.sin(k * 2.4 + wob) * 0.05 + Math.sin(k * 5.1 - wob * 1.3) * 0.025;
+        if (half <= 0.05) continue;
+        cam.rect(ctx, x - half, y + dy - rowH / 2, half * 2, rowH + 0.4, color);
+    }
+}
+
+// x, y = kütlenin MERKEZİ. r taban yarıçap, wide yatay genişleme,
+// stretch/dirX/dirY hareketin uzattığı yön, light beyaz ışığın gücü.
+export function drawBlob(ctx, cam, {
+    x, y, r = 4, wide = 1.25, wob = 0, stretch = 0, dirX = 1, dirY = 0, light = 1
+}) {
+    const ax = Math.abs(dirX);
+    const ay = Math.abs(dirY);
+    const rx = r * wide * (1 + stretch * 0.55 * ax) * (1 - stretch * 0.3 * ay);
+    const ry = r * (1 + stretch * 0.55 * ay) * (1 - stretch * 0.3 * ax);
+    if (rx <= 0.05 || ry <= 0.05) return;
+
+    if (light > 0) cam.glow(ctx, x, y, Math.max(rx, ry) * 3, 'rgba(255,255,255,ALPHA)', 0.2 * light);
+    ellipseCells(ctx, cam, x, y, rx, ry, VIRUS_LIGHT, wob);
+    ellipseCells(ctx, cam, x + rx * 0.1, y + ry * 0.13, rx * 0.93, ry * 0.89, VIRUS_COLOR, wob);
+    cam.rect(ctx, x - rx * 0.5, y - ry * 0.52, Math.max(0.7, rx * 0.22), Math.max(0.6, ry * 0.16), VIRUS_LIGHT);
+}
+
+// Akarken arkada kalan damlalar: kütle katı değil
+export function blobDrops(ctx, cam, x, y, dirX, dirY, r, k = 1) {
+    if (k <= 0) return;
+    for (let i = 0; i < 2; i++) {
+        const back = (i + 1) * r * 1.6 * k;
+        const s = r * (0.3 - i * 0.1);
+        if (s <= 0.05) continue;
+        ellipseCells(ctx, cam, x - dirX * back, y - dirY * back, s * 1.2, s, VIRUS_LIGHT, 0);
+        ellipseCells(ctx, cam, x - dirX * back + s * 0.2, y - dirY * back + s * 0.2, s, s * 0.8, VIRUS_COLOR, 0);
+    }
+}
+
 // --- Ortak nesneler ---
 
 // Fayans duvar: laboratuvarın ve çalışma alanının arka planı

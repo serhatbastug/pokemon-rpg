@@ -391,9 +391,16 @@ const { ComicPlayer, IN_FRAMES } = await import('../src/comic/ComicPlayer.js');
 check('çizgi roman: kare kimlikleri benzersiz',
     new Set(comic.PANELS.map(p => p.id)).size === comic.PANELS.length);
 
-check('çizgi roman: dört bölümün de kareleri var',
-    comic.CHAPTERS.every(c => comic.panelsOfChapter(c.n).length >= 5),
+// Her bölümde başlık kartından sonra en az bir kare olmalı. Kare SAYISI
+// bölüme göre değişiyor: 2. bölüm (cadde) bilerek TEK KARE - mazgaldan
+// çıkıştan bulaşma zincirine kadar her şey tek kadrajda kesintisiz akıyor,
+// oyuncu araya girmiyor.
+check('çizgi roman: her bölümün başlıktan sonra karesi var',
+    comic.CHAPTERS.every(c => comic.panelsOfChapter(c.n).length >= 2),
     comic.CHAPTERS.map(c => comic.panelsOfChapter(c.n).length).join(','));
+
+check('çizgi roman: prolog toplamda yeterince kare',
+    comic.PANELS.length >= 20, String(comic.PANELS.length));
 
 check('çizgi roman: her bölüm bir başlık kartıyla açılıyor',
     comic.CHAPTERS.every(c => comic.panelsOfChapter(c.n)[0].art === 'title'));

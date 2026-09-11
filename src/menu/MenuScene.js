@@ -6,7 +6,7 @@
 //             karakter seçimine gidilir
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
-import { drawTrainer } from '../world/trainerSprite.js';
+import { drawMenuAvatar } from '../world/menuAvatarSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import {
@@ -318,7 +318,7 @@ export class MenuScene {
         ctx.fillRect(Math.round((player.x - 14) / PX) * PX, Math.round((player.y + 2) / PX) * PX, PX * 7, PX * 2);
         ctx.globalAlpha = 1;
 
-        drawTrainer(ctx, Math.round(player.x), Math.round(player.y - 26), player.dir, player.moving, PLAYER_SCALE);
+        drawMenuAvatar(ctx, Math.round(player.x), Math.round(player.y - 26), player.dir, player.moving, PLAYER_SCALE);
     }
 
     // "F AÇ" ipucu antrenörün başının üstünde durur: kemerin çerçevesine ya da

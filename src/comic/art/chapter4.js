@@ -1,304 +1,476 @@
-// 4. BÖLÜM - KUŞATMA
+// 4. BÖLÜM - EV
 //
-// Tesis avlusunun İÇİNDEYİZ. Bizim dışımızda TAM BEŞ sağlıklı - bu sayı
-// 5. bölümde de tutuyor. Virüslüler tel örgüye dayanıyor, sağlıklıları acil
-// çıkıştan geçiriyoruz, en son biz geçiyoruz.
+// Bizimkinin oturma odası, akşam. Bölüm TEK ÇEKİM: kamera hiç kıpırdamıyor.
+// Bizimki koltukta gazete okurken arkadaşı (= profesör, ASLA SÖYLENMEZ)
+// kapıdan içeri giriyor.
 //
-// ARKADAŞIN DÖNÜŞÜ GÖSTERİLMİYOR: ne ısırılma, ne dönüşüm, ne kolun çekilip
-// çekilmediği. Çelik kapı iniyor, cümle ortasında kesiliyor, o kadar. Ayıran
-// şey kapının kendisi; belirsizlik bilerek bırakılıyor.
+// ARKADAŞIN YÜZÜ BURADA DA GÖRÜNMÜYOR: kafası saçla kaplı düz bir şekil,
+// göz/kaş/burun/ağız YOK. Tek işareti bileğindeki TURUNCU BANT (comicKit
+// `BAND_COLOR` - 1. bölümdeki saatle, 5. bölümdeki bantla AYNI renk).
+//
+// Bizimkinin yüzü tam tersine AYRINTILI: bu onun çizgi romandaki İLK
+// çıkışı, sonraki bölümlerde de aynı kalacak (bkz. [[menu-avatar-antivirus]]
+// notundaki gibi kullanıcı ayrıntı istedi).
+//
+// Sohbet UZUN olduğu için bilerek çok sayıda küçük balona bölünüyor - her
+// biri kendi başına havada kalıp okunacak kadar bekliyor (dialogue.js'in
+// HOLD_BASE + uzunluk mekaniği zaten bunu sağlıyor), sonra oyuncu F ile
+// ilerletiyor. "Katılıyorum" ile "Fakat önce bir denek bulmalıyız" araya
+// bilerek AYRI birer kare olarak girdi - kullanıcının işaret ettiği kesme.
 
-import { PX, blk, hash } from '../../pixel/pixelDraw.js';
-import { drawTrainer } from '../../world/trainerSprite.js';
-import { drawFriend, drawSurvivor } from '../../adventure/people.js';
+import { PX, hash } from '../../pixel/pixelDraw.js';
 import {
-    fill, vignette, darken, glow, bands, mix, limb,
-    span, easeOut, easeIn, gridLerp
+    createCam, vignette, mix, BAND_COLOR,
+    span, clamp01, easeOut, lerp
 } from '../comicKit.js';
 
-const CONCRETE = ['#6e7278', '#787c83', '#63676d', '#585c62'];
+const SCENE = { w: 232, h: 122 };
+const WIDE = { u: PX, cx: SCENE.w / 2, cy: SCENE.h / 2 };
 
-// Beton avlu: dökme plakalar ve derzler (3. bölümün zemini)
-function yardFloor(ctx, A, top) {
-    for (let y = top; y < A.y + A.h; y += PX) {
-        for (let x = A.x; x < A.x + A.w; x += PX) {
-            const slabX = Math.floor(x / (PX * 22));
-            const slabY = Math.floor(y / (PX * 16));
-            let tone = CONCRETE[Math.floor(hash(slabX, slabY, 11) * CONCRETE.length)];
-            if (hash(x, y, 13) < 0.10) tone = CONCRETE[Math.floor(hash(x, y, 17) * CONCRETE.length)];
-            if (x % (PX * 22) === 0 || y % (PX * 16) === 0) tone = '#4e5258';
-            blk(ctx, x, y, PX, PX, tone);
+const CEIL_H = 8;
+const FLOOR_Y = 100;
+
+const SEAT_X = 60;         // bizimkinin koltuğu
+const SEAT_Y = 84;
+const STAND_X = 158;        // arkadaşın konuşurken durduğu yer
+const DOOR_X = 210;         // arkadaşın girdiği kapı
+
+// --- Renkler ---
+
+const WALL = '#c3ae86';
+const WALL_SEAM = '#a8916a';
+const WALL_TRIM = '#5c4530';
+const FLOOR_A = '#8a6a42';
+const FLOOR_B = '#7d5f3a';
+const FLOOR_SEAM = '#5f4728';
+
+const BIZ_HAIR = '#5a3d24';
+const BIZ_SKIN = '#c99a6e';
+const BIZ_CARDIGAN = '#6b3232';
+const BIZ_CARDIGAN_SHADE = '#4a2020';
+const BIZ_SHIRT = '#d8cdb8';
+const BIZ_TROUSER = '#3a4048';
+
+const FRIEND_HAIR = '#332920';
+const FRIEND_SKIN = '#caa079';
+const FRIEND_COAT = '#4a5560';
+const FRIEND_COAT_SHADE = '#33393f';
+const FRIEND_TROUSER = '#2c2f33';
+
+// Hücre düzleminde kalın çapraz çizgi: kol, bacak
+function limbCells(ctx, cam, x0, y0, x1, y1, thick, color) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));
+    for (let i = 0; i <= steps; i++) {
+        const k = i / steps;
+        cam.rect(ctx, x0 + dx * k - thick / 2, y0 + dy * k - thick / 2, thick, thick, color);
+    }
+}
+
+function vBands(ctx, cam, x, y, w, h, from, to, steps = 8) {
+    const stepH = h / steps;
+    for (let i = 0; i < steps; i++) {
+        cam.rect(ctx, x, y + i * stepH, w, stepH + 0.6, mix(from, to, i / (steps - 1 || 1)));
+    }
+}
+
+// --- Odanın parçaları ---
+
+function walls(ctx, cam) {
+    cam.rect(ctx, 0, 0, SCENE.w, CEIL_H, '#3a3128');
+    vBands(ctx, cam, 0, CEIL_H, SCENE.w, FLOOR_Y - CEIL_H - 8, mix(WALL, '#ffffff', 0.08), WALL, 6);
+    for (let y = CEIL_H; y < FLOOR_Y; y += 13) cam.rect(ctx, 0, y, SCENE.w, 0.8, WALL_SEAM);
+    // Çizgili duvar kağıdı: ince düşey şeritler
+    for (let x = 0; x < SCENE.w; x += 6) cam.rect(ctx, x, CEIL_H, 1, FLOOR_Y - CEIL_H - 8, 'rgba(0,0,0,0.03)');
+    for (let x = 0; x < SCENE.w; x += 2) {
+        for (let y = CEIL_H; y < FLOOR_Y - 8; y += 3) {
+            if (hash(x, y, 6) > 0.975) cam.rect(ctx, x, y, 2, 1, mix(WALL, '#000000', 0.12));
+        }
+    }
+    cam.rect(ctx, 0, FLOOR_Y - 8, SCENE.w, 7, WALL_TRIM);
+    cam.rect(ctx, 0, FLOOR_Y - 8, SCENE.w, 1, mix(WALL_TRIM, '#ffffff', 0.22));
+    cam.rect(ctx, 0, FLOOR_Y - 1, SCENE.w, 1, '#3c2c1c');
+
+    floor(ctx, cam);
+}
+
+// Ahşap parke zemin: yatay tahtalar, akşam ışığında ılık ton
+function floor(ctx, cam) {
+    const PLANK = 7;
+    let row = 0;
+    for (let y = FLOOR_Y; y < SCENE.h; y += PLANK) {
+        const rowTone = row % 2 === 0 ? FLOOR_A : FLOOR_B;
+        for (let x = -((row * 11) % 30); x < SCENE.w; x += 30) {
+            const tone = mix(rowTone, '#000000', hash(x, row, 9) * 0.08);
+            cam.rect(ctx, x, y, 29, PLANK - 0.5, tone);
+            cam.rect(ctx, x, y, 29, 0.6, mix(tone, '#ffffff', 0.15));
+            cam.rect(ctx, x + 28, y, 1, PLANK - 0.5, FLOOR_SEAM);
+        }
+        cam.rect(ctx, 0, y + PLANK - 0.5, SCENE.w, 0.6, FLOOR_SEAM);
+        row++;
+    }
+}
+
+// Pencere: dışarısı akşam - koyu mor-mavi, içeride perde
+function windowEvening(ctx, cam) {
+    const x = 18, y = 14, w = 32, h = 30;
+    cam.rect(ctx, x - 3, y - 3, w + 6, h + 6, '#7a6144');
+    cam.rect(ctx, x, y, w, h, '#2c2c44');
+    vBands(ctx, cam, x + 2, y + 2, w - 4, h - 4, '#3a3a5c', '#1c1c30', 5);
+    cam.rect(ctx, x + w * 0.62, y + h * 0.22, 3, 3, '#e8dfa0');
+    cam.glow(ctx, x + w * 0.62, y + h * 0.22, 7, 'rgba(230,220,160,ALPHA)', 0.3);
+    cam.rect(ctx, x + w / 2 - 1, y, 2, h, WALL_TRIM);
+    cam.rect(ctx, x, y + h / 2 - 1, w, 2, WALL_TRIM);
+    // Perdeler: iki yana çekilmiş
+    const curtain = '#8a3b38';
+    cam.rect(ctx, x - 5, y - 4, 6, h + 10, curtain);
+    cam.rect(ctx, x - 5, y - 4, 2, h + 10, mix(curtain, '#ffffff', 0.18));
+    cam.rect(ctx, x + w - 1, y - 4, 6, h + 10, curtain);
+    cam.rect(ctx, x + w + 3, y - 4, 2, h + 10, mix(curtain, '#000000', 0.2));
+    cam.rect(ctx, x - 7, y - 6, w + 14, 3, WALL_TRIM);
+}
+
+// Kitaplık: bilim insanı havası
+function bookshelf(ctx, cam) {
+    const x = 122, y = FLOOR_Y - 52, w = 30, h = 52;
+    cam.rect(ctx, x - 1, y - 1, w + 2, h + 1, '#3f2f1e');
+    cam.rect(ctx, x, y, w, h, '#6b4a2c');
+    for (const sy of [y + 3, y + h * 0.36, y + h * 0.68]) {
+        cam.rect(ctx, x + 1, sy, w - 2, 1.4, '#3f2f1e');
+        let bx = x + 2;
+        let i = 0;
+        while (bx < x + w - 3) {
+            const bw = 2.6 + hash(i, sy, 3) * 2.2;
+            const bh = 7 + hash(i, sy, 7) * 4;
+            const tone = mix('#8a4a3a', '#3a5a6a', hash(i, sy, 11));
+            cam.rect(ctx, bx, sy - bh, bw, bh, tone);
+            cam.rect(ctx, bx, sy - bh, bw, 1, mix(tone, '#ffffff', 0.25));
+            bx += bw + 0.6;
+            i++;
+        }
+    }
+    cam.rect(ctx, x, y + h - 1, w, 1, '#2c2014');
+}
+
+// Kapı: arkadaş buradan giriyor, koridor ışığı arkasından vuruyor
+function doorway(ctx, cam, glow) {
+    const x = 196, w = 28, y = CEIL_H + 2, h = FLOOR_Y - y - 8;
+    cam.rect(ctx, x - 3, y - 3, w + 6, h + 4, WALL_TRIM);
+    cam.rect(ctx, x, y, w, h, mix('#3a2f24', '#f0e4b8', 0.18 + glow * 0.35));
+    if (glow > 0) cam.glow(ctx, x + w / 2, y + h * 0.4, 22, 'rgba(240,225,180,ALPHA)', glow * 0.3);
+}
+
+// --- Koltuk: bizimki bunun içinde oturuyor ---
+function armchair(ctx, cam, x, seatY) {
+    const backTop = seatY - 30;
+    cam.rect(ctx, x - 15, backTop, 30, 30, '#8a3b38');
+    cam.rect(ctx, x - 15, backTop, 6, 30, mix('#8a3b38', '#ffffff', 0.1));
+    cam.rect(ctx, x + 9, backTop, 6, 30, mix('#8a3b38', '#000000', 0.2));
+    for (let i = 0; i < 2; i++) {
+        cam.rect(ctx, x - 6 + i * 9, backTop + 8, 2, 2, '#5c211f');
+    }
+    cam.rect(ctx, x - 18, seatY - 6, 36, 8, '#7a332f');
+    cam.rect(ctx, x - 18, seatY - 6, 36, 1.4, mix('#7a332f', '#ffffff', 0.2));
+    // Kol dayamaları
+    for (const s of [-1, 1]) {
+        cam.rect(ctx, x + s * 19 - 4, seatY - 20, 8, 20, '#7a332f');
+        cam.rect(ctx, x + s * 19 - 4, seatY - 20, 8, 1.4, mix('#7a332f', '#ffffff', 0.22));
+    }
+    // Ayaklar
+    for (const s of [-1, 1]) cam.rect(ctx, x + s * 14, seatY + 4, 3, FLOOR_Y - seatY - 4, '#3f2c1e');
+}
+
+// Yan sehpa + lamba: odanın sıcak ışık kaynağı
+function sideTable(ctx, cam, x) {
+    const topY = SEAT_Y - 14;
+    cam.rect(ctx, x - 9, topY, 18, 2.4, '#5c4530');
+    cam.rect(ctx, x - 2, topY + 2.4, 4, FLOOR_Y - topY - 2.4, '#43301e');
+    cam.rect(ctx, x - 3, topY - 10, 2, 10, '#33261a');
+    cam.rect(ctx, x - 6, topY - 18, 12, 9, '#d8c88a');
+    cam.rect(ctx, x - 6, topY - 18, 12, 2, mix('#d8c88a', '#ffffff', 0.3));
+    cam.glow(ctx, x, topY - 14, 24, 'rgba(250,225,150,ALPHA)', 0.28);
+    // Fincan
+    cam.rect(ctx, x + 6, topY - 2.4, 4, 2.4, '#e8e2d0');
+}
+
+// --- Gazete: açık, sütunlar okunmuyor (ch1'deki notla aynı kural) ---
+function newspaper(ctx, cam, x, y, w, h) {
+    cam.rect(ctx, x - w / 2 - 0.6, y - 0.6, w + 1.2, h + 1.2, '#8a8168');
+    cam.rect(ctx, x - w / 2, y, w, h, '#e8e2cf');
+    cam.rect(ctx, x - 0.4, y, 0.8, h, '#c9c2a8');
+    for (let side = 0; side < 2; side++) {
+        const cx = x - w / 2 + side * w / 2;
+        cam.rect(ctx, cx + w * 0.08, y + h * 0.1, w * 0.3, h * 0.14, '#a89f84');
+        for (let i = 0; i < 5; i++) {
+            cam.rect(ctx, cx + w * 0.08, y + h * 0.32 + i * h * 0.11, w * 0.34, h * 0.05, '#b6ad91');
         }
     }
 }
 
-// Tesis cephesi ve üstteki ACİL ÇIKIŞ kapısı
-function facade(ctx, A, top, h) {
-    blk(ctx, A.x, top, A.w, h, '#6c7078');
-    blk(ctx, A.x, top, A.w, PX * 2, '#858a92');
-    for (let x = A.x; x < A.x + A.w; x += PX * 26) blk(ctx, x, top, PX * 2, h, '#5a5f66');
-    for (let x = A.x + PX * 8; x < A.x + A.w - PX * 10; x += PX * 26) {
-        blk(ctx, x, top + PX * 6, PX * 12, PX * 8, '#3b4149');
-        blk(ctx, x, top + PX * 6, PX * 12, PX, '#8d939b');
-    }
-}
+// --- Oturan, gazete okuyan bizimki ---
+//
+// Yüzü AYRINTILI: iki parçalı kaş, ışık noktalı gözler, burun köprüsü,
+// üst-alt dudak, parmak izleri - 3. bölümdeki tekniklerin aynısı.
+function bizPerson(ctx, cam, p) {
+    const { x, headTurn = 1, lean = 0, paperUp = 0, talk = 0 } = p;
+    const skin = BIZ_SKIN, skinShade = mix(skin, '#000000', 0.24), skinLit = mix(skin, '#ffffff', 0.12);
+    const mouth = mix(skin, '#7a3f38', 0.4);
+    const hipX = x + lean * 2;
 
-// Tel örgü: yüksek kontrastlı desen dama tahtasına dönüyor, o yüzden seyrek
-function chainFence(ctx, A, top, h) {
-    for (let x = A.x; x < A.x + A.w; x += PX * 4) blk(ctx, x, top, PX, h, '#8b939b');
-    for (let y = top; y < top + h; y += PX * 4) blk(ctx, A.x, y, A.w, PX, '#7b838b');
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, top - PX * 2, PX * 3, h + PX * 2, '#4d545b');
-    blk(ctx, A.x, top - PX * 2, A.w, PX * 2, '#4d545b');
-}
-
-// Örgünün ardındaki kalabalık: düzenli aralık çit gibi duruyor, bu yüzden
-// aralık/boy rastgele ve siluetler üst üste biniyor
-function crowd(ctx, A, baseY, count = 26) {
-    for (let i = 0; i < count; i++) {
-        const x = A.x + (i / count) * A.w + (hash(i, 3, 5) - 0.5) * PX * 8;
-        const h = PX * (26 + Math.floor(hash(i, 7, 2) * 12));
-        const w = PX * (8 + Math.floor(hash(i, 5, 9) * 3));
-        const tone = mix('#26400d', '#537f22', hash(i, 11, 4));
-        blk(ctx, x, baseY - h, w, h, tone);
-        blk(ctx, x + PX, baseY - h - PX * 6, w - PX * 2, PX * 6, mix('#456f19', '#3d6317', hash(i, 2, 8)));
-    }
-}
-
-// İnen çelik kapı
-function steelDoor(ctx, x, y, w, closed) {
-    const h = Math.max(PX, closed);
-    blk(ctx, x - PX * 3, y - PX * 4, w + PX * 6, PX * 4, '#3a4149');
-    blk(ctx, x, y, w, h, '#8a929c');
-    for (let ly = y; ly < y + h; ly += PX * 6) blk(ctx, x, ly, w, PX * 2, '#5f6873');
-    blk(ctx, x, y + h - PX * 2, w, PX * 2, '#3a4149');
-    // Uyarı şeridi
-    for (let sx = x; sx < x + w; sx += PX * 8) blk(ctx, sx, y + h - PX * 6, PX * 4, PX * 4, '#c9a227');
-}
-
-// --- 1. Avlu, sakin: altı kişi iş başında ---
-function yardCalm(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.22), '#7d8794', '#9aa4b0', 5);
-    const fenceTop = A.y + Math.round(A.h * 0.16 / PX) * PX;
-    const yardTop = A.y + Math.round(A.h * 0.46 / PX) * PX;
-
-    facade(ctx, A, A.y, Math.round(A.h * 0.16));
-    chainFence(ctx, A, fenceTop, yardTop - fenceTop);
-    yardFloor(ctx, A, yardTop);
-
-    // Solda jeneratör ve acil durum kolu, aralarında kablo
-    const gx = A.x + PX * 10;
-    blk(ctx, gx, yardTop - PX * 22, PX * 30, PX * 22, '#4a5158');
-    blk(ctx, gx, yardTop - PX * 22, PX * 30, PX * 2, '#626a72');
-    blk(ctx, gx + PX * 6, yardTop - PX * 16, PX * 8, PX * 6, '#2d333a');
-    const lx = gx + PX * 46;
-    blk(ctx, lx, yardTop - PX * 16, PX * 5, PX * 16, '#3f464d');
-    blk(ctx, lx - PX * 3, yardTop - PX * 22, PX * 4, PX * 8, '#b04a3a');
-    limb(ctx, gx + PX * 30, yardTop - PX * 4, lx, yardTop - PX * 4, PX * 2, '#23282d');
-
-    // Sağda gözetleme kulesi ve rögar
-    const tx = A.x + A.w - PX * 40;
-    blk(ctx, tx, A.y + PX * 6, PX * 6, yardTop - A.y + PX * 10, '#555c63');
-    blk(ctx, tx + PX * 18, A.y + PX * 6, PX * 6, yardTop - A.y + PX * 10, '#555c63');
-    blk(ctx, tx - PX * 4, A.y + PX * 2, PX * 32, PX * 8, '#454c53');
-    const mhx = A.x + A.w - PX * 30;
-    blk(ctx, mhx, A.y + A.h - PX * 22, PX * 18, PX * 8, '#4b545c');
-    blk(ctx, mhx + PX * 2, A.y + A.h - PX * 20, PX * 14, PX * 4, '#5c666e');
-
-    // Sandıklar
-    for (let i = 0; i < 3; i++) {
-        const cx = A.x + PX * 92 + i * PX * 22;
-        blk(ctx, cx, yardTop + PX * 6, PX * 18, PX * 14, '#7a5a34');
-        blk(ctx, cx, yardTop + PX * 6, PX * 18, PX * 2, '#96703f');
-        blk(ctx, cx + PX * 7, yardTop + PX * 6, PX * 4, PX * 14, '#5f4728');
+    // Bacaklar
+    for (const s of [-1, 1]) {
+        const kx = hipX + 13;
+        const ky = SEAT_Y + s * 1.2;
+        limbCells(ctx, cam, hipX + s * 2, SEAT_Y, kx, ky, 4.4, BIZ_TROUSER);
+        limbCells(ctx, cam, kx, ky, kx, FLOOR_Y - 1, 4, BIZ_TROUSER);
+        cam.rect(ctx, kx - 2, FLOOR_Y - 2, 7, 2, '#1d2126');
     }
 
-    // Altı kişi: biz + BEŞ sağlıklı
-    drawSurvivor(ctx, A.x + PX * 40, yardTop + PX * 34, 'down', false, 6, 0);
-    drawSurvivor(ctx, A.x + PX * 74, yardTop + PX * 26, 'right', false, 6, 1);
-    drawSurvivor(ctx, A.x + PX * 150, yardTop + PX * 40, 'left', false, 6, 2);
-    drawSurvivor(ctx, A.x + PX * 186, yardTop + PX * 22, 'down', false, 6, 3);
-    drawSurvivor(ctx, A.x + PX * 120, yardTop + PX * 14, 'up', false, 6, 4);
-    drawFriend(ctx, A.x + PX * 62, yardTop + PX * 52, 'down', false, 6);
-    drawTrainer(ctx, A.x + PX * 106, yardTop + PX * 50, 'down', false, 6);
+    // Gövde: hırka + içindeki gömlek yakası
+    const torsoH = 27;
+    const shoulderY = SEAT_Y - torsoH;
+    const coatW = 21;
+    cam.rect(ctx, hipX - coatW / 2, shoulderY + 1, coatW, torsoH - 1, BIZ_CARDIGAN);
+    cam.rect(ctx, hipX - coatW / 2, shoulderY + 1, coatW * 0.24, torsoH - 1, mix(BIZ_CARDIGAN, '#ffffff', 0.15));
+    cam.rect(ctx, hipX + coatW * 0.26, shoulderY + 1, coatW * 0.24, torsoH - 1, BIZ_CARDIGAN_SHADE);
+    cam.rect(ctx, hipX - 3.2, shoulderY + 1.4, 6.4, torsoH * 0.6, BIZ_SHIRT);
+    cam.rect(ctx, hipX - 2.6, shoulderY + 3, 5.2, 3.4, skinShade);
+    for (let i = 0; i < 3; i++) cam.rect(ctx, hipX + 0.6, shoulderY + 7 + i * 5.6, 1.2, 1.2, mix(BIZ_CARDIGAN, '#000000', 0.35));
 
-    vignette(ctx, 0.4);
-}
-
-// --- 2. Örgüye dayanan kalabalık ---
-function fenceCrowd(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.30), '#6f7885', '#8e97a3', 5);
-    const fenceTop = A.y + PX * 10;
-    const yardTop = A.y + Math.round(A.h * 0.62 / PX) * PX;
-
-    crowd(ctx, A, yardTop - PX * 6, 30);
-    chainFence(ctx, A, fenceTop, yardTop - fenceTop);
-    yardFloor(ctx, A, yardTop);
-
-    // Örgüyü iten eller: parmakları teller arasından geçiyor
-    for (let i = 0; i < 7; i++) {
-        const hx = A.x + PX * 20 + i * PX * 32 + Math.floor(hash(i, 4, 6) * PX * 10);
-        const hy = yardTop - PX * (30 + Math.floor(hash(i, 8, 3) * 16));
-        blk(ctx, hx, hy, PX * 7, PX * 5, '#537f22');
-        for (let f = 0; f < 3; f++) blk(ctx, hx + f * PX * 3, hy - PX * 3, PX * 2, PX * 3, '#5e8f28');
+    // Kollar: paperUp > 0 iken gazeteyi tutmak için yukarı kalkık
+    for (const s of [-1, 1]) {
+        const sx = hipX + s * coatW * 0.42;
+        const sy = shoulderY + 2;
+        const ex = lerp(sx + s * 4, hipX + s * 6, paperUp);
+        const ey = lerp(sy + torsoH * 0.55, shoulderY - 8 - talk * 2, paperUp);
+        const hx = lerp(hipX + s * 8, hipX + s * 4, paperUp);
+        const hy = lerp(SEAT_Y - 5, shoulderY - 10 - talk * 2, paperUp);
+        limbCells(ctx, cam, sx, sy, ex, ey, 3.6, BIZ_CARDIGAN);
+        limbCells(ctx, cam, ex, ey, hx, hy, 3.2, BIZ_CARDIGAN);
+        cam.rect(ctx, hx - 2, hy - 1.7, 4, 3.4, skin);
+        for (let i = 0; i < 3; i++) cam.rect(ctx, hx - 1.6 + i * 1.3, hy + 1, 1, 0.8, skinShade);
     }
 
-    // Arkadaş: örgüye bakıyor, kolunda bant
-    drawFriend(ctx, 300, 396, 'up', false, 7);
-    drawTrainer(ctx, 470, 420, 'up', false, 7);
+    // Baş
+    const hx = hipX + headTurn * 1.6;
+    const hy = shoulderY - 12.4;
+    const headW = 12, headH = 12.6;
+    cam.rect(ctx, hipX - 2.4, shoulderY - 3, 4.8, 4, skinShade);
+    cam.rect(ctx, hx + headTurn * headW * 0.5 - 1, hy + headH * 0.4, 1.6, headH * 0.24, skinShade);
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
+    cam.rect(ctx, hx - headW / 2, hy, headW * 0.2, headH, skinShade);
+    cam.rect(ctx, hx + headW * 0.34, hy, headW * 0.16, headH, skinLit);
+    cam.rect(ctx, hx - headW * 0.1, hy + headH * 0.74, headW * 0.5, headH * 0.16, mix(skinShade, skin, 0.35));
 
-    darken(ctx, 0.12);
-    vignette(ctx, 0.5);
+    const eyeY = hy + headH * 0.46;
+    const eyeW = 1.9, eyeH = 1.4, gap = 2.3;
+    const fx = headTurn * 1.4;
+    for (const s of [-1, 1]) {
+        cam.rect(ctx, hx + fx + s * gap - eyeW * 0.6, eyeY - eyeH * 1.7, eyeW * 0.9, eyeH * 0.55, BIZ_HAIR);
+        cam.rect(ctx, hx + fx + s * gap - eyeW * 0.6 + (s > 0 ? eyeW * 0.6 : -eyeW * 0.15), eyeY - eyeH * 1.5, eyeW * 0.55, eyeH * 0.4, BIZ_HAIR);
+        cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY, eyeW, eyeH, '#20242a');
+        cam.rect(ctx, hx + fx + s * gap - eyeW / 2 + 0.3, eyeY + 0.2, 0.6, 0.5, '#eceadd');
+    }
+    cam.rect(ctx, hx + fx - 0.5, eyeY - eyeH * 0.2, 1, eyeH * 1.5, mix(skin, skinShade, 0.3));
+    cam.rect(ctx, hx + fx + 1.1, eyeY + eyeH * 1.1, eyeW * 0.65, eyeH * 0.6, skinShade);
+    cam.rect(ctx, hx + fx - 1.5 + talk * 0.3, eyeY + eyeH * 3, 3.2 - talk * 0.6, 0.6, mix(mouth, '#000000', 0.25));
+    cam.rect(ctx, hx + fx - 1.4 + talk * 0.3, eyeY + eyeH * 3.5, 3 - talk * 0.6, 1 + talk * 0.9, mouth);
+
+    cam.rect(ctx, hx - headW / 2 - 0.8, hy - 1.6, headW + 1.6, headH * 0.34, BIZ_HAIR);
+    cam.rect(ctx, hx - headW * 0.3, hy - 1.6, headW * 0.22, headH * 0.14, mix(BIZ_HAIR, '#ffffff', 0.14));
+    cam.rect(ctx, hx - headW * 0.52, hy + headH * 0.1, headW * 0.2, headH * 0.5, BIZ_HAIR);
+    // Dağınık bir tutam - evde rahat oturuyor
+    cam.rect(ctx, hx - headW * 0.05, hy - 2.6, headW * 0.16, 2, BIZ_HAIR);
+
+    if (paperUp > 0.1) newspaper(ctx, cam, hipX + 4, shoulderY - 26 * paperUp, 30, 22 * paperUp);
+    else if (paperUp <= 0.1) newspaper(ctx, cam, hipX + 3, SEAT_Y - 9, 26, 16);
 }
 
-// --- 3. Plan: ormana kaçıyoruz ---
-function yardPlan(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.26), '#67707d', '#89929e', 5);
-    const yardTop = A.y + Math.round(A.h * 0.40 / PX) * PX;
-    facade(ctx, A, A.y, Math.round(A.h * 0.26));
-    yardFloor(ctx, A, yardTop);
+// --- Arkadaş: yüzü YOK, sadece saçla kaplı düz bir kafa. Turuncu bant tek işaret ---
+function friendPerson(ctx, cam, p) {
+    const { x, dir = -1, armRaise = 0, talk = 0 } = p;
+    const skin = FRIEND_SKIN, skinShade = mix(skin, '#000000', 0.22);
 
-    // Üstte ACİL ÇIKIŞ: açık, ışığı yanıyor
-    const doorX = A.x + Math.round(A.w * 0.44 / PX) * PX;
-    const doorW = PX * 40;
-    const doorTop = A.y + Math.round(A.h * 0.26 / PX) * PX - PX * 30;
-    blk(ctx, doorX - PX * 3, doorTop, doorW + PX * 6, PX * 32, '#3a4149');
-    blk(ctx, doorX, doorTop + PX * 2, doorW, PX * 28, '#2a3038');
-    blk(ctx, doorX + PX * 4, doorTop + PX * 6, doorW - PX * 8, PX * 20, '#c7d2a8');
-    glow(ctx, doorX + doorW / 2, doorTop + PX * 16, PX * 40, 'rgba(200,220,160,ALPHA)', 0.22);
+    for (const s of [-1, 1]) {
+        const hipX = x + s * 2;
+        limbCells(ctx, cam, hipX, SEAT_Y + 2, hipX, FLOOR_Y - 1, 4.6, s > 0 ? FRIEND_TROUSER : mix(FRIEND_TROUSER, '#000000', 0.18));
+        cam.rect(ctx, hipX - 2.4, FLOOR_Y - 2, 6, 2, '#0f1215');
+    }
 
-    // Biz: elimizde parçalayıcı silah
-    drawTrainer(ctx, 380, 392, 'right', false, 7);
-    blk(ctx, 412, 384, PX * 12, PX * 4, '#3c434a');
-    blk(ctx, 424, 386, PX * 5, PX * 2, '#22272c');
+    const torsoH = 34;
+    const shoulderY = SEAT_Y + 2 - torsoH;
+    const coatW = 23;
+    cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW, torsoH - 1, FRIEND_COAT);
+    cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW * 0.24, torsoH - 1, mix(FRIEND_COAT, '#ffffff', 0.1));
+    cam.rect(ctx, x + coatW * 0.26, shoulderY + 1, coatW * 0.24, torsoH - 1, FRIEND_COAT_SHADE);
+    cam.rect(ctx, x - 1.2, shoulderY + 3, 2.4, torsoH - 5, mix(FRIEND_COAT_SHADE, '#000000', 0.15));
 
-    // Cevap veren sağlıklı ve arkasındaki diğerleri
-    drawSurvivor(ctx, 720, 402, 'left', false, 7, 0);
-    drawSurvivor(ctx, 800, 380, 'left', false, 6, 1);
-    drawSurvivor(ctx, 856, 404, 'down', false, 6, 2);
-    drawSurvivor(ctx, 640, 370, 'down', false, 6, 3);
-    drawFriend(ctx, 560, 412, 'right', false, 6);
+    // Kollar: biri sakin, biri konuşurken jest yapıyor - bant o kolda
+    const idleSx = x - coatW * 0.42;
+    const idleSy = shoulderY + 2;
+    limbCells(ctx, cam, idleSx, idleSy, idleSx - 2, idleSy + torsoH * 0.55, 3.8, FRIEND_COAT);
+    limbCells(ctx, cam, idleSx - 2, idleSy + torsoH * 0.55, x - 6, SEAT_Y - 3, 3.4, FRIEND_COAT);
+    cam.rect(ctx, x - 8, SEAT_Y - 6, 4.4, 3.6, skin);
 
-    vignette(ctx, 0.45);
+    const gestSx = x + coatW * 0.42;
+    const gestSy = shoulderY + 2;
+    const raise = clamp01(armRaise);
+    const ex = lerp(gestSx + 4, gestSx + 8, raise);
+    const ey = lerp(gestSy + torsoH * 0.35, gestSy + torsoH * 0.1, raise);
+    const handX = lerp(x + 10, x + 16, raise);
+    const handY = lerp(SEAT_Y - 4, shoulderY + torsoH * 0.15 - talk * 2, raise);
+    limbCells(ctx, cam, gestSx, gestSy, ex, ey, 3.8, FRIEND_COAT);
+    limbCells(ctx, cam, ex, ey, handX, handY, 3.4, FRIEND_COAT);
+    cam.rect(ctx, handX - 2.2, handY - 1.8, 4.4, 3.6, skin);
+    for (let i = 0; i < 3; i++) cam.rect(ctx, handX - 1.7 + i * 1.4, handY + 1.1, 1, 0.8, skinShade);
+    // TURUNCU BANT: bileğin biraz yukarısında, kolun %70'inde
+    const bandX = lerp(gestSx, handX, 0.68);
+    const bandY = lerp(gestSy, handY, 0.68);
+    cam.rect(ctx, bandX - 2.4, bandY - 1.6, 4.8, 3.2, BAND_COLOR);
+    cam.rect(ctx, bandX - 2.4, bandY - 1.6, 4.8, 1, mix(BAND_COLOR, '#ffffff', 0.3));
+
+    // Yaka
+    cam.rect(ctx, x - 2.4, shoulderY, 4.8, 3, mix(FRIEND_COAT, '#000000', 0.12));
+
+    // --- Kafa: YÜZ YOK. Sadece saçla kaplı düz bir şekil. ---
+    const hx = x + dir * -1.2;
+    const hy = shoulderY - 13;
+    const headW = 12.4, headH = 13;
+    cam.rect(ctx, x - 2.6, shoulderY - 3, 5.2, 4, skinShade);
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH * 0.5, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2, hy + headH * 0.5, headW * 0.22, headH * 0.4, FRIEND_HAIR);
+    cam.rect(ctx, hx + headW * 0.28, hy + headH * 0.5, headW * 0.22, headH * 0.4, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW * 0.08, hy - 2, headW * 0.2, 2.2, FRIEND_HAIR);
 }
 
-// --- 4. HAREKETLİ: yarıktan içeri doluyorlar ---
-function breach(ctx, A, t) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.24), '#5c6470', '#7c8593', 5);
-    const yardTop = A.y + Math.round(A.h * 0.38 / PX) * PX;
-    facade(ctx, A, A.y, Math.round(A.h * 0.24));
-    yardFloor(ctx, A, yardTop);
+// --- Sahne ---
 
-    // Soldaki yarık: örgü yırtılmış
-    blk(ctx, A.x, yardTop - PX * 34, PX * 40, PX * 34, '#3f464e');
-    for (let i = 0; i < 6; i++) {
-        limb(ctx, A.x + PX * 34, yardTop - PX * (30 - i * 5), A.x + PX * (18 + i * 3), yardTop - PX * (34 - i * 6), PX * 2, '#98a1a9');
-    }
+function scene(ctx, cam, s) {
+    walls(ctx, cam);
+    windowEvening(ctx, cam);
+    bookshelf(ctx, cam);
+    doorway(ctx, cam, s.doorGlow || 0);
 
-    // İçeri girenler: soldan sağa ilerliyorlar
-    const march = easeOut(t);
-    for (let i = 0; i < 7; i++) {
-        const lead = hash(i, 3, 2);
-        const x = A.x + PX * 10 + march * (PX * 70 + lead * PX * 60) + i * PX * 12;
-        const y = yardTop + PX * 10 + Math.floor(hash(i, 9, 4) * PX * 26);
-        const h = PX * 30;
-        blk(ctx, x, y - h, PX * 10, h, mix('#26400d', '#537f22', lead));
-        blk(ctx, x + PX, y - h - PX * 7, PX * 8, PX * 7, '#456f19');
-        // Vurulanın yerinde kalıcı yeşil leke
-        if (t > 0.5 && lead > 0.6) {
-            blk(ctx, x - PX * 4, y, PX * 16, PX * 3, '#3d7522');
-        }
-    }
+    armchair(ctx, cam, SEAT_X, SEAT_Y);
+    sideTable(ctx, cam, SEAT_X + 26);
+    bizPerson(ctx, cam, s.biz);
+    if (s.friend) friendPerson(ctx, cam, s.friend);
 
-    // Üstteki acil çıkış: sağlıklılar sırayla geçiyor
-    const doorX = A.x + Math.round(A.w * 0.56 / PX) * PX;
-    blk(ctx, doorX - PX * 3, A.y + PX * 30, PX * 46, PX * 30, '#3a4149');
-    blk(ctx, doorX, A.y + PX * 32, PX * 40, PX * 26, '#c7d2a8');
-    const passed = Math.floor(span(t, 0.1, 0.9) * 5);
-    for (let i = passed; i < 5; i++) {
-        drawSurvivor(ctx, doorX + PX * 20 + (i - passed) * PX * 4, yardTop + PX * 26 + (i - passed) * PX * 16, 'up', true, 6, i);
-    }
-
-    // Biz: kapıyı tutuyoruz, ateş ediyoruz
-    const px = doorX - PX * 26;
-    const py = yardTop + PX * 30;
-    drawTrainer(ctx, px, py, 'left', false, 7);
-    const flash = Math.sin(t * 40) > 0.4;
-    blk(ctx, px - PX * 14, py - PX * 4, PX * 12, PX * 4, '#3c434a');
-    if (flash) {
-        glow(ctx, px - PX * 18, py - PX * 2, PX * 20, 'rgba(255,240,180,ALPHA)', 0.6);
-        blk(ctx, px - PX * 20, py - PX * 5, PX * 6, PX * 6, '#ffe9a8');
-    }
-
-    darken(ctx, 0.08);
-    vignette(ctx, 0.5);
+    vignette(ctx, 0.36);
 }
 
-// --- 5. HAREKETLİ: çelik kapı iniyor, arkadaş geri dönüyor ---
-function doorClosing(ctx, A, t) {
-    // Kamera kapıya DÖNÜK: inen kapı karenin kendisi kadar büyük olmalı,
-    // yoksa bölümün ayıran anı tavandaki bir çıtaya dönüyor.
-    const floorY = A.y + Math.round(A.h * 0.76 / PX) * PX;
-    blk(ctx, A.x, A.y, A.w, floorY - A.y, '#5b636c');
-    facade(ctx, A, A.y, Math.round(A.h * 0.14));
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, A.y, PX * 2, floorY - A.y, '#4d545c');
-    yardFloor(ctx, A, floorY);
+const BIZ_BASE = { x: SEAT_X };
+const FRIEND_BASE = { x: STAND_X, dir: -1 };
 
-    const doorX = A.x + Math.round(A.w * 0.20 / PX) * PX;
-    const doorW = Math.round(A.w * 0.44 / PX) * PX;
-    const doorTop = A.y + Math.round(A.h * 0.14 / PX) * PX;
-    const doorH = floorY - doorTop;
+// =================== KARELER ===================
 
-    // Kapı boşluğu: ardı karanlık
-    blk(ctx, doorX - PX * 5, doorTop - PX * 4, doorW + PX * 10, doorH + PX * 4, '#2b3138');
-    blk(ctx, doorX, doorTop, doorW, doorH, '#12161a');
-    blk(ctx, doorX, floorY - PX * 4, doorW, PX * 4, '#1c2126');
-
-    // Kapının ardında: arkadaş kola doğru gidiyor. Işık azalıyor, ne
-    // ısırılma ne dönüşüm görülüyor - yalnızca uzaklaşan bir siluet.
-    const back = easeIn(span(t, 0.05, 0.85));
-    const fx = gridLerp(doorX + doorW * 0.62, doorX + PX * 10, back);
-    glow(ctx, doorX + PX * 8, doorTop + doorH * 0.5, PX * 40, 'rgba(190,170,120,ALPHA)', 0.22 * (1 - back * 0.7));
-    drawFriend(ctx, fx, doorTop + doorH * 0.72, 'left', true, 6);
-
-    // Kapı iniyor
-    const closed = gridLerp(PX * 6, doorH, easeIn(t));
-    steelDoor(ctx, doorX, doorTop, doorW, closed);
-
-    // Biz: dışarıda, kapıya dönük, ön planda iri
-    drawTrainer(ctx, doorX + doorW + PX * 40, floorY + PX * 6, 'left', false, 9);
-
-    darken(ctx, easeIn(span(t, 0.6, 1)) * 0.3);
-    vignette(ctx, 0.55);
+// --- 1. HAREKETLİ: arkadaş kapıdan giriyor, bizimki gazeteyi indiriyor ---
+function homeEnter(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const walk = easeOut(span(t, 0.08, 0.85));
+    const lower = span(t, 0.55, 0.95);
+    const fx = lerp(DOOR_X, STAND_X, walk);
+    scene(ctx, cam, {
+        doorGlow: 1 - span(t, 0, 0.5),
+        biz: { ...BIZ_BASE, paperUp: 1 - lower },
+        friend: walk > 0.01 ? { ...FRIEND_BASE, x: fx } : null
+    });
 }
 
-// --- 6. Kapalı kapı ---
-function doorShut(ctx, A) {
-    // Bir önceki karenin aynı kadrajı, kapı tamamen inmiş hâli: değişen tek
-    // şey kapı ve önünde kalan tek kişi.
-    const floorY = A.y + Math.round(A.h * 0.76 / PX) * PX;
-    blk(ctx, A.x, A.y, A.w, floorY - A.y, '#4d545d');
-    facade(ctx, A, A.y, Math.round(A.h * 0.14));
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, A.y, PX * 2, floorY - A.y, '#434a52');
-    yardFloor(ctx, A, floorY);
+// --- 2. "Duydun mu, yeni bir virüs çıkmış." ---
+function homeAsk(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, talk: 1 },
+        friend: { ...FRIEND_BASE }
+    });
+}
 
-    const doorX = A.x + Math.round(A.w * 0.20 / PX) * PX;
-    const doorW = Math.round(A.w * 0.44 / PX) * PX;
-    const doorTop = A.y + Math.round(A.h * 0.14 / PX) * PX;
-    blk(ctx, doorX - PX * 5, doorTop - PX * 4, doorW + PX * 10, floorY - doorTop + PX * 4, '#2b3138');
-    steelDoor(ctx, doorX, doorTop, doorW, floorY - doorTop);
+// --- 3. "V-986 virüsünü mü diyorsun? Evet, duydum onu." ---
+function homeHeard(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0 },
+        friend: { ...FRIEND_BASE, armRaise: 0.4, talk: 1 }
+    });
+}
 
-    // Kapının önünde tek kişi: biz. Sırtı bize dönük, kapıya bakıyor.
-    drawTrainer(ctx, doorX + doorW / 2, floorY + PX * 12, 'up', false, 9);
+// --- 4. "Çok hızlı yayılıyormuş, aşısı da yokmuş." ---
+function homeDesc(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const raise = 0.4 + easeOut(span(t, 0, 0.6)) * 0.4;
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0 },
+        friend: { ...FRIEND_BASE, armRaise: raise, talk: 1 }
+    });
+}
 
-    darken(ctx, 0.3);
-    vignette(ctx, 0.7);
+// --- 5. "Belirtisi olmaması kötü yanı, ama önemli olabilir diye konuşuluyor." ---
+function homeWarn(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0 },
+        friend: { ...FRIEND_BASE, armRaise: 0.85, talk: 1 }
+    });
+}
+
+// --- 6. Bizimkinin önerisi: çalışmalıyız, uyarabilmeliyiz ---
+function homePropose(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const lean = easeOut(span(t, 0, 0.6)) * 0.4;
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, lean, talk: 1 },
+        friend: { ...FRIEND_BASE, armRaise: 0.1 }
+    });
+}
+
+// --- 7. "Katılıyorum." ---
+function homeAgree(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.4 },
+        friend: { ...FRIEND_BASE, armRaise: 0.2, talk: 1 }
+    });
+}
+
+// --- 8. "Fakat önce bir denek bulmalıyız." - balon BİLEREK kesildi ---
+function homeSubject(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.4 },
+        friend: { ...FRIEND_BASE, armRaise: 0.5, talk: 1 }
+    });
+}
+
+// --- 9. "İnsanları ikna etmek için... bir para ödülü koyabiliriz." ---
+function homeReward(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.4 },
+        friend: { ...FRIEND_BASE, armRaise: 0.75, talk: 1 }
+    });
+}
+
+// --- 10. Kapanış: "Sen bir denek bul, ben bilgi toplayayım." ---
+function homeClose(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.2, talk: 1 },
+        friend: { ...FRIEND_BASE, armRaise: 0.15 }
+    });
 }
 
 export const CHAPTER_4_ART = {
-    yardCalm,
-    fenceCrowd,
-    yardPlan,
-    breach,
-    doorClosing,
-    doorShut
+    homeEnter,
+    homeAsk,
+    homeHeard,
+    homeDesc,
+    homeWarn,
+    homePropose,
+    homeAgree,
+    homeSubject,
+    homeReward,
+    homeClose
 };

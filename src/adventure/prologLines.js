@@ -59,7 +59,55 @@ export const CLINIC_LOOK_A = [
     { speaker: 'doktor', text: 'Bir kameradan bu görüntü çıkmış.' }
 ];
 
-// --- Prolog 4: kuşatma ---
+// --- Prolog 4: ev ---
+//
+// Bizimki evde gazete okurken arkadaşı (= profesör, asla söylenmez) içeri
+// giriyor. Uzun bir sohbet - birden fazla balona bölünüyor, aralarda
+// düşünmesi/okunması için havada kalıyor.
+
+// Bizimki gazeteyi indirip soruyor
+export const HOME_ASK = [
+    { speaker: 'biz', text: 'Duydun mu, yeni bir virüs çıkmış.' }
+];
+
+// Arkadaş kapıdan içeri girerken
+export const HOME_HEARD = [
+    { speaker: 'arkadas', text: 'V-986 virüsünü mü diyorsun? Evet, duydum onu.' }
+];
+
+export const HOME_DESC = [
+    { speaker: 'arkadas', text: 'Çok hızlı yayılıyormuş, aşısı da yokmuş.' }
+];
+
+export const HOME_WARN = [
+    { speaker: 'arkadas', text: 'Belirtisi olmaması kötü yanı, ama önemli olabilir diye konuşuluyor.' }
+];
+
+// Bizimkinin önerisi
+export const HOME_PROPOSE = [
+    { speaker: 'biz', text: 'Bence işimiz gereği bu virüs üzerine biraz çalışmalıyız.' },
+    { speaker: 'biz', text: 'İleride bir belirti ortaya çıkarsa insanları uyarabilmeliyiz.' }
+];
+
+export const HOME_AGREE = [
+    { speaker: 'arkadas', text: 'Katılıyorum.' }
+];
+
+// Balon burada BİLEREK kesiliyor - kullanıcının işaret ettiği nokta
+export const HOME_SUBJECT = [
+    { speaker: 'arkadas', text: 'Fakat önce bir denek bulmalıyız.' }
+];
+
+export const HOME_REWARD = [
+    { speaker: 'arkadas', text: 'İnsanları ikna etmek için iş bitince bir de para ödülü koyabiliriz.' }
+];
+
+export const HOME_CLOSE = [
+    { speaker: 'biz', text: 'Peki, o zaman sen bir denek bul.' },
+    { speaker: 'biz', text: 'Ben de bu virüs hakkında edinebileceğim bilgileri toplayayım.' }
+];
+
+// --- Prolog 5: kuşatma ---
 
 // Virüslüler tel örgüye dayandığı an
 export const SIEGE_SPOTTED = [
@@ -85,7 +133,7 @@ export const SIEGE_CALL = [
     { speaker: 'biz', text: 'HEY nereye gidiyors-' }
 ];
 
-// --- Kanalizasyon (prolog 4 ile 5 arasında) ---
+// --- Kanalizasyon (prolog 5 ile 6 arasında) ---
 
 // Rögardan indik, koşu başlıyor
 export const SEWER_START = [
@@ -102,14 +150,14 @@ export const SEWER_EXIT = [
     { speaker: 'saglikli-1', text: 'Merdiven şurada, yukarı çıkıyoruz.' }
 ];
 
-// --- Prolog 5: şehrin kenarı ---
+// --- Prolog 6: şehrin kenarı ---
 
 // Rögar kapağından çıkınca
 export const CITY_HOPE = [
     { speaker: 'biz', text: 'Umarım o iyidir.' }
 ];
 
-// Prolog 3'te konuşandan BAŞKASI cevap veriyor
+// Kuşatmada konuşandan BAŞKASI cevap veriyor
 export const CITY_DOUBT = [
     { speaker: 'saglikli-1', text: 'Umarım öyledir fakat ben öyle olduğunu zannetmiyorum,' },
     { speaker: 'saglikli-1', text: 'sonuçta virüslerin arasında tek sağlıklı.' }

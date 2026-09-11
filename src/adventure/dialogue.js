@@ -106,5 +106,7 @@ export const VOICE_PITCH = {
     'saglikli-1': 0.92,
     'saglikli-2': 1.1,
     'saglikli-3': 0.86,
-    'saglikli-4': 1.3
+    'saglikli-4': 1.3,
+    doktor: 0.9,
+    hasta: 1.08
 };

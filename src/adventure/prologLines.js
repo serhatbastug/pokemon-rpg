@@ -23,7 +23,43 @@ export const LAB_LATE = [
     { speaker: 'profesor', text: 'Bugünlük bu kadar yeter, testleri daha sonra yaparım.' }
 ];
 
-// --- Prolog 3: çalışma alanı ---
+// --- Prolog 3: sağlık ocağı ---
+//
+// Doktor ve hasta. Doktorun bildiği her şey burada söyleniyor - virüsün
+// gerçek kaynağını KENDİSİ de bilmiyor, "araştırılıyor" dışında bir şey
+// söylemiyor.
+
+// Ekrandaki tahlile bakarken
+export const CLINIC_RESULT = [
+    { speaker: 'doktor', text: 'Tahlillerinde bir şey çıktı.' },
+    { speaker: 'doktor', text: 'Yeni bir virüs. Adını V-986 koymuşlar.' }
+];
+
+// Doktor ekrandaki grafiği gösteriyor
+export const CLINIC_DETAILS = [
+    { speaker: 'doktor', text: 'Çok hızlı yayılıyor ve şu ana kadar aşısı yok.' },
+    { speaker: 'doktor', text: 'En kötüsü de hiçbir belirti vermiyor.' }
+];
+
+// Hasta doğal olarak soruyor
+export const CLINIC_ORIGIN_Q = [
+    { speaker: 'hasta', text: 'Nereden çıktı bu? Bana nasıl bulaştı?' }
+];
+
+export const CLINIC_ORIGIN_A = [
+    { speaker: 'doktor', text: 'Henüz bilinmiyor. Hala araştırılıyor.' }
+];
+
+export const CLINIC_LOOK_Q = [
+    { speaker: 'hasta', text: 'Peki neye benziyor?' }
+];
+
+// Doktor çıktıyı uzatırken
+export const CLINIC_LOOK_A = [
+    { speaker: 'doktor', text: 'Bir kameradan bu görüntü çıkmış.' }
+];
+
+// --- Prolog 4: kuşatma ---
 
 // Virüslüler tel örgüye dayandığı an
 export const SIEGE_SPOTTED = [
@@ -49,7 +85,7 @@ export const SIEGE_CALL = [
     { speaker: 'biz', text: 'HEY nereye gidiyors-' }
 ];
 
-// --- Kanalizasyon (prolog 3 ile 4 arasında) ---
+// --- Kanalizasyon (prolog 4 ile 5 arasında) ---
 
 // Rögardan indik, koşu başlıyor
 export const SEWER_START = [
@@ -66,7 +102,7 @@ export const SEWER_EXIT = [
     { speaker: 'saglikli-1', text: 'Merdiven şurada, yukarı çıkıyoruz.' }
 ];
 
-// --- Prolog 4: şehrin kenarı ---
+// --- Prolog 5: şehrin kenarı ---
 
 // Rögar kapağından çıkınca
 export const CITY_HOPE = [

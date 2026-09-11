@@ -202,11 +202,11 @@ async function main() {
     });
     check('Hareketli kare canlaniyor', motion.erken < 1 && motion.gec === 1, JSON.stringify(motion));
 
-    // Dört bölümün de karesi var. Sayı bölüme göre değişiyor: 2. bölüm
+    // Beş bölümün de karesi var. Sayı bölüme göre değişiyor: 2. bölüm
     // (cadde) bilerek TEK KARE - her şey tek kadrajda kesintisiz akıyor.
     const chapters = await page.evaluate(() => {
         const p = window.__comic.player;
-        return [1, 2, 3, 4].map(n => p.panels.filter(x => x.chapter === n).length);
+        return [1, 2, 3, 4, 5].map(n => p.panels.filter(x => x.chapter === n).length);
     });
     check('Her bolumun basliktan sonra karesi var', chapters.every(n => n >= 2), chapters.join(','));
 

@@ -1,304 +1,437 @@
-// 3. BÖLÜM - KUŞATMA
+// 3. BÖLÜM - SAĞLIK OCAĞI
 //
-// Tesis avlusunun İÇİNDEYİZ. Bizim dışımızda TAM BEŞ sağlıklı - bu sayı
-// 4. bölümde de tutuyor. Virüslüler tel örgüye dayanıyor, sağlıklıları acil
-// çıkıştan geçiriyoruz, en son biz geçiyoruz.
+// Doktorun muayene odası. Bölüm TEK ÇEKİM: hasta solda, doktor sağda, aralarında
+// masa ve monitör. Kamera hiç kıpırdamıyor - TEK İSTİSNA son kare, doktorun
+// uzattığı çıktıya doğru yavaşça yaklaşıyor.
 //
-// ARKADAŞIN DÖNÜŞÜ GÖSTERİLMİYOR: ne ısırılma, ne dönüşüm, ne kolun çekilip
-// çekilmediği. Çelik kapı iniyor, cümle ortasında kesiliyor, o kadar. Ayıran
-// şey kapının kendisi; belirsizlik bilerek bırakılıyor.
+// Doktorun bildiği her şey burada söyleniyor: yeni bir virüs (V-986), hızlı
+// yayılıyor, aşısı yok, belirti vermiyor. "Nereden, nasıl" sorusuna tek
+// cevabı "araştırılıyor" - kendisi de bilmiyor, bu yüzden EKRANDA hiçbir
+// açıklama yok.
+//
+// SON KAREDEKİ FOTOĞRAF: caddede mazgaldan çıkış anı (bkz. chapter2.js
+// `street`, t küçükken). Bir sokak kamerası rastlantıyla yakalamış - fotoğraf
+// gri/soluk, GÜVENLİK KAMERASI çekimi gibi; ne doktor ne hasta ne olduğunu
+// çözebiliyor, okuyucu tanıyor.
 
-import { PX, blk, hash } from '../../pixel/pixelDraw.js';
-import { drawTrainer } from '../../world/trainerSprite.js';
-import { drawFriend, drawSurvivor } from '../../adventure/people.js';
+import { PX, hash } from '../../pixel/pixelDraw.js';
 import {
-    fill, vignette, darken, glow, bands, mix, limb,
-    span, easeOut, easeIn, gridLerp
+    createCam, vignette, mix, ellipseCells,
+    span, clamp01, easeOut, lerp
 } from '../comicKit.js';
 
-const CONCRETE = ['#6e7278', '#787c83', '#63676d', '#585c62'];
+// --- Sahnenin ölçüleri (hücre) ---
+// 232x122: WIDE kamerada bir hücre PX, kadrajı birebir dolduruyor (bkz.
+// chapter1.js / chapter2.js aynı kural).
 
-// Beton avlu: dökme plakalar ve derzler (3. bölümün zemini)
-function yardFloor(ctx, A, top) {
-    for (let y = top; y < A.y + A.h; y += PX) {
-        for (let x = A.x; x < A.x + A.w; x += PX) {
-            const slabX = Math.floor(x / (PX * 22));
-            const slabY = Math.floor(y / (PX * 16));
-            let tone = CONCRETE[Math.floor(hash(slabX, slabY, 11) * CONCRETE.length)];
-            if (hash(x, y, 13) < 0.10) tone = CONCRETE[Math.floor(hash(x, y, 17) * CONCRETE.length)];
-            if (x % (PX * 22) === 0 || y % (PX * 16) === 0) tone = '#4e5258';
-            blk(ctx, x, y, PX, PX, tone);
+const SCENE = { w: 232, h: 122 };
+const WIDE = { u: PX, cx: SCENE.w / 2, cy: SCENE.h / 2 };
+
+const CEIL_H = 8;
+const FLOOR_Y = 100;
+
+const PAT_X = 56;          // hasta: solda, kameraya yakın
+const DOC_X = 190;         // doktor: sağda, masanın ardında
+const SEAT_Y = 82;         // her iki sandalyenin oturma yüksekliği
+
+const DESK = { x: 104, y: 76, w: 64, h: 4 };
+const MON = { x: 122, y: 52, w: 26, h: 22 };     // monitör ekranı
+const FOLDER = { x: 152, y: 70, w: 14, h: 8 };   // doktorun elindeki dosya
+
+// Çıktının SON hâli: doktorun hastaya doğru tuttuğu, kameranın son karede
+// yaklaştığı yer. Fotoğrafın İÇERİĞİ bu kutuya GÖRELİ konumlarla çiziliyor,
+// böylece hem masadan çıkarken (küçük, kayarak) hem yakınlaşırken (büyük,
+// sabit) aynı çizim işini görüyor.
+const PHOTO_HELD = { x: 140, y: 46, w: 34, h: 24 };
+const CLOSE = { u: PX * 4.5, cx: PHOTO_HELD.x + PHOTO_HELD.w / 2, cy: PHOTO_HELD.y + PHOTO_HELD.h / 2 };
+
+// --- Renkler ---
+
+const WALL = '#7c93a0';
+const WALL_SEAM = '#657f8d';
+const WALL_TRIM = '#5b7280';
+const FLOOR_TONE = '#8f8a7a';
+const FLOOR_SEAM = '#7c7768';
+
+const DOC_COAT = '#eef1f2';
+const DOC_COAT_SHADE = '#c6cfd3';
+const PAT_COAT = '#4c5b52';
+const PAT_COAT_SHADE = '#333f38';
+const DOC_SKIN = '#c9a074';
+const PAT_SKIN = '#a8825f';
+const DOC_HAIR = '#3a2a1c';
+const PAT_HAIR = '#241f1b';
+const TROUSER = '#333a33';
+
+// Hücre düzleminde kalın çapraz çizgi: kol, bacak
+function limbCells(ctx, cam, x0, y0, x1, y1, thick, color) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));
+    for (let i = 0; i <= steps; i++) {
+        const k = i / steps;
+        cam.rect(ctx, x0 + dx * k - thick / 2, y0 + dy * k - thick / 2, thick, thick, color);
+    }
+}
+
+// --- Odanın parçaları ---
+
+function walls(ctx, cam) {
+    cam.rect(ctx, 0, 0, SCENE.w, CEIL_H, '#3c4750');
+    cam.rect(ctx, 0, CEIL_H, SCENE.w, FLOOR_Y - CEIL_H, WALL);
+    for (let y = CEIL_H; y < FLOOR_Y; y += 11) cam.rect(ctx, 0, y, SCENE.w, 1, WALL_SEAM);
+    cam.rect(ctx, 0, FLOOR_Y - 10, SCENE.w, 2, WALL_TRIM);
+
+    cam.rect(ctx, 0, FLOOR_Y, SCENE.w, SCENE.h - FLOOR_Y, FLOOR_TONE);
+    cam.rect(ctx, 0, FLOOR_Y, SCENE.w, 1, '#655f52');
+    for (let x = 0; x < SCENE.w; x += 14) cam.rect(ctx, x, FLOOR_Y, 1, SCENE.h - FLOOR_Y, FLOOR_SEAM);
+    for (let x = 0; x < SCENE.w; x += 3) {
+        for (let y = CEIL_H; y < FLOOR_Y; y += 3) {
+            if (hash(x, y, 5) > 0.965) cam.rect(ctx, x, y, 2, 1, '#6f8794');
         }
     }
 }
 
-// Tesis cephesi ve üstteki ACİL ÇIKIŞ kapısı
-function facade(ctx, A, top, h) {
-    blk(ctx, A.x, top, A.w, h, '#6c7078');
-    blk(ctx, A.x, top, A.w, PX * 2, '#858a92');
-    for (let x = A.x; x < A.x + A.w; x += PX * 26) blk(ctx, x, top, PX * 2, h, '#5a5f66');
-    for (let x = A.x + PX * 8; x < A.x + A.w - PX * 10; x += PX * 26) {
-        blk(ctx, x, top + PX * 6, PX * 12, PX * 8, '#3b4149');
-        blk(ctx, x, top + PX * 6, PX * 12, PX, '#8d939b');
+// Pencere: hastanın arkasında, sabah ışığı içeri vuruyor
+function window_(ctx, cam) {
+    const x = 20, y = 16, w = 30, h = 28;
+    cam.rect(ctx, x - 2, y - 2, w + 4, h + 4, WALL_TRIM);
+    cam.rect(ctx, x, y, w, h, '#cfe0e6');
+    cam.rect(ctx, x, y, w, h * 0.55, '#e8f0ee');
+    cam.rect(ctx, x + w / 2 - 1, y, 2, h, WALL_TRIM);
+    cam.rect(ctx, x, y + h / 2 - 1, w, 2, WALL_TRIM);
+    cam.glow(ctx, x + w * 0.3, y + h * 0.35, 26, 'rgba(255,250,225,ALPHA)', 0.16);
+}
+
+// Göz testi tablosu: satırlar harf değil, aşağı indikçe daralan çizgiler -
+// hiçbir yakınlıkta okunmuyor (ch1'deki notla aynı kural)
+function eyeChart(ctx, cam) {
+    const x = 96, y = 18, w = 18, h = 30;
+    cam.rect(ctx, x - 1, y - 1, w + 2, h + 2, WALL_TRIM);
+    cam.rect(ctx, x, y, w, h, '#eceadd');
+    for (let row = 0; row < 6; row++) {
+        const ly = y + 3 + row * 4.4;
+        const lw = Math.max(2, w - 4 - row * 2.4);
+        cam.rect(ctx, x + (w - lw) / 2, ly, lw, 2, '#333a33');
     }
 }
 
-// Tel örgü: yüksek kontrastlı desen dama tahtasına dönüyor, o yüzden seyrek
-function chainFence(ctx, A, top, h) {
-    for (let x = A.x; x < A.x + A.w; x += PX * 4) blk(ctx, x, top, PX, h, '#8b939b');
-    for (let y = top; y < top + h; y += PX * 4) blk(ctx, A.x, y, A.w, PX, '#7b838b');
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, top - PX * 2, PX * 3, h + PX * 2, '#4d545b');
-    blk(ctx, A.x, top - PX * 2, A.w, PX * 2, '#4d545b');
+// Kırmızı artı işareti: doktorun arkasında
+function crossSign(ctx, cam) {
+    const x = 202, y = 20, w = 14, h = 14;
+    cam.rect(ctx, x - 1, y - 1, w + 2, h + 2, WALL_TRIM);
+    cam.rect(ctx, x, y, w, h, '#f4f1e4');
+    cam.rect(ctx, x + w * 0.36, y + 2, w * 0.28, h - 4, '#a8412f');
+    cam.rect(ctx, x + 2, y + h * 0.36, w - 4, h * 0.28, '#a8412f');
 }
 
-// Örgünün ardındaki kalabalık: düzenli aralık çit gibi duruyor, bu yüzden
-// aralık/boy rastgele ve siluetler üst üste biniyor
-function crowd(ctx, A, baseY, count = 26) {
-    for (let i = 0; i < count; i++) {
-        const x = A.x + (i / count) * A.w + (hash(i, 3, 5) - 0.5) * PX * 8;
-        const h = PX * (26 + Math.floor(hash(i, 7, 2) * 12));
-        const w = PX * (8 + Math.floor(hash(i, 5, 9) * 3));
-        const tone = mix('#26400d', '#537f22', hash(i, 11, 4));
-        blk(ctx, x, baseY - h, w, h, tone);
-        blk(ctx, x + PX, baseY - h - PX * 6, w - PX * 2, PX * 6, mix('#456f19', '#3d6317', hash(i, 2, 8)));
+// Masa ve üstündeki monitör
+function desk(ctx, cam) {
+    cam.rect(ctx, DESK.x, DESK.y, DESK.w, DESK.h, '#c7cdd0');
+    cam.rect(ctx, DESK.x, DESK.y, DESK.w, 1, '#e2e7e9');
+    cam.rect(ctx, DESK.x, DESK.y + DESK.h, DESK.w, FLOOR_Y - DESK.y - DESK.h, '#8b959b');
+    cam.rect(ctx, DESK.x, DESK.y + DESK.h, DESK.w, 1, '#6f797f');
+}
+
+// Monitör: kan tahlili ekranı. wave dalgalı bir çizgi (soyut - hiçbir yazı
+// yok), dot sağ üstte yanıp sönen küçük bir uyarı.
+function monitor(ctx, cam, t) {
+    const { x, y, w, h } = MON;
+    cam.rect(ctx, x + w / 2 - 2, DESK.y - 2, 4, 2, '#8b959b');       // stand
+    cam.rect(ctx, x - 2, y - 2, w + 4, h + 4, '#2c3238');
+    cam.rect(ctx, x, y, w, h, '#12181c');
+
+    for (let i = 0; i <= 20; i++) {
+        const k = i / 20;
+        const wx = x + 1 + k * (w - 2);
+        const wy = y + h * 0.62 + Math.sin(k * 11 + t * 3) * h * 0.16 * Math.max(0.2, Math.sin(k * 4));
+        cam.rect(ctx, wx, wy, 1.3, 1.3, '#c9463a');
+    }
+    for (let gy = y + 3; gy < y + h - 2; gy += 5) cam.rect(ctx, x + 1, gy, w - 2, 0.5, '#1e262c');
+
+    if (Math.floor(t * 2) % 2 === 0) cam.rect(ctx, x + w - 4, y + 2, 2.2, 2.2, '#c9463a');
+}
+
+// Doktorun elindeki dosya: kapalı, fotoğraf ondan çıkıyor
+function folder(ctx, cam) {
+    cam.rect(ctx, FOLDER.x, FOLDER.y, FOLDER.w, FOLDER.h, '#8a6a3a');
+    cam.rect(ctx, FOLDER.x, FOLDER.y, FOLDER.w, 1, '#a68448');
+    cam.rect(ctx, FOLDER.x + 1, FOLDER.y - 1, FOLDER.w - 4, 1, '#d8d3c2');
+}
+
+// --- Oturan insan ---
+//
+// Basit ama yüzlü: gözler, kaş, burun, ağız. dir = bakılan/oturulan yön
+// (+1 sağa, -1 sola). headDown: ekrana/kağıda bakış. headTurn: karşıdaki
+// kişiye dönüş. lean: öne eğilme. armRaise: jest yapan kolun kalkışı.
+// holdsPhoto: true ise jest kolu PHOTO_HELD'e uzanıyor.
+function seatedPerson(ctx, cam, p) {
+    const {
+        x, dir, headDown = 0, headTurn = 0.6, lean = 0, armRaise = 0, shrug = 0,
+        holdsPhoto = false, coat, coatShade, skin, hair
+    } = p;
+    const skinShade = mix(skin, '#000000', 0.28);
+    const mouth = mix(skin, '#7a3f38', 0.45);
+    const hipX = x + dir * lean * 2;
+
+    // --- Bacaklar: kalçadan öne, dizden aşağı ---
+    for (const s of [-1, 1]) {
+        const kx = hipX + dir * 13;
+        const ky = SEAT_Y + s * 1.2;
+        const fx = kx;
+        const fy = FLOOR_Y - 1;
+        limbCells(ctx, cam, hipX + s * 2, SEAT_Y, kx, ky, 4.4, TROUSER);
+        limbCells(ctx, cam, kx, ky, fx, fy, 4, TROUSER);
+        cam.rect(ctx, fx - 2, fy - 1, 5 + dir * 2, 2, '#1d2126');
+    }
+
+    // --- Sandalye: ayak seviyesinde basit bir tabure ---
+    cam.rect(ctx, hipX - 9, SEAT_Y + 1, 18, 2, '#5b6268');
+    cam.rect(ctx, hipX - 8, SEAT_Y + 3, 2, FLOOR_Y - SEAT_Y - 3, '#454b51');
+    cam.rect(ctx, hipX + 6, SEAT_Y + 3, 2, FLOOR_Y - SEAT_Y - 3, '#454b51');
+
+    // --- Gövde ---
+    const torsoH = 28 - shrug * 1.5;
+    const shoulderY = SEAT_Y - torsoH;
+    const coatW = 21;
+    cam.rect(ctx, hipX - coatW / 2, shoulderY, coatW, torsoH, coat);
+    cam.rect(ctx, hipX - coatW / 2, shoulderY, coatW * 0.26, torsoH, mix(coat, '#ffffff', 0.14));
+    cam.rect(ctx, hipX + coatW * 0.24, shoulderY, coatW * 0.22, torsoH, coatShade);
+    cam.rect(ctx, hipX - 1.4, shoulderY + 2, 2.8, torsoH - 4, coatShade);
+
+    // --- Kollar ---
+    const idleSide = -dir;
+    const idleSx = hipX + idleSide * coatW * 0.42;
+    const idleSy = shoulderY + 2;
+    limbCells(ctx, cam, idleSx, idleSy, idleSx + idleSide * 2, idleSy + torsoH * 0.55, 3.6, coat);
+    limbCells(ctx, cam, idleSx + idleSide * 2, idleSy + torsoH * 0.55, hipX + idleSide * 5, SEAT_Y - 3, 3.2, coat);
+    cam.rect(ctx, hipX + idleSide * 6, SEAT_Y - 5, 4, 3.4, skin);
+
+    const gestSx = hipX + dir * coatW * 0.42;
+    const gestSy = shoulderY + 2 - shrug * 3;
+    let handX, handY;
+    if (holdsPhoto) {
+        handX = lerp(gestSx, PHOTO_HELD.x + PHOTO_HELD.w * 0.14, armRaise);
+        handY = lerp(gestSy + torsoH * 0.5, PHOTO_HELD.y + PHOTO_HELD.h * 0.9, armRaise);
+    } else {
+        handX = lerp(gestSx + dir * 3, hipX + dir * 24, armRaise * 0.6);
+        handY = lerp(gestSy + torsoH * 0.5, shoulderY - 2 - shrug * 2, armRaise);
+    }
+    const elbowX = lerp(gestSx, (gestSx + handX) / 2, 0.6);
+    const elbowY = lerp(gestSy + torsoH * 0.3, (gestSy + handY) / 2, 0.6);
+    limbCells(ctx, cam, gestSx, gestSy, elbowX, elbowY, 3.6, coat);
+    limbCells(ctx, cam, elbowX, elbowY, handX, handY, 3.2, coat);
+    cam.rect(ctx, handX - 2, handY - 1.7, 4, 3.4, skin);
+
+    // --- Boyun ve kafa ---
+    const faceShift = dir * headTurn * 3.2;
+    const hx = hipX + faceShift;
+    const hy = shoulderY - 12 + headDown * 3.4;
+    const headW = 12.5, headH = 13;
+    cam.rect(ctx, hipX - 2.6, shoulderY - 3, 5.2, 4, skinShade);
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
+    cam.rect(ctx, hx - headW / 2, hy, headW * 0.26, headH, skinShade);
+    cam.rect(ctx, hx + headW * 0.5 - 1, hy + headH * 0.42, 1.4, headH * 0.2, skinShade);
+
+    const eyeY = hy + headH * (0.48 + headDown * 0.1);
+    const eyeW = 2.2, eyeH = 1.5, gap = 2.4;
+    const fx = dir * headTurn * 1.6;
+    for (const s of [-1, 1]) {
+        cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY - eyeH * 1.6, eyeW * 1.15, eyeH * 0.6, hair);
+        cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY, eyeW, eyeH * (1 - headDown * 0.4), '#20242a');
+    }
+    cam.rect(ctx, hx + fx + dir * 1.2, eyeY + eyeH * 1.3, eyeW * 0.7, eyeH * 1.1, skinShade);
+    cam.rect(ctx, hx + fx - 1.6, eyeY + eyeH * 3.1, 3.4, eyeH * 0.8, mouth);
+
+    cam.rect(ctx, hx - headW / 2 - 0.6, hy - 1.2, headW + 1.2, headH * 0.38, hair);
+    cam.rect(ctx, hx - dir * headW * 0.5, hy + headH * 0.18, headW * 0.2, headH * 0.42, hair);
+
+    if (p.glasses) {
+        for (const s of [-1, 1]) {
+            cam.rect(ctx, hx + fx + s * gap - eyeW * 0.8, eyeY - 0.6, eyeW * 1.6, eyeH * 1.5, 'rgba(230,235,238,0.28)');
+        }
+        cam.rect(ctx, hx + fx - gap * 0.4, eyeY, gap * 0.8, 0.6, '#2c3238');
+    }
+    if (p.stetho) {
+        const nx = hipX, ny = shoulderY + 3;
+        limbCells(ctx, cam, nx - 3, ny, nx - 4, ny + 8, 1.3, '#2b2f33');
+        limbCells(ctx, cam, nx + 3, ny, nx + 4, ny + 8, 1.3, '#2b2f33');
+        cam.rect(ctx, nx - 5, ny + 7, 2.4, 2.4, '#8b939b');
     }
 }
 
-// İnen çelik kapı
-function steelDoor(ctx, x, y, w, closed) {
-    const h = Math.max(PX, closed);
-    blk(ctx, x - PX * 3, y - PX * 4, w + PX * 6, PX * 4, '#3a4149');
-    blk(ctx, x, y, w, h, '#8a929c');
-    for (let ly = y; ly < y + h; ly += PX * 6) blk(ctx, x, ly, w, PX * 2, '#5f6873');
-    blk(ctx, x, y + h - PX * 2, w, PX * 2, '#3a4149');
-    // Uyarı şeridi
-    for (let sx = x; sx < x + w; sx += PX * 8) blk(ctx, sx, y + h - PX * 6, PX * 4, PX * 4, '#c9a227');
-}
+// --- Fotoğraf: caddedeki mazgaldan çıkış anı, güvenlik kamerası griliğinde ---
+//
+// Kutunun içindeki her şey box'a GÖRELİ (0..1) veriliyor: aynı çizim hem
+// masadan çıkarken (küçük) hem yakınlaşırken (büyük) doğru oranda duruyor.
+function photoContent(ctx, cam, box, t) {
+    const at = (fx, fy) => [box.x + fx * box.w, box.y + fy * box.h];
 
-// --- 1. Avlu, sakin: altı kişi iş başında ---
-function yardCalm(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.22), '#7d8794', '#9aa4b0', 5);
-    const fenceTop = A.y + Math.round(A.h * 0.16 / PX) * PX;
-    const yardTop = A.y + Math.round(A.h * 0.46 / PX) * PX;
+    cam.rect(ctx, box.x - 1.4, box.y - 1.4, box.w + 2.8, box.h + 2.8, '#d8d3c2');
+    cam.rect(ctx, box.x, box.y, box.w, box.h, '#5c6167');
 
-    facade(ctx, A, A.y, Math.round(A.h * 0.16));
-    chainFence(ctx, A, fenceTop, yardTop - fenceTop);
-    yardFloor(ctx, A, yardTop);
+    // Kaldırım/yol ayrımı - chapter2'deki `street` ile aynı tonlar
+    const [rx, ry] = at(0, 0.62);
+    cam.rect(ctx, rx, ry, box.w, box.h * 0.38, '#4e535a');
+    const [sx, sy] = at(0, 0);
+    cam.rect(ctx, sx, sy, box.w, box.h * 0.62, '#8a9098');
 
-    // Solda jeneratör ve acil durum kolu, aralarında kablo
-    const gx = A.x + PX * 10;
-    blk(ctx, gx, yardTop - PX * 22, PX * 30, PX * 22, '#4a5158');
-    blk(ctx, gx, yardTop - PX * 22, PX * 30, PX * 2, '#626a72');
-    blk(ctx, gx + PX * 6, yardTop - PX * 16, PX * 8, PX * 6, '#2d333a');
-    const lx = gx + PX * 46;
-    blk(ctx, lx, yardTop - PX * 16, PX * 5, PX * 16, '#3f464d');
-    blk(ctx, lx - PX * 3, yardTop - PX * 22, PX * 4, PX * 8, '#b04a3a');
-    limb(ctx, gx + PX * 30, yardTop - PX * 4, lx, yardTop - PX * 4, PX * 2, '#23282d');
-
-    // Sağda gözetleme kulesi ve rögar
-    const tx = A.x + A.w - PX * 40;
-    blk(ctx, tx, A.y + PX * 6, PX * 6, yardTop - A.y + PX * 10, '#555c63');
-    blk(ctx, tx + PX * 18, A.y + PX * 6, PX * 6, yardTop - A.y + PX * 10, '#555c63');
-    blk(ctx, tx - PX * 4, A.y + PX * 2, PX * 32, PX * 8, '#454c53');
-    const mhx = A.x + A.w - PX * 30;
-    blk(ctx, mhx, A.y + A.h - PX * 22, PX * 18, PX * 8, '#4b545c');
-    blk(ctx, mhx + PX * 2, A.y + A.h - PX * 20, PX * 14, PX * 4, '#5c666e');
-
-    // Sandıklar
-    for (let i = 0; i < 3; i++) {
-        const cx = A.x + PX * 92 + i * PX * 22;
-        blk(ctx, cx, yardTop + PX * 6, PX * 18, PX * 14, '#7a5a34');
-        blk(ctx, cx, yardTop + PX * 6, PX * 18, PX * 2, '#96703f');
-        blk(ctx, cx + PX * 7, yardTop + PX * 6, PX * 4, PX * 14, '#5f4728');
-    }
-
-    // Altı kişi: biz + BEŞ sağlıklı
-    drawSurvivor(ctx, A.x + PX * 40, yardTop + PX * 34, 'down', false, 6, 0);
-    drawSurvivor(ctx, A.x + PX * 74, yardTop + PX * 26, 'right', false, 6, 1);
-    drawSurvivor(ctx, A.x + PX * 150, yardTop + PX * 40, 'left', false, 6, 2);
-    drawSurvivor(ctx, A.x + PX * 186, yardTop + PX * 22, 'down', false, 6, 3);
-    drawSurvivor(ctx, A.x + PX * 120, yardTop + PX * 14, 'up', false, 6, 4);
-    drawFriend(ctx, A.x + PX * 62, yardTop + PX * 52, 'down', false, 6);
-    drawTrainer(ctx, A.x + PX * 106, yardTop + PX * 50, 'down', false, 6);
-
-    vignette(ctx, 0.4);
-}
-
-// --- 2. Örgüye dayanan kalabalık ---
-function fenceCrowd(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.30), '#6f7885', '#8e97a3', 5);
-    const fenceTop = A.y + PX * 10;
-    const yardTop = A.y + Math.round(A.h * 0.62 / PX) * PX;
-
-    crowd(ctx, A, yardTop - PX * 6, 30);
-    chainFence(ctx, A, fenceTop, yardTop - fenceTop);
-    yardFloor(ctx, A, yardTop);
-
-    // Örgüyü iten eller: parmakları teller arasından geçiyor
-    for (let i = 0; i < 7; i++) {
-        const hx = A.x + PX * 20 + i * PX * 32 + Math.floor(hash(i, 4, 6) * PX * 10);
-        const hy = yardTop - PX * (30 + Math.floor(hash(i, 8, 3) * 16));
-        blk(ctx, hx, hy, PX * 7, PX * 5, '#537f22');
-        for (let f = 0; f < 3; f++) blk(ctx, hx + f * PX * 3, hy - PX * 3, PX * 2, PX * 3, '#5e8f28');
-    }
-
-    // Arkadaş: örgüye bakıyor, kolunda bant
-    drawFriend(ctx, 300, 396, 'up', false, 7);
-    drawTrainer(ctx, 470, 420, 'up', false, 7);
-
-    darken(ctx, 0.12);
-    vignette(ctx, 0.5);
-}
-
-// --- 3. Plan: ormana kaçıyoruz ---
-function yardPlan(ctx, A) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.26), '#67707d', '#89929e', 5);
-    const yardTop = A.y + Math.round(A.h * 0.40 / PX) * PX;
-    facade(ctx, A, A.y, Math.round(A.h * 0.26));
-    yardFloor(ctx, A, yardTop);
-
-    // Üstte ACİL ÇIKIŞ: açık, ışığı yanıyor
-    const doorX = A.x + Math.round(A.w * 0.44 / PX) * PX;
-    const doorW = PX * 40;
-    const doorTop = A.y + Math.round(A.h * 0.26 / PX) * PX - PX * 30;
-    blk(ctx, doorX - PX * 3, doorTop, doorW + PX * 6, PX * 32, '#3a4149');
-    blk(ctx, doorX, doorTop + PX * 2, doorW, PX * 28, '#2a3038');
-    blk(ctx, doorX + PX * 4, doorTop + PX * 6, doorW - PX * 8, PX * 20, '#c7d2a8');
-    glow(ctx, doorX + doorW / 2, doorTop + PX * 16, PX * 40, 'rgba(200,220,160,ALPHA)', 0.22);
-
-    // Biz: elimizde parçalayıcı silah
-    drawTrainer(ctx, 380, 392, 'right', false, 7);
-    blk(ctx, 412, 384, PX * 12, PX * 4, '#3c434a');
-    blk(ctx, 424, 386, PX * 5, PX * 2, '#22272c');
-
-    // Cevap veren sağlıklı ve arkasındaki diğerleri
-    drawSurvivor(ctx, 720, 402, 'left', false, 7, 0);
-    drawSurvivor(ctx, 800, 380, 'left', false, 6, 1);
-    drawSurvivor(ctx, 856, 404, 'down', false, 6, 2);
-    drawSurvivor(ctx, 640, 370, 'down', false, 6, 3);
-    drawFriend(ctx, 560, 412, 'right', false, 6);
-
-    vignette(ctx, 0.45);
-}
-
-// --- 4. HAREKETLİ: yarıktan içeri doluyorlar ---
-function breach(ctx, A, t) {
-    bands(ctx, A.x, A.y, A.w, Math.round(A.h * 0.24), '#5c6470', '#7c8593', 5);
-    const yardTop = A.y + Math.round(A.h * 0.38 / PX) * PX;
-    facade(ctx, A, A.y, Math.round(A.h * 0.24));
-    yardFloor(ctx, A, yardTop);
-
-    // Soldaki yarık: örgü yırtılmış
-    blk(ctx, A.x, yardTop - PX * 34, PX * 40, PX * 34, '#3f464e');
-    for (let i = 0; i < 6; i++) {
-        limb(ctx, A.x + PX * 34, yardTop - PX * (30 - i * 5), A.x + PX * (18 + i * 3), yardTop - PX * (34 - i * 6), PX * 2, '#98a1a9');
-    }
-
-    // İçeri girenler: soldan sağa ilerliyorlar
-    const march = easeOut(t);
-    for (let i = 0; i < 7; i++) {
-        const lead = hash(i, 3, 2);
-        const x = A.x + PX * 10 + march * (PX * 70 + lead * PX * 60) + i * PX * 12;
-        const y = yardTop + PX * 10 + Math.floor(hash(i, 9, 4) * PX * 26);
-        const h = PX * 30;
-        blk(ctx, x, y - h, PX * 10, h, mix('#26400d', '#537f22', lead));
-        blk(ctx, x + PX, y - h - PX * 7, PX * 8, PX * 7, '#456f19');
-        // Vurulanın yerinde kalıcı yeşil leke
-        if (t > 0.5 && lead > 0.6) {
-            blk(ctx, x - PX * 4, y, PX * 16, PX * 3, '#3d7522');
+    // Tanelenme: eski güvenlik kamerası çekimi
+    for (let gx = 0; gx < box.w; gx += 1) {
+        for (let gy = 0; gy < box.h; gy += 1) {
+            if (hash(gx, gy, 31) > 0.95) {
+                const [nx, ny] = at(gx / box.w, gy / box.h);
+                cam.rect(ctx, nx, ny, 1, 1, hash(gx, gy, 37) > 0.5 ? '#efece0' : '#33383e');
+            }
         }
     }
 
-    // Üstteki acil çıkış: sağlıklılar sırayla geçiyor
-    const doorX = A.x + Math.round(A.w * 0.56 / PX) * PX;
-    blk(ctx, doorX - PX * 3, A.y + PX * 30, PX * 46, PX * 30, '#3a4149');
-    blk(ctx, doorX, A.y + PX * 32, PX * 40, PX * 26, '#c7d2a8');
-    const passed = Math.floor(span(t, 0.1, 0.9) * 5);
-    for (let i = passed; i < 5; i++) {
-        drawSurvivor(ctx, doorX + PX * 20 + (i - passed) * PX * 4, yardTop + PX * 26 + (i - passed) * PX * 16, 'up', true, 6, i);
+    // Mazgal: kütlenin çıktığı yer - genişçe, açıkça görünür
+    const [gx0, gy0] = at(0.24, 0.60);
+    cam.rect(ctx, gx0, gy0, box.w * 0.42, box.h * 0.14, '#0e1114');
+    cam.rect(ctx, gx0 + box.w * 0.02, gy0 + box.h * 0.02, box.w * 0.38, box.h * 0.10, '#181c20');
+    for (let i = 0; i < 4; i++) {
+        cam.rect(ctx, gx0 + box.w * 0.02 + i * box.w * 0.1, gy0 + box.h * 0.02, box.w * 0.01, box.h * 0.10, '#0a0c0e');
     }
 
-    // Biz: kapıyı tutuyoruz, ateş ediyoruz
-    const px = doorX - PX * 26;
-    const py = yardTop + PX * 30;
-    drawTrainer(ctx, px, py, 'left', false, 7);
-    const flash = Math.sin(t * 40) > 0.4;
-    blk(ctx, px - PX * 14, py - PX * 4, PX * 12, PX * 4, '#3c434a');
-    if (flash) {
-        glow(ctx, px - PX * 18, py - PX * 2, PX * 20, 'rgba(255,240,180,ALPHA)', 0.6);
-        blk(ctx, px - PX * 20, py - PX * 5, PX * 6, PX * 6, '#ffe9a8');
+    // Kütle: tek renk yerine GRİ - fotoğraf renksiz, kimse ne olduğunu
+    // çözemedi. Biçim yine de drawBlob'daki oval/akışkan aile, mazgalın
+    // aralığından TAZE çıkmış - küçük ve grate'in solundan yükseliyor.
+    const [bx, by] = at(0.32, 0.575);
+    const r = box.h * 0.13;
+    ellipseCells(ctx, cam, bx, by, r * 1.3, r, '#e7e4da', t * 6, 0.7);
+    ellipseCells(ctx, cam, bx + r * 0.1, by + r * 0.1, r * 1.15, r * 0.86, '#9a9d9f', t * 6, 0.7);
+
+    // Sol üst köşede yanıp sönen kayıt lekesi - saat NE YAZDIĞI okunmuyor
+    if (Math.floor(t * 3) % 2 === 0) cam.glow(ctx, box.x + box.w * 0.08, box.y + box.h * 0.08, 3, 'rgba(200,60,50,ALPHA)', 0.7);
+    for (let i = 0; i < 4; i++) {
+        cam.rect(ctx, box.x + box.w * 0.7 + i * box.w * 0.06, box.y + box.h * 0.92, box.w * 0.04, box.h * 0.04, '#efece0');
     }
-
-    darken(ctx, 0.08);
-    vignette(ctx, 0.5);
 }
 
-// --- 5. HAREKETLİ: çelik kapı iniyor, arkadaş geri dönüyor ---
-function doorClosing(ctx, A, t) {
-    // Kamera kapıya DÖNÜK: inen kapı karenin kendisi kadar büyük olmalı,
-    // yoksa bölümün ayıran anı tavandaki bir çıtaya dönüyor.
-    const floorY = A.y + Math.round(A.h * 0.76 / PX) * PX;
-    blk(ctx, A.x, A.y, A.w, floorY - A.y, '#5b636c');
-    facade(ctx, A, A.y, Math.round(A.h * 0.14));
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, A.y, PX * 2, floorY - A.y, '#4d545c');
-    yardFloor(ctx, A, floorY);
+// --- Sahne ---
 
-    const doorX = A.x + Math.round(A.w * 0.20 / PX) * PX;
-    const doorW = Math.round(A.w * 0.44 / PX) * PX;
-    const doorTop = A.y + Math.round(A.h * 0.14 / PX) * PX;
-    const doorH = floorY - doorTop;
+function scene(ctx, cam, s) {
+    walls(ctx, cam);
+    window_(ctx, cam);
+    eyeChart(ctx, cam);
+    crossSign(ctx, cam);
 
-    // Kapı boşluğu: ardı karanlık
-    blk(ctx, doorX - PX * 5, doorTop - PX * 4, doorW + PX * 10, doorH + PX * 4, '#2b3138');
-    blk(ctx, doorX, doorTop, doorW, doorH, '#12161a');
-    blk(ctx, doorX, floorY - PX * 4, doorW, PX * 4, '#1c2126');
+    seatedPerson(ctx, cam, s.patient);
+    desk(ctx, cam);
+    monitor(ctx, cam, s.t);
+    folder(ctx, cam);
+    seatedPerson(ctx, cam, s.doctor);
 
-    // Kapının ardında: arkadaş kola doğru gidiyor. Işık azalıyor, ne
-    // ısırılma ne dönüşüm görülüyor - yalnızca uzaklaşan bir siluet.
-    const back = easeIn(span(t, 0.05, 0.85));
-    const fx = gridLerp(doorX + doorW * 0.62, doorX + PX * 10, back);
-    glow(ctx, doorX + PX * 8, doorTop + doorH * 0.5, PX * 40, 'rgba(190,170,120,ALPHA)', 0.22 * (1 - back * 0.7));
-    drawFriend(ctx, fx, doorTop + doorH * 0.72, 'left', true, 6);
+    if (s.photo) photoContent(ctx, cam, s.photo, s.t);
 
-    // Kapı iniyor
-    const closed = gridLerp(PX * 6, doorH, easeIn(t));
-    steelDoor(ctx, doorX, doorTop, doorW, closed);
-
-    // Biz: dışarıda, kapıya dönük, ön planda iri
-    drawTrainer(ctx, doorX + doorW + PX * 40, floorY + PX * 6, 'left', false, 9);
-
-    darken(ctx, easeIn(span(t, 0.6, 1)) * 0.3);
-    vignette(ctx, 0.55);
+    vignette(ctx, 0.32);
 }
 
-// --- 6. Kapalı kapı ---
-function doorShut(ctx, A) {
-    // Bir önceki karenin aynı kadrajı, kapı tamamen inmiş hâli: değişen tek
-    // şey kapı ve önünde kalan tek kişi.
-    const floorY = A.y + Math.round(A.h * 0.76 / PX) * PX;
-    blk(ctx, A.x, A.y, A.w, floorY - A.y, '#4d545d');
-    facade(ctx, A, A.y, Math.round(A.h * 0.14));
-    for (let x = A.x; x < A.x + A.w; x += PX * 30) blk(ctx, x, A.y, PX * 2, floorY - A.y, '#434a52');
-    yardFloor(ctx, A, floorY);
+const PAT_BASE = { x: PAT_X, dir: 1, coat: PAT_COAT, coatShade: PAT_COAT_SHADE, skin: PAT_SKIN, hair: PAT_HAIR };
+const DOC_BASE = {
+    x: DOC_X, dir: -1, coat: DOC_COAT, coatShade: DOC_COAT_SHADE, skin: DOC_SKIN, hair: DOC_HAIR,
+    glasses: true, stetho: true
+};
 
-    const doorX = A.x + Math.round(A.w * 0.20 / PX) * PX;
-    const doorW = Math.round(A.w * 0.44 / PX) * PX;
-    const doorTop = A.y + Math.round(A.h * 0.14 / PX) * PX;
-    blk(ctx, doorX - PX * 5, doorTop - PX * 4, doorW + PX * 10, floorY - doorTop + PX * 4, '#2b3138');
-    steelDoor(ctx, doorX, doorTop, doorW, floorY - doorTop);
+// =================== KARELER ===================
 
-    // Kapının önünde tek kişi: biz. Sırtı bize dönük, kapıya bakıyor.
-    drawTrainer(ctx, doorX + doorW / 2, floorY + PX * 12, 'up', false, 9);
+// --- 1. HAREKETLİ: doktor ekrandaki tahlilden hastaya dönüyor ---
+function clinicTurn(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const k = easeOut(span(t, 0.1, 0.9));
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 0.5, headDown: 0.1 },
+        doctor: { ...DOC_BASE, headTurn: k, headDown: 1 - k, armRaise: 0.1 }
+    });
+}
 
-    darken(ctx, 0.3);
-    vignette(ctx, 0.7);
+// --- 2. "Tahlillerinde bir şey çıktı. Yeni bir virüs, V-986." ---
+function clinicResult(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const raise = 0.2 + easeOut(span(t, 0, 0.7)) * 0.3;
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 0.8, lean: span(t, 0, 1) * 0.3 },
+        doctor: { ...DOC_BASE, headTurn: 1, armRaise: raise }
+    });
+}
+
+// --- 3. "Hızlı yayılıyor, aşısı yok, belirti vermiyor." ---
+function clinicDetails(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const raise = 0.5 + easeOut(span(t, 0, 0.7)) * 0.35;
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 0.8, lean: 0.3 },
+        doctor: { ...DOC_BASE, headTurn: 1, armRaise: raise }
+    });
+}
+
+// --- 4. Hastanın sorduğu an (hem "nereden" hem "neye benziyor" burayı kullanıyor) ---
+function clinicQuestion(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const lean = 0.3 + easeOut(span(t, 0, 0.8)) * 0.55;
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 1, lean, armRaise: easeOut(span(t, 0.15, 0.85)) * 0.5 },
+        doctor: { ...DOC_BASE, headTurn: 1, armRaise: 0.15 }
+    });
+}
+
+// --- 5. "Henüz bilinmiyor, hâlâ araştırılıyor." - omuz silkme ---
+function clinicUnknown(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const shrug = Math.sin(clamp01(span(t, 0.1, 0.6)) * Math.PI) * 0.7;
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 1, lean: 0.6 },
+        doctor: { ...DOC_BASE, headTurn: 1, shrug, armRaise: shrug * 0.6 }
+    });
+}
+
+// --- 6. HAREKETLİ: çıktı dosyadan çıkıp yukarı kalkıyor ---
+function clinicPhotoOut(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const out = easeOut(span(t, 0.1, 0.95));
+    const w = lerp(8, PHOTO_HELD.w, out);
+    const h = lerp(6, PHOTO_HELD.h, out);
+    const photo = {
+        x: lerp(FOLDER.x, PHOTO_HELD.x, out),
+        y: lerp(FOLDER.y - 2, PHOTO_HELD.y, out),
+        w, h
+    };
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 1, lean: 0.5 },
+        doctor: { ...DOC_BASE, headTurn: 1, armRaise: out, holdsPhoto: true },
+        photo: out > 0.04 ? photo : null
+    });
+}
+
+// --- 7. HAREKETLİ: kamera fotoğrafa yaklaşıyor. YAZI YOK ---
+function clinicPhotoZoom(ctx, A, t) {
+    const k = easeOut(span(t, 0, 0.9));
+    const cam = createCam(A, {
+        u: lerp(WIDE.u, CLOSE.u, k),
+        cx: lerp(WIDE.cx, CLOSE.cx, k),
+        cy: lerp(WIDE.cy, CLOSE.cy, k)
+    });
+    scene(ctx, cam, {
+        t,
+        patient: { ...PAT_BASE, headTurn: 1, lean: 0.5 },
+        doctor: { ...DOC_BASE, headTurn: 1, armRaise: 1, holdsPhoto: true },
+        photo: PHOTO_HELD
+    });
 }
 
 export const CHAPTER_3_ART = {
-    yardCalm,
-    fenceCrowd,
-    yardPlan,
-    breach,
-    doorClosing,
-    doorShut
+    clinicTurn,
+    clinicResult,
+    clinicDetails,
+    clinicQuestion,
+    clinicUnknown,
+    clinicPhotoOut,
+    clinicPhotoZoom
 };

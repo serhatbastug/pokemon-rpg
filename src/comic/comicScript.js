@@ -33,6 +33,8 @@
 
 import {
     LAB_RECIPE, LAB_LATE,
+    CLINIC_RESULT, CLINIC_DETAILS, CLINIC_ORIGIN_Q, CLINIC_ORIGIN_A,
+    CLINIC_LOOK_Q, CLINIC_LOOK_A,
     SIEGE_SPOTTED, SIEGE_PLAN, SIEGE_AGREE, SIEGE_CALL,
     SEWER_START, SEWER_EXIT,
     CITY_HOPE, CITY_DOUBT, CITY_ONWARD,
@@ -49,8 +51,9 @@ const at = (lines, x, y) => lines.map(line => ({ ...line, at: [x, y] }));
 export const CHAPTERS = [
     { n: 1, title: 'LABORATUVAR', subtitle: 'BİR YIL ÖNCE' },
     { n: 2, title: 'CADDE', subtitle: 'ERTESİ SABAH' },
-    { n: 3, title: 'KUŞATMA', subtitle: null, still: true },
-    { n: 4, title: 'ORMANIN AĞZI', subtitle: null, still: true }
+    { n: 3, title: 'SAĞLIK OCAĞI', subtitle: 'GÜNLER SONRA' },
+    { n: 4, title: 'KUŞATMA', subtitle: null, still: true },
+    { n: 5, title: 'ORMANIN AĞZI', subtitle: null, still: true }
 ];
 
 export const PANELS = [
@@ -158,95 +161,151 @@ export const PANELS = [
         ]
     },
 
-    // ================= BEKLEYEN BÖLÜMLER =================
-    // 3 ve 4. bölümler sırayla yeniden tarif edilip yeniden çizilecek.
-    // O güne kadar hiçbiri OYNAMIYOR: hepsinin motion'ı 0, kareler bitmiş
-    // hâllerini duruk gösteriyor. Aralarındaki "HAREKETLİ" notları eski
-    // hareketi anlatıyor, yenisi yazılınca geri gelecekler.
-
-    // ================= 3. BÖLÜM - KUŞATMA =================
-    // Tesis avlusu. Bizim dışımızda TAM BEŞ sağlıklı - bu sayı 4. bölümde de
-    // tutmak zorunda. Arkadaşın dönüştüğü GÖSTERİLMİYOR: ayıran şey kapı.
+    // ================= 3. BÖLÜM - SAĞLIK OCAĞI =================
+    // Doktorun muayene odası. TEK KARE: kamera bölüm boyunca hiç kıpırdamıyor
+    // (cont: true, karartma yok), tek istisna SON kare - doktorun uzattığı
+    // çıktıya doğru yavaşça yaklaşıyor.
+    //
+    // Doktorun bildiği her şey burada söyleniyor; "nereden, nasıl" sorusuna
+    // "araştırılıyor" dışında bir cevabı yok - kendisi de bilmiyor. Son
+    // karedeki fotoğraf CADDEDEKİ mazgaldan çıkış anı (bkz. chapter2.js
+    // `street`): bir sokak kamerası rastlantıyla yakalamış, kimse ne
+    // olduğunu çözememiş.
 
     { id: 'baslik-3', chapter: 3, art: 'title', motion: 0, hold: 90 },
 
     {
-        id: 'kusatma-avlu', chapter: 3, art: 'yardCalm',
+        // HAREKETLİ: doktor ekrandaki tahlilden hastaya dönüyor
+        id: 'klinik-baslangic', chapter: 3, art: 'clinicTurn',
+        motion: 60, hold: 10
+    },
+    {
+        id: 'klinik-teshis', chapter: 3, art: 'clinicResult', cont: true,
+        lines: at(CLINIC_RESULT, 620, 190),
+        motion: 30, hold: 20
+    },
+    {
+        id: 'klinik-detay', chapter: 3, art: 'clinicDetails', cont: true,
+        lines: at(CLINIC_DETAILS, 620, 190),
+        motion: 30, hold: 20
+    },
+    {
+        id: 'klinik-soru-nereden', chapter: 3, art: 'clinicQuestion', cont: true,
+        lines: at(CLINIC_ORIGIN_Q, 330, 340),
+        motion: 20, hold: 20
+    },
+    {
+        id: 'klinik-cevap-bilinmiyor', chapter: 3, art: 'clinicUnknown', cont: true,
+        lines: at(CLINIC_ORIGIN_A, 620, 190),
+        motion: 20, hold: 20
+    },
+    {
+        id: 'klinik-soru-nasil', chapter: 3, art: 'clinicQuestion', cont: true,
+        lines: at(CLINIC_LOOK_Q, 330, 340),
+        motion: 0, hold: 20
+    },
+    {
+        // HAREKETLİ: çıktı çekmeceden çıkıp masaya konuyor
+        id: 'klinik-fotograf', chapter: 3, art: 'clinicPhotoOut', cont: true,
+        lines: at(CLINIC_LOOK_A, 620, 190),
+        motion: 50, hold: 20
+    },
+    {
+        // HAREKETLİ: kamera fotoğrafa yaklaşıyor. EKRANDA HİÇBİR YAZI YOK -
+        // okuyucu neye baktığını kendisi çözsün, karakterler bilmiyor.
+        id: 'klinik-yakinlasma', chapter: 3, art: 'clinicPhotoZoom', cont: true,
+        motion: 200, hold: 130
+    },
+
+    // ================= BEKLEYEN BÖLÜMLER =================
+    // 4 ve 5. bölümler sırayla yeniden tarif edilip yeniden çizilecek.
+    // O güne kadar hiçbiri OYNAMIYOR: hepsinin motion'ı 0, kareler bitmiş
+    // hâllerini duruk gösteriyor. Aralarındaki "HAREKETLİ" notları eski
+    // hareketi anlatıyor, yenisi yazılınca geri gelecekler.
+
+    // ================= 4. BÖLÜM - KUŞATMA =================
+    // Tesis avlusu. Bizim dışımızda TAM BEŞ sağlıklı - bu sayı 5. bölümde de
+    // tutmak zorunda. Arkadaşın dönüştüğü GÖSTERİLMİYOR: ayıran şey kapı.
+
+    { id: 'baslik-4', chapter: 4, art: 'title', motion: 0, hold: 90 },
+
+    {
+        id: 'kusatma-avlu', chapter: 4, art: 'yardCalm',
         caption: 'TESİS. AYAKTA KALAN ALTI KİŞİ.',
         motion: 0, hold: 80
     },
     {
-        id: 'kusatma-orgu', chapter: 3, art: 'fenceCrowd',
+        id: 'kusatma-orgu', chapter: 4, art: 'fenceCrowd',
         lines: at(SIEGE_SPOTTED, 300, 300),
         motion: 0
     },
     {
-        id: 'kusatma-plan', chapter: 3, art: 'yardPlan',
+        id: 'kusatma-plan', chapter: 4, art: 'yardPlan',
         lines: [...at(SIEGE_PLAN, 380, 320), ...at(SIEGE_AGREE, 720, 330)],
         motion: 0
     },
     {
         // HAREKETLİ: yarıktan içeri doluyorlar, biz kapıyı tutuyoruz
-        id: 'kusatma-yarik', chapter: 3, art: 'breach',
+        id: 'kusatma-yarik', chapter: 4, art: 'breach',
         motion: 0, hold: 40
     },
     {
         // HAREKETLİ: çelik kapı iniyor, cümle ortasında kesiliyor
-        id: 'kusatma-kapi', chapter: 3, art: 'doorClosing',
+        id: 'kusatma-kapi', chapter: 4, art: 'doorClosing',
         lines: at(SIEGE_CALL, 560, 340),
         motion: 0, hold: 30
     },
     {
-        id: 'kusatma-kapali', chapter: 3, art: 'doorShut',
+        id: 'kusatma-kapali', chapter: 4, art: 'doorShut',
         caption: 'KAPI BİR DAHA AÇILMADI.',
         motion: 0, hold: 110
     },
 
-    // ================= 4. BÖLÜM - ORMANIN AĞZI =================
+    // ================= 5. BÖLÜM - ORMANIN AĞZI =================
     // Kanalizasyon, rögar, şehrin kenarı ve ormanın ağzındaki dönüş.
     // Tünel "yoğun maruziyet": beşinin sayacını bitiren yer orası.
 
-    { id: 'baslik-4', chapter: 4, art: 'title', motion: 0, hold: 90 },
+    { id: 'baslik-5', chapter: 5, art: 'title', motion: 0, hold: 90 },
 
     {
-        id: 'orman-tunel', chapter: 4, art: 'sewerRun',
+        id: 'orman-tunel', chapter: 5, art: 'sewerRun',
         lines: at(SEWER_START, 480, 300),
         motion: 0
     },
     {
-        id: 'orman-merdiven', chapter: 4, art: 'sewerLadder',
+        id: 'orman-merdiven', chapter: 5, art: 'sewerLadder',
         lines: at(SEWER_EXIT, 620, 300),
         motion: 0
     },
     {
-        id: 'orman-sehir', chapter: 4, art: 'ruinedCity',
+        id: 'orman-sehir', chapter: 5, art: 'ruinedCity',
         caption: 'ŞEHRİN KENARI.',
         lines: [...at(CITY_HOPE, 380, 330), ...at(CITY_DOUBT, 700, 330), ...at(CITY_ONWARD, 380, 330)],
         motion: 0
     },
     {
-        id: 'orman-durus', chapter: 4, art: 'forestMouth',
+        id: 'orman-durus', chapter: 5, art: 'forestMouth',
         lines: at(FOREST_STOPPED, 400, 320),
         motion: 0
     },
     {
         // HAREKETLİ: beşinin de yüzü yavaşça yeşilleniyor
-        id: 'orman-donus', chapter: 4, art: 'greening',
+        id: 'orman-donus', chapter: 5, art: 'greening',
         motion: 0, hold: 60
     },
     {
         // HAREKETLİ: parçalayıcı silah. Öldürmüyor, dağıtıyor.
-        id: 'orman-vurus', chapter: 4, art: 'shots',
+        id: 'orman-vurus', chapter: 5, art: 'shots',
         motion: 0, hold: 40
     },
     {
-        id: 'orman-sonra', chapter: 4, art: 'aftermath',
+        id: 'orman-sonra', chapter: 5, art: 'aftermath',
         lines: at(FOREST_AFTER, 420, 330),
         motion: 0
     },
     {
         // Kolunda ilk yeşil damar: oyunun sayacı burada başlıyor
-        id: 'orman-giris', chapter: 4, art: 'intoForest',
+        id: 'orman-giris', chapter: 5, art: 'intoForest',
         caption: 'SON SAĞLIKLI İNSAN.',
         motion: 0, hold: 120
     }

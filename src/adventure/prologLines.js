@@ -32,7 +32,7 @@ export const LAB_LATE = [
 // Ekrandaki tahlile bakarken
 export const CLINIC_RESULT = [
     { speaker: 'doktor', text: 'Tahlillerinde bir şey çıktı.' },
-    { speaker: 'doktor', text: 'Yeni bir virüs. Adını V-986 koymuşlar.' }
+    { speaker: 'doktor', text: 'V-986 isimli yeni bir virüs.' }
 ];
 
 // Doktor ekrandaki grafiği gösteriyor

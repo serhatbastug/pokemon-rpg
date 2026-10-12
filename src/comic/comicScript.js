@@ -241,17 +241,17 @@ export const PANELS = [
     },
     {
         id: 'ev-duydum', chapter: 4, art: 'homeHeard', cont: true,
-        lines: at(HOME_HEARD, 660, 220),
+        lines: at(HOME_HEARD, 660, 150),
         motion: 0, hold: 20
     },
     {
         id: 'ev-tarif', chapter: 4, art: 'homeDesc', cont: true,
-        lines: at(HOME_DESC, 660, 220),
+        lines: at(HOME_DESC, 660, 150),
         motion: 0, hold: 20
     },
     {
         id: 'ev-uyari', chapter: 4, art: 'homeWarn', cont: true,
-        lines: at(HOME_WARN, 660, 220),
+        lines: at(HOME_WARN, 660, 150),
         motion: 0, hold: 20
     },
     {
@@ -261,7 +261,7 @@ export const PANELS = [
     },
     {
         id: 'ev-katilma', chapter: 4, art: 'homeAgree', cont: true,
-        lines: at(HOME_AGREE, 660, 220),
+        lines: at(HOME_AGREE, 660, 150),
         motion: 0, hold: 20
     },
     {

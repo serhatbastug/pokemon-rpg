@@ -289,62 +289,63 @@ function bizPerson(ctx, cam, p) {
 
 // --- Arkadaş: yüzü YOK, sadece saçla kaplı düz bir kafa. Turuncu bant tek işaret ---
 function friendPerson(ctx, cam, p) {
-    const { x, dir = -1, armRaise = 0, talk = 0 } = p;
+    const { x, dir = -1, talk = 0 } = p;
     const skin = FRIEND_SKIN, skinShade = mix(skin, '#000000', 0.22);
-    // Bel yerden 24 hücre yukarıda: bacaklar gövdeyle orantılı uzun
     const hipY = FLOOR_Y - 24;
-
-    for (const s of [-1, 1]) {
-        const hipX = x + s * 2;
-        limbCells(ctx, cam, hipX, hipY, hipX, FLOOR_Y - 1, 4.6, s > 0 ? FRIEND_TROUSER : mix(FRIEND_TROUSER, '#000000', 0.18));
-        cam.rect(ctx, hipX - 2.4, FLOOR_Y - 2, 6, 2, '#0f1215');
-    }
-
     const torsoH = 29;
     const shoulderY = hipY - torsoH;
     const coatW = 21;
+
+    // Bacaklar: üstte kalın, aşağıda daralıyor - paltonun altından çıkıyor
+    for (const s of [-1, 1]) {
+        const lx = x + s * 2.4;
+        const col = s > 0 ? FRIEND_TROUSER : mix(FRIEND_TROUSER, '#000000', 0.18);
+        cam.rect(ctx, lx - 3, hipY + 2, 6, 7, col);
+        cam.rect(ctx, lx - 2.6, hipY + 9, 5.2, 9, col);
+        cam.rect(ctx, lx - 2.3, hipY + 18, 4.6, FLOOR_Y - hipY - 19, col);
+        cam.rect(ctx, lx - 2.8, FLOOR_Y - 2, 6, 2, '#0f1215');
+    }
+
+    // Gövde: palto belin altına sarkıyor, etek hafifçe açılıyor
     cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW, torsoH - 1, FRIEND_COAT);
-    cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW * 0.24, torsoH - 1, mix(FRIEND_COAT, '#ffffff', 0.1));
-    cam.rect(ctx, x + coatW * 0.26, shoulderY + 1, coatW * 0.24, torsoH - 1, FRIEND_COAT_SHADE);
-    cam.rect(ctx, x - 1.2, shoulderY + 3, 2.4, torsoH - 5, mix(FRIEND_COAT_SHADE, '#000000', 0.15));
+    cam.rect(ctx, x - coatW / 2 - 0.8, hipY - 5, coatW + 1.6, 6, FRIEND_COAT);
+    cam.rect(ctx, x - coatW / 2 - 0.4, hipY + 1, coatW + 0.8, 4, mix(FRIEND_COAT, '#000000', 0.12));
+    cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW * 0.24, torsoH + 4, mix(FRIEND_COAT, '#ffffff', 0.1));
+    cam.rect(ctx, x + coatW * 0.26, shoulderY + 1, coatW * 0.24, torsoH + 4, FRIEND_COAT_SHADE);
+    cam.rect(ctx, x - 1.2, shoulderY + 3, 2.4, torsoH + 1, mix(FRIEND_COAT_SHADE, '#000000', 0.15));
 
-    // Kollar: biri sakin, biri konuşurken jest yapıyor - bant o kolda
-    const idleSx = x - coatW * 0.42;
-    const idleSy = shoulderY + 2;
-    limbCells(ctx, cam, idleSx, idleSy, idleSx - 2, idleSy + torsoH * 0.55, 3.8, FRIEND_COAT);
-    limbCells(ctx, cam, idleSx - 2, idleSy + torsoH * 0.55, x - 6, hipY - 3, 3.4, FRIEND_COAT);
-    cam.rect(ctx, x - 8, hipY - 6, 4.4, 3.6, skin);
+    // Kollar: ikisi de yanda sakin sarkıyor, SABİT. Bant kolun bilek ucunda.
+    for (const s of [-1, 1]) {
+        const sx = x + s * coatW * 0.42;
+        const sy = shoulderY + 2;
+        const ex = sx + s * 1.2;
+        const ey = sy + torsoH * 0.5;
+        const handX = x + s * 10.6;
+        const handY = hipY + 1;
+        limbCells(ctx, cam, sx, sy, ex, ey, 3.8, FRIEND_COAT);
+        limbCells(ctx, cam, ex, ey, handX, handY - 2, 3.4, FRIEND_COAT);
+        cam.rect(ctx, handX - 2, handY - 2, 4, 3.6, skin);
+        for (let i = 0; i < 3; i++) cam.rect(ctx, handX - 1.5 + i * 1.2, handY + 1.4, 0.9, 0.8, skinShade);
+        // Turuncu bant: sağdaki (izleyiciye yakın) bilekte, mantıklı yerde
+        if (s > 0) {
+            cam.rect(ctx, handX - 2.1, handY - 4.6, 4.2, 2.4, BAND_COLOR);
+            cam.rect(ctx, handX - 2.1, handY - 4.6, 4.2, 0.8, mix(BAND_COLOR, '#ffffff', 0.3));
+        }
+    }
 
-    const gestSx = x + coatW * 0.42;
-    const gestSy = shoulderY + 2;
-    const raise = clamp01(armRaise);
-    const ex = lerp(gestSx + 4, gestSx + 8, raise);
-    const ey = lerp(gestSy + torsoH * 0.35, gestSy + torsoH * 0.1, raise);
-    const handX = lerp(x + 10, x + 16, raise);
-    const handY = lerp(hipY - 4, shoulderY + torsoH * 0.15 - talk * 2, raise);
-    limbCells(ctx, cam, gestSx, gestSy, ex, ey, 3.8, FRIEND_COAT);
-    limbCells(ctx, cam, ex, ey, handX, handY, 3.4, FRIEND_COAT);
-    cam.rect(ctx, handX - 2.2, handY - 1.8, 4.4, 3.6, skin);
-    for (let i = 0; i < 3; i++) cam.rect(ctx, handX - 1.7 + i * 1.4, handY + 1.1, 1, 0.8, skinShade);
-    // TURUNCU BANT: bileğin biraz yukarısında, kolun %70'inde
-    const bandX = lerp(gestSx, handX, 0.68);
-    const bandY = lerp(gestSy, handY, 0.68);
-    cam.rect(ctx, bandX - 2.4, bandY - 1.6, 4.8, 3.2, BAND_COLOR);
-    cam.rect(ctx, bandX - 2.4, bandY - 1.6, 4.8, 1, mix(BAND_COLOR, '#ffffff', 0.3));
-
-    // Yaka
     cam.rect(ctx, x - 2.4, shoulderY, 4.8, 3, mix(FRIEND_COAT, '#000000', 0.12));
 
-    // --- Kafa: YÜZ YOK. Sadece saçla kaplı düz bir şekil. ---
+    // Baş: YÜZ YOK. Düz ten yüzey, üstte ve arkada saç. Siyah değil.
     const hx = x + dir * -1.2;
     const hy = shoulderY - 13;
     const headW = 12.4, headH = 13;
     cam.rect(ctx, x - 2.6, shoulderY - 3, 5.2, 4, skinShade);
-    // Baş tamamen saçla kaplı: ten sadece boyunda, yüz diye bir şey yok
-    cam.rect(ctx, hx - headW / 2, hy, headW, headH, FRIEND_HAIR);
-    cam.rect(ctx, hx - headW / 2, hy + headH * 0.78, headW, headH * 0.22, mix(FRIEND_HAIR, '#000000', 0.2));
-    cam.rect(ctx, hx + headW * 0.12, hy + 1, headW * 0.26, headH * 0.4, mix(FRIEND_HAIR, '#ffffff', 0.12));
-    cam.rect(ctx, hx - headW * 0.08, hy - 2, headW * 0.2, 2.2, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
+    cam.rect(ctx, hx - headW / 2, hy + headH * 0.55, headW * 0.18, headH * 0.45, skinShade);
+    cam.rect(ctx, hx + headW * 0.3, hy + headH * 0.2, headW * 0.2, headH * 0.8, mix(skin, '#ffffff', 0.1));
+    cam.rect(ctx, hx - headW / 2 - 0.6, hy - 0.6, headW + 1.2, headH * 0.36, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2 - 0.6, hy, headW * 0.2, headH * 0.6, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW * 0.05, hy - 2, headW * 0.22, 2.2, FRIEND_HAIR);
 }
 
 // --- Sahne ---

@@ -291,16 +291,18 @@ function bizPerson(ctx, cam, p) {
 function friendPerson(ctx, cam, p) {
     const { x, dir = -1, armRaise = 0, talk = 0 } = p;
     const skin = FRIEND_SKIN, skinShade = mix(skin, '#000000', 0.22);
+    // Bel yerden 24 hücre yukarıda: bacaklar gövdeyle orantılı uzun
+    const hipY = FLOOR_Y - 24;
 
     for (const s of [-1, 1]) {
         const hipX = x + s * 2;
-        limbCells(ctx, cam, hipX, SEAT_Y + 2, hipX, FLOOR_Y - 1, 4.6, s > 0 ? FRIEND_TROUSER : mix(FRIEND_TROUSER, '#000000', 0.18));
+        limbCells(ctx, cam, hipX, hipY, hipX, FLOOR_Y - 1, 4.6, s > 0 ? FRIEND_TROUSER : mix(FRIEND_TROUSER, '#000000', 0.18));
         cam.rect(ctx, hipX - 2.4, FLOOR_Y - 2, 6, 2, '#0f1215');
     }
 
-    const torsoH = 34;
-    const shoulderY = SEAT_Y + 2 - torsoH;
-    const coatW = 23;
+    const torsoH = 29;
+    const shoulderY = hipY - torsoH;
+    const coatW = 21;
     cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW, torsoH - 1, FRIEND_COAT);
     cam.rect(ctx, x - coatW / 2, shoulderY + 1, coatW * 0.24, torsoH - 1, mix(FRIEND_COAT, '#ffffff', 0.1));
     cam.rect(ctx, x + coatW * 0.26, shoulderY + 1, coatW * 0.24, torsoH - 1, FRIEND_COAT_SHADE);
@@ -310,8 +312,8 @@ function friendPerson(ctx, cam, p) {
     const idleSx = x - coatW * 0.42;
     const idleSy = shoulderY + 2;
     limbCells(ctx, cam, idleSx, idleSy, idleSx - 2, idleSy + torsoH * 0.55, 3.8, FRIEND_COAT);
-    limbCells(ctx, cam, idleSx - 2, idleSy + torsoH * 0.55, x - 6, SEAT_Y - 3, 3.4, FRIEND_COAT);
-    cam.rect(ctx, x - 8, SEAT_Y - 6, 4.4, 3.6, skin);
+    limbCells(ctx, cam, idleSx - 2, idleSy + torsoH * 0.55, x - 6, hipY - 3, 3.4, FRIEND_COAT);
+    cam.rect(ctx, x - 8, hipY - 6, 4.4, 3.6, skin);
 
     const gestSx = x + coatW * 0.42;
     const gestSy = shoulderY + 2;
@@ -319,7 +321,7 @@ function friendPerson(ctx, cam, p) {
     const ex = lerp(gestSx + 4, gestSx + 8, raise);
     const ey = lerp(gestSy + torsoH * 0.35, gestSy + torsoH * 0.1, raise);
     const handX = lerp(x + 10, x + 16, raise);
-    const handY = lerp(SEAT_Y - 4, shoulderY + torsoH * 0.15 - talk * 2, raise);
+    const handY = lerp(hipY - 4, shoulderY + torsoH * 0.15 - talk * 2, raise);
     limbCells(ctx, cam, gestSx, gestSy, ex, ey, 3.8, FRIEND_COAT);
     limbCells(ctx, cam, ex, ey, handX, handY, 3.4, FRIEND_COAT);
     cam.rect(ctx, handX - 2.2, handY - 1.8, 4.4, 3.6, skin);
@@ -338,10 +340,10 @@ function friendPerson(ctx, cam, p) {
     const hy = shoulderY - 13;
     const headW = 12.4, headH = 13;
     cam.rect(ctx, x - 2.6, shoulderY - 3, 5.2, 4, skinShade);
-    cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
-    cam.rect(ctx, hx - headW / 2, hy, headW, headH * 0.5, FRIEND_HAIR);
-    cam.rect(ctx, hx - headW / 2, hy + headH * 0.5, headW * 0.22, headH * 0.4, FRIEND_HAIR);
-    cam.rect(ctx, hx + headW * 0.28, hy + headH * 0.5, headW * 0.22, headH * 0.4, FRIEND_HAIR);
+    // Baş tamamen saçla kaplı: ten sadece boyunda, yüz diye bir şey yok
+    cam.rect(ctx, hx - headW / 2, hy, headW, headH, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2, hy + headH * 0.78, headW, headH * 0.22, mix(FRIEND_HAIR, '#000000', 0.2));
+    cam.rect(ctx, hx + headW * 0.12, hy + 1, headW * 0.26, headH * 0.4, mix(FRIEND_HAIR, '#ffffff', 0.12));
     cam.rect(ctx, hx - headW * 0.08, hy - 2, headW * 0.2, 2.2, FRIEND_HAIR);
 }
 
@@ -435,25 +437,7 @@ function homeAgree(ctx, A, t) {
     });
 }
 
-// --- 8. "Fakat önce bir denek bulmalıyız." - balon BİLEREK kesildi ---
-function homeSubject(ctx, A, t) {
-    const cam = createCam(A, WIDE);
-    scene(ctx, cam, {
-        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.4 },
-        friend: { ...FRIEND_BASE, armRaise: 0.5, talk: 1 }
-    });
-}
-
-// --- 9. "İnsanları ikna etmek için... bir para ödülü koyabiliriz." ---
-function homeReward(ctx, A, t) {
-    const cam = createCam(A, WIDE);
-    scene(ctx, cam, {
-        biz: { ...BIZ_BASE, paperUp: 0, lean: 0.4 },
-        friend: { ...FRIEND_BASE, armRaise: 0.75, talk: 1 }
-    });
-}
-
-// --- 10. Kapanış: "Sen bir denek bul, ben bilgi toplayayım." ---
+// --- 8. Kapanış: "Ben de bilgi toplayayım." ---
 function homeClose(ctx, A, t) {
     const cam = createCam(A, WIDE);
     scene(ctx, cam, {
@@ -470,7 +454,5 @@ export const CHAPTER_4_ART = {
     homeWarn,
     homePropose,
     homeAgree,
-    homeSubject,
-    homeReward,
     homeClose
 };

@@ -93,17 +93,7 @@ export const HOME_AGREE = [
     { speaker: 'arkadas', text: 'Katılıyorum.' }
 ];
 
-// Balon burada BİLEREK kesiliyor - kullanıcının işaret ettiği nokta
-export const HOME_SUBJECT = [
-    { speaker: 'arkadas', text: 'Fakat önce bir denek bulmalıyız.' }
-];
-
-export const HOME_REWARD = [
-    { speaker: 'arkadas', text: 'İnsanları ikna etmek için iş bitince bir de para ödülü koyabiliriz.' }
-];
-
 export const HOME_CLOSE = [
-    { speaker: 'biz', text: 'Peki, o zaman sen bir denek bul.' },
     { speaker: 'biz', text: 'Ben de bu virüs hakkında edinebileceğim bilgileri toplayayım.' }
 ];
 

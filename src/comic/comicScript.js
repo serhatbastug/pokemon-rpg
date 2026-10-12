@@ -37,7 +37,7 @@ import {
     CLINIC_RESULT, CLINIC_DETAILS, CLINIC_ORIGIN_Q, CLINIC_ORIGIN_A,
     CLINIC_LOOK_Q, CLINIC_LOOK_A,
     HOME_ASK, HOME_HEARD, HOME_DESC, HOME_WARN, HOME_PROPOSE,
-    HOME_AGREE, HOME_SUBJECT, HOME_REWARD, HOME_CLOSE,
+    HOME_AGREE, HOME_CLOSE,
     SIEGE_SPOTTED, SIEGE_PLAN, SIEGE_AGREE, SIEGE_CALL,
     SEWER_START, SEWER_EXIT,
     CITY_HOPE, CITY_DOUBT, CITY_ONWARD,
@@ -262,17 +262,6 @@ export const PANELS = [
     {
         id: 'ev-katilma', chapter: 4, art: 'homeAgree', cont: true,
         lines: at(HOME_AGREE, 660, 220),
-        motion: 0, hold: 20
-    },
-    {
-        // Balon burada BİLEREK kesiliyor
-        id: 'ev-denek', chapter: 4, art: 'homeSubject', cont: true,
-        lines: at(HOME_SUBJECT, 660, 220),
-        motion: 0, hold: 20
-    },
-    {
-        id: 'ev-odul', chapter: 4, art: 'homeReward', cont: true,
-        lines: at(HOME_REWARD, 660, 220),
         motion: 0, hold: 20
     },
     {

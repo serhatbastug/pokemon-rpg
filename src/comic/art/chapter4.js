@@ -344,8 +344,23 @@ function friendPerson(ctx, cam, p) {
     cam.rect(ctx, hx - headW / 2, hy + headH * 0.55, headW * 0.18, headH * 0.45, skinShade);
     cam.rect(ctx, hx + headW * 0.3, hy + headH * 0.2, headW * 0.2, headH * 0.8, mix(skin, '#ffffff', 0.1));
     cam.rect(ctx, hx - headW / 2 - 0.6, hy - 0.6, headW + 1.2, headH * 0.36, FRIEND_HAIR);
-    cam.rect(ctx, hx - headW / 2 - 0.6, hy, headW * 0.2, headH * 0.6, FRIEND_HAIR);
+    cam.rect(ctx, hx + headW / 2 - headW * 0.2 + 0.6, hy, headW * 0.2, headH * 0.6, FRIEND_HAIR);
     cam.rect(ctx, hx - headW * 0.05, hy - 2, headW * 0.22, 2.2, FRIEND_HAIR);
+
+    // Yüz: sola bakıyor (dir = -1), özellikler yüzün ön yarısına kayık
+    const mouthTone = mix(skin, '#7a3f38', 0.4);
+    const eyeY = hy + headH * 0.46;
+    const fx = dir * 1.6;
+    for (const s of [-1, 1]) {
+        const ex = hx + fx + s * 2.3;
+        cam.rect(ctx, ex - 1, eyeY - 2.3, 2, 0.7, FRIEND_HAIR);
+        cam.rect(ctx, ex - 0.95, eyeY, 1.9, 1.4, '#20242a');
+        cam.rect(ctx, ex - 0.65, eyeY + 0.2, 0.6, 0.5, '#eceadd');
+    }
+    cam.rect(ctx, hx + fx - 0.5, eyeY, 1, 2.4, mix(skin, skinShade, 0.4));
+    cam.rect(ctx, hx + fx + dir * 0.9 - 0.6, eyeY + 2, 1.4, 0.7, skinShade);
+    cam.rect(ctx, hx + fx - 1.5, eyeY + 4.2, 3, 0.6, mix(mouthTone, '#000000', 0.25));
+    cam.rect(ctx, hx + fx - 1.4, eyeY + 4.7, 2.8, 0.9 + talk * 0.9, mouthTone);
 }
 
 // --- Sahne ---

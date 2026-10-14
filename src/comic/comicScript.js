@@ -185,33 +185,33 @@ export const PANELS = [
     },
     {
         id: 'klinik-teshis', chapter: 3, art: 'clinicResult', cont: true,
-        lines: at(CLINIC_RESULT, 620, 190),
+        lines: at(CLINIC_RESULT, 788, 192),
         motion: 30, hold: 20
     },
     {
         id: 'klinik-detay', chapter: 3, art: 'clinicDetails', cont: true,
-        lines: at(CLINIC_DETAILS, 620, 190),
+        lines: at(CLINIC_DETAILS, 788, 192),
         motion: 30, hold: 20
     },
     {
         id: 'klinik-soru-nereden', chapter: 3, art: 'clinicQuestion', cont: true,
-        lines: at(CLINIC_ORIGIN_Q, 330, 340),
+        lines: at(CLINIC_ORIGIN_Q, 268, 192),
         motion: 20, hold: 20
     },
     {
         id: 'klinik-cevap-bilinmiyor', chapter: 3, art: 'clinicUnknown', cont: true,
-        lines: at(CLINIC_ORIGIN_A, 620, 190),
+        lines: at(CLINIC_ORIGIN_A, 788, 192),
         motion: 20, hold: 20
     },
     {
         id: 'klinik-soru-nasil', chapter: 3, art: 'clinicQuestion', cont: true,
-        lines: at(CLINIC_LOOK_Q, 330, 340),
+        lines: at(CLINIC_LOOK_Q, 268, 192),
         motion: 0, hold: 20
     },
     {
         // HAREKETLİ: çıktı çekmeceden çıkıp masaya konuyor
         id: 'klinik-fotograf', chapter: 3, art: 'clinicPhotoOut', cont: true,
-        lines: at(CLINIC_LOOK_A, 620, 190),
+        lines: at(CLINIC_LOOK_A, 788, 192),
         motion: 50, hold: 20
     },
     {
@@ -236,7 +236,7 @@ export const PANELS = [
     },
     {
         id: 'ev-soru', chapter: 4, art: 'homeAsk', cont: true,
-        lines: at(HOME_ASK, 330, 330),
+        lines: at(HOME_ASK, 284, 196),
         motion: 0, hold: 20
     },
     {
@@ -256,7 +256,7 @@ export const PANELS = [
     },
     {
         id: 'ev-oneri', chapter: 4, art: 'homePropose', cont: true,
-        lines: at(HOME_PROPOSE, 330, 330),
+        lines: at(HOME_PROPOSE, 284, 196),
         motion: 0, hold: 20
     },
     {
@@ -266,7 +266,7 @@ export const PANELS = [
     },
     {
         id: 'ev-kapanis', chapter: 4, art: 'homeClose', cont: true,
-        lines: at(HOME_CLOSE, 330, 330),
+        lines: at(HOME_CLOSE, 284, 196),
         motion: 0, hold: 90
     },
 

@@ -51,7 +51,8 @@ export const CHAPTERS = [
     { n: 1, title: 'LABORATUVAR', subtitle: 'BİR YIL ÖNCE' },
     { n: 2, title: 'CADDE', subtitle: 'ERTESİ SABAH' },
     { n: 3, title: 'SAĞLIK OCAĞI', subtitle: 'GÜNLER SONRA' },
-    { n: 4, title: 'KARANTİNA', subtitle: 'AYNI GÜNLERDE' }
+    { n: 4, title: 'KARANTİNA', subtitle: 'AYNI GÜNLERDE' },
+    { n: 5, title: 'BİR HAFTA SONRA', subtitle: null }
 ];
 
 export const PANELS = [
@@ -267,6 +268,25 @@ export const PANELS = [
         id: 'ev-kapanis', chapter: 4, art: 'homeClose', cont: true,
         lines: at(HOME_CLOSE, 284, 196),
         motion: 0, hold: 90
+    },
+
+    // ================= 5. BÖLÜM - BİR HAFTA SONRA =================
+    // Toplumun büyük kısmı enfekte. Kollarda yeşillenme, ateş, halsizlik.
+    // Sokaklar boş; kalanlar hasta. Konuşma yok, yalnızca iki anlatıcı kutusu.
+
+    { id: 'baslik-5', chapter: 5, art: 'title', motion: 0, hold: 90 },
+
+    {
+        // HAREKETLİ: aynı cadde, neredeyse boş. Hastalar ağır ağır yürüyor.
+        id: 'hafta-sokak', chapter: 5, art: 'streetWeek',
+        caption: 'SOKAKLAR BOŞALDI.',
+        motion: 240, hold: 30
+    },
+    {
+        // HAREKETLİ: yeşil kolun yukarı tırmanması
+        id: 'hafta-kol', chapter: 5, art: 'greenArm',
+        caption: 'ATEŞ. HALSİZLİK. KOLLARDA YEŞİL İZLER.',
+        motion: 160, hold: 60
     }
 ];
 

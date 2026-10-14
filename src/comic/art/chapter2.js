@@ -431,15 +431,17 @@ function person(ctx, cam, p, time) {
         const hy2 = a.hipY + a.h * 0.06 + y0;
         const tone = s < 0 ? lit : shade;
         limbCells(ctx, cam, sx, sy, ex, ey, a.h * 0.07, tone);
-        limbCells(ctx, cam, ex, ey, hx2, hy2, a.h * 0.06, tone);
-        cam.rect(ctx, hx2 - a.h * 0.025, hy2, a.h * 0.05, a.h * 0.04, skin);      // el
+        // Hastanın kolu: ön kol ve el yeşile dönmüş
+        const sickK = p.sick || 0;
+        limbCells(ctx, cam, ex, ey, hx2, hy2, a.h * 0.06, sickK ? mix(tone, '#3f9a28', 0.6 * sickK) : tone);
+        cam.rect(ctx, hx2 - a.h * 0.025, hy2, a.h * 0.05, a.h * 0.04, sickK ? mix(skin, '#3f9a28', 0.65 * sickK) : skin);      // el
         cam.rect(ctx, ex - a.h * 0.035, ey - a.h * 0.01, a.h * 0.07, a.h * 0.02, s < 0 ? shade : trouserDark);
     }
 
     // --- Boyun, kafa, YÜZ
     // Yüz hatları gidilen yöne kayık: gövde yandan, yüz dörtte üç.
     const hx = px(dir * a.h * 0.008 + look * a.h * 0.01);
-    const hy = a.top + y0;
+    const hy = a.top + y0 + (p.sick || 0) * a.h * 0.03;     // hasta: baş öne düşük
     cam.rect(ctx, px(-a.h * 0.03), a.shoulderY - a.h * 0.045 + y0, a.h * 0.06, a.h * 0.06, skinShade);   // boyun
     cam.rect(ctx, hx - a.headW / 2, hy, a.headW, a.headH, skin);
     cam.rect(ctx, hx - a.headW / 2, hy, a.headW * 0.26, a.headH, skinShade);        // yüzün gölgeli yanı
@@ -502,8 +504,8 @@ function bakeTones(p) {
         trouser,
         trouserLit: mix(trouser, '#ffffff', 0.1),
         trouserDark: mix(trouser, '#000000', 0.18),
-        skin: mix(p.skin, HAZE, dim * 0.75),
-        skinShade: mix(mix(p.skin, '#000000', 0.3), HAZE, dim * 0.75),
+        skin: mix(mix(p.skin, '#8aa070', 0.3 * (p.sick || 0)), HAZE, dim * 0.75),
+        skinShade: mix(mix(mix(p.skin, '#8aa070', 0.3 * (p.sick || 0)), '#000000', 0.3), HAZE, dim * 0.75),
         mouth: mix(p.skin, '#7a3f38', 0.45),
         hair,
         hatBrim: mix(hair, '#000000', 0.25),
@@ -668,7 +670,8 @@ function scene(ctx, cam, s) {
         cam.glow(ctx, GRATE.x + GRATE.w * 0.45, GRATE.y + GRATE.h * 0.55, 13,
             'rgba(255,255,255,ALPHA)', s.glint * 0.45);
     }
-    crowd(ctx, cam, s.time, s.marks);
+    if (s.people) s.people(ctx, cam, s.time);
+    else crowd(ctx, cam, s.time, s.marks);
     if (s.draw) s.draw(ctx, cam);
     grate(ctx, cam, { bars: true });
     pole(ctx, cam);
@@ -789,6 +792,18 @@ function street(ctx, A, t) {
 
 // --- 4. bölümden: aynı cadde, bu kez virüs yok. Asılı "KARANTİNAYA GİRİN"
 // afişinin altından kalabalık hiçbir şey olmamış gibi akıp gidiyor. ---
+function drawBanner(c, m) {
+    const x = 84, y = 4, w = 64, h = 8;
+    m.rect(c, x - 1, y - 1, w + 2, h + 2, '#2a2018');
+    m.rect(c, x, y, w, h, '#b83a2e');
+    m.rect(c, x, y, w, 1, mix('#b83a2e', '#ffffff', 0.25));
+    m.rect(c, x, y + h - 1, w, 1, mix('#b83a2e', '#000000', 0.3));
+    // Direkler: iki ucu cepheye bağlı
+    m.rect(c, x - 2, y - 2, 2, h + 4, '#3a2c20');
+    m.rect(c, x + w, y - 2, 2, h + 4, '#3a2c20');
+    drawPixelText(c, 'KARANTİNAYA GİRİN', m.px(x + 3), m.py(y + 1.4), { scale: 2, color: '#f4f1e4' });
+}
+
 function streetIgnore(ctx, A, t) {
     const cam = createCam(A, WIDE);
     scene(ctx, cam, {
@@ -797,18 +812,46 @@ function streetIgnore(ctx, A, t) {
         time: t * CLOCK,
         glint: 0,
         marks: [],
-        draw: (c, m) => {
-            const x = 84, y = 4, w = 64, h = 8;
-            m.rect(c, x - 1, y - 1, w + 2, h + 2, '#2a2018');
-            m.rect(c, x, y, w, h, '#b83a2e');
-            m.rect(c, x, y, w, 1, mix('#b83a2e', '#ffffff', 0.25));
-            m.rect(c, x, y + h - 1, w, 1, mix('#b83a2e', '#000000', 0.3));
-            // Direkler: iki ucu cepheye bağlı
-            m.rect(c, x - 2, y - 2, 2, h + 4, '#3a2c20');
-            m.rect(c, x + w, y - 2, 2, h + 4, '#3a2c20');
-            drawPixelText(c, 'KARANTİNAYA GİRİN', m.px(x + 3), m.py(y + 1.4), { scale: 2, color: '#f4f1e4' });
-        }
+        draw: (c, m) => drawBanner(c, m)
     });
 }
 
-export const CHAPTER_2_ART = { street, streetIgnore };
+// --- 5. bölümden: bir hafta sonra. Aynı cadde, neredeyse boş. Kalan birkaç
+// kişi hasta: kolları yeşil, başları düşük, adımları ağır. Afiş hâlâ asılı. ---
+const SICK_FOLK = (() => {
+    const pick = (i, lane, extra) => bakeTones({
+        ...CROWD[i], lane, h: LANES[lane].h * 0.97, sick: 1, mark: 0, ...extra
+    });
+    return [
+        pick(3, 0, { x0: 40, speed: 5, dir: 1 }),
+        pick(14, 0, { x0: 190, speed: 4, dir: -1 }),
+        pick(5, 1, { x0: 120, speed: 6, dir: 1 }),
+        pick(20, 1, { x0: 80, speed: 0, dir: -1, still: true, x: 80 }),
+        pick(9, 2, { x0: 30, speed: 7, dir: 1 }),
+        pick(23, 2, { x0: 150, speed: 0, dir: 1, still: true, x: 150 })
+    ];
+})();
+
+function sickAt(p, time) {
+    if (p.still) return { ...p, dist: 0, moving: false };
+    return walkerAt(p, time);
+}
+
+function streetWeek(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        area: A,
+        t: 0,
+        time: t * CLOCK,
+        glint: 0,
+        marks: [],
+        people: (c, m, time) => {
+            for (let lane = 0; lane < LANES.length; lane++) {
+                for (const p of SICK_FOLK) if (p.lane === lane) person(c, m, sickAt(p, time), time);
+            }
+        },
+        draw: (c, m) => drawBanner(c, m)
+    });
+}
+
+export const CHAPTER_2_ART = { street, streetIgnore, streetWeek };

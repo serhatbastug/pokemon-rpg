@@ -80,7 +80,7 @@ ondan öncesi kare kare anlatılıyor. Her kare tam ekran gelir, öncekinin
 üstünü örter; oyuncu **F / SPACE / ENTER**, kolda **ÇARPI** ile ilerletir.
 **ESC / DAİRE** prologu bırakır.
 
-Şimdilik dört bölüm var; 5. bölümden itibaren hikâye yeni senaryoya göre
+Şimdilik beş bölüm var; 5. bölümden itibaren hikâye yeni senaryoya göre
 yazılacak (karantina, bir hafta sonra, deney, hap, şehirden kaçış, orman):
 
 | Bölüm | Ne anlatılıyor |
@@ -89,6 +89,7 @@ yazılacak (karantina, bir hafta sonra, deney, hap, şehirden kaçış, orman):
 | 2. CADDE | Tek kare, sabit kamera: virüs dokuz kişiye bulaşıyor. |
 | 3. SAĞLIK OCAĞI | Doktor hastaya V-986'yı anlatıyor. |
 | 4. KARANTİNA | Harry ve Fred birbirlerine adıyla seslenerek haberi konuşuyor, karantina çağrısı reddediliyor, virüsü tanımaya karar veriyorlar. |
+| 5. BİR HAFTA SONRA | Boşalan cadde, kolları yeşillenen hastalar, ateşli yeşil bir kol. |
 
 Kurallar:
 
@@ -110,7 +111,7 @@ src/comic/
   ComicScene.js       Canvas, girdi, ses, döngü
   comicArt.js         Sayfa: çerçeve, anlatıcı kutusu, başlık kartı, çizim haritası
   comicKit.js         Karelerin paylaştığı çizim araçları (kol, cam kap, ışık)
-  art/chapter1..4.js  Kare çizimleri, bölüm bölüm
+  art/chapter1..5.js  Kare çizimleri, bölüm bölüm
 ```
 
 Kareleri gözle görmek için: `node tools/comic-shots.mjs` (tümü),

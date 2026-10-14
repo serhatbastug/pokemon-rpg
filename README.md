@@ -80,14 +80,15 @@ ondan öncesi kare kare anlatılıyor. Her kare tam ekran gelir, öncekinin
 üstünü örter; oyuncu **F / SPACE / ENTER**, kolda **ÇARPI** ile ilerletir.
 **ESC / DAİRE** prologu bırakır.
 
-Dört bölüm, 29 kare:
+Şimdilik dört bölüm var; 5. bölümden itibaren hikâye yeni senaryoya göre
+yazılacak (karantina, bir hafta sonra, deney, hap, şehirden kaçış, orman):
 
-| Bölüm | Kare | Ne anlatılıyor |
-|---|---|---|
-| 1. LABORATUVAR | 6 | Gece, deney 44, şişenin rafa konması, ışıkların sönmesi, camın çatlaması. **Tek kelime konuşulmuyor** - yalnızca anlatıcı kutuları. |
-| 2. ÇALIŞMA ALANI | 7 | Temiz çıkan tahliller, hücrenin İÇİNDEKİ virüs, duvardaki haritaya iğnelenen vakalar, ortaya çıkan hat (su şebekesi), aşı kuyruğu. |
-| 3. KUŞATMA | 7 | Avludaki altı kişi, örgüye dayanan kalabalık, kaçış planı, yarıktan giriş, **inen çelik kapı** ve yarım kalan cümle. |
-| 4. ORMANIN AĞZI | 9 | Tünelde koşu, rögardan çıkış, ormanın ağzında duran beş kişi, yeşillenme, vuruş, ormana tek başına giriş. |
+| Bölüm | Ne anlatılıyor |
+|---|---|
+| 1. LABORATUVAR | Fred sıvıyı karıştırıyor, kap paramparça oluyor. |
+| 2. CADDE | Tek kare, sabit kamera: virüs dokuz kişiye bulaşıyor. |
+| 3. SAĞLIK OCAĞI | Doktor hastaya V-986'yı anlatıyor. |
+| 4. EV | Harry ve Fred virüsü konuşuyor, denek bulma kararı. |
 
 Kurallar:
 
@@ -116,9 +117,8 @@ Kareleri gözle görmek için: `node tools/comic-shots.mjs` (tümü),
 `node tools/comic-shots.mjs lab-raf 0.9` (tek kare, hareketin belli bir anı).
 Görüntüler `tools/shots/` altına düşer, sunucunun açık olması gerekir.
 
-> Prologun eski **oynanabilir** sahneleri (kuşatma, kanalizasyon koşusu,
-> şehrin kenarı) çizgi romana dönüştüğü için kaldırıldı; kodları git
-> geçmişinde duruyor (son hâli `376ae07`).
+> Kuşatma, kanalizasyon ve ormanın ağzı bölümleri yeni senaryo nedeniyle silindi;
+> eski hâlleri git geçmişinde duruyor.
 
 
 ## Kontroller

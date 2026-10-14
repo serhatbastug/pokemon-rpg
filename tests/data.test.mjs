@@ -469,8 +469,8 @@ check('çizgi roman: açılma sönümü bitiyor', player.alpha === 1);
 
 // Son kareden sonra biter (sonsuz döngü yok)
 player.enter(comic.PANELS.length - 1);
-player.frame = 99999;
-player.advance();
+// Son karede balon varsa önce o bitiyor: birkaç F basışı gerekebilir
+for (let i = 0; i < 20 && !player.finished; i++) { player.frame = 99999; player.advance(); }
 check('çizgi roman: son kareden sonra bitiyor', player.finished && !player.running);
 
 // ---- Dövüş hamleleri ----

@@ -12,8 +12,6 @@ import { CHAPTER_1_ART } from './art/chapter1.js';
 import { CHAPTER_2_ART } from './art/chapter2.js';
 import { CHAPTER_3_ART } from './art/chapter3.js';
 import { CHAPTER_4_ART } from './art/chapter4.js';
-import { CHAPTER_5_ART } from './art/chapter5.js';
-import { CHAPTER_6_ART } from './art/chapter6.js';
 
 export { PAGE, AREA } from './comicKit.js';
 
@@ -96,9 +94,7 @@ export const PANEL_ART = {
     ...CHAPTER_1_ART,
     ...CHAPTER_2_ART,
     ...CHAPTER_3_ART,
-    ...CHAPTER_4_ART,
-    ...CHAPTER_5_ART,
-    ...CHAPTER_6_ART
+    ...CHAPTER_4_ART
 };
 
 // Bir kareyi çizer. Bilinmeyen anahtar sessiz boş kare bırakmasın diye

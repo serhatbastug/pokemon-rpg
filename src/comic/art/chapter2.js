@@ -18,6 +18,7 @@
 // alınan yola bağlı - yoksa yürürken kayıyorlar.
 
 import { PX, hash, newCanvas } from '../../pixel/pixelDraw.js';
+import { drawPixelText } from '../../pixel/pixelFont.js';
 import {
     createCam, vignette, mix, drawBlob, blobDrops,
     span, clamp01, easeOut, easeIn, lerp
@@ -786,4 +787,28 @@ function street(ctx, A, t) {
     });
 }
 
-export const CHAPTER_2_ART = { street };
+// --- 4. bölümden: aynı cadde, bu kez virüs yok. Asılı "KARANTİNAYA GİRİN"
+// afişinin altından kalabalık hiçbir şey olmamış gibi akıp gidiyor. ---
+function streetIgnore(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        area: A,
+        t: 0,
+        time: t * CLOCK,
+        glint: 0,
+        marks: [],
+        draw: (c, m) => {
+            const x = 84, y = 4, w = 64, h = 8;
+            m.rect(c, x - 1, y - 1, w + 2, h + 2, '#2a2018');
+            m.rect(c, x, y, w, h, '#b83a2e');
+            m.rect(c, x, y, w, 1, mix('#b83a2e', '#ffffff', 0.25));
+            m.rect(c, x, y + h - 1, w, 1, mix('#b83a2e', '#000000', 0.3));
+            // Direkler: iki ucu cepheye bağlı
+            m.rect(c, x - 2, y - 2, 2, h + 4, '#3a2c20');
+            m.rect(c, x + w, y - 2, 2, h + 4, '#3a2c20');
+            drawPixelText(c, 'KARANTİNAYA GİRİN', m.px(x + 3), m.py(y + 1.4), { scale: 2, color: '#f4f1e4' });
+        }
+    });
+}
+
+export const CHAPTER_2_ART = { street, streetIgnore };

@@ -254,6 +254,11 @@ export const PANELS = [
         motion: 0, hold: 20
     },
     {
+        // Karar verildi, ama sokak umursamıyor: afişin altından akıp giden kalabalık
+        id: 'ev-reddedildi', chapter: 4, art: 'streetIgnore',
+        motion: 240, hold: 30
+    },
+    {
         id: 'ev-katilma', chapter: 4, art: 'homeAgree', cont: true,
         lines: at(HOME_AGREE, 660, 150),
         motion: 0, hold: 20

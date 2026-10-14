@@ -51,7 +51,7 @@ export const CHAPTERS = [
     { n: 1, title: 'LABORATUVAR', subtitle: 'BİR YIL ÖNCE' },
     { n: 2, title: 'CADDE', subtitle: 'ERTESİ SABAH' },
     { n: 3, title: 'SAĞLIK OCAĞI', subtitle: 'GÜNLER SONRA' },
-    { n: 4, title: 'EV', subtitle: 'AYNI GÜNLERDE' }
+    { n: 4, title: 'KARANTİNA', subtitle: 'AYNI GÜNLERDE' }
 ];
 
 export const PANELS = [

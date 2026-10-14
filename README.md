@@ -88,7 +88,7 @@ yazılacak (karantina, bir hafta sonra, deney, hap, şehirden kaçış, orman):
 | 1. LABORATUVAR | Fred sıvıyı karıştırıyor, kap paramparça oluyor. |
 | 2. CADDE | Tek kare, sabit kamera: virüs dokuz kişiye bulaşıyor. |
 | 3. SAĞLIK OCAĞI | Doktor hastaya V-986'yı anlatıyor. |
-| 4. EV | Harry ve Fred virüsü konuşuyor, denek bulma kararı. |
+| 4. KARANTİNA | Harry ve Fred birbirlerine adıyla seslenerek haberi konuşuyor, karantina çağrısı reddediliyor, virüsü tanımaya karar veriyorlar. |
 
 Kurallar:
 

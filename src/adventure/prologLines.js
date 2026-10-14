@@ -67,32 +67,33 @@ export const CLINIC_LOOK_A = [
 
 // Bizimki gazeteyi indirip soruyor
 export const HOME_ASK = [
-    { speaker: 'biz', text: 'Duydun mu, yeni bir virüs çıkmış.' }
+    { speaker: 'biz', text: 'Fred, V-986 diye yeni bir virüs çıkmış, duydun mu?' }
 ];
 
 // Arkadaş kapıdan içeri girerken
 export const HOME_HEARD = [
-    { speaker: 'arkadas', text: 'V-986 virüsünü mü diyorsun? Evet, duydum onu.' }
+    { speaker: 'arkadas', text: 'Duydum Harry. Çok hızlı yayılıyormuş, aşısı da yokmuş.' }
 ];
 
 export const HOME_DESC = [
-    { speaker: 'arkadas', text: 'Çok hızlı yayılıyormuş, aşısı da yokmuş.' }
+    { speaker: 'arkadas', text: 'En kötüsü belirtisi olmaması. Ortaya çıktığında çok geç olabilir.' }
 ];
 
 export const HOME_WARN = [
-    { speaker: 'arkadas', text: 'Belirtisi olmaması kötü yanı, ama önemli olabilir diye konuşuluyor.' }
+    { speaker: 'arkadas', text: 'Bence insanları karantinaya girmeye çağırmalıyız, Harry.' }
 ];
 
 // Bizimkinin önerisi
 export const HOME_PROPOSE = [
-    { speaker: 'biz', text: 'Bence işimiz gereği bu virüs üzerine biraz çalışmalıyız.' },
-    { speaker: 'biz', text: 'İleride bir belirti ortaya çıkarsa insanları uyarabilmeliyiz.' }
+    { speaker: 'biz', text: 'Haklısın Fred. Belirti çıkmadan herkesi uyarmalıyız.' },
+    { speaker: 'biz', text: 'Hemen duyuruyu yapalım.' }
 ];
 
 export const HOME_AGREE = [
-    { speaker: 'arkadas', text: 'Katılıyorum.' }
+    { speaker: 'arkadas', text: 'Duyurduk ama kimse dinlemiyor Harry. Karantinaya girmek istemiyorlar.' }
 ];
 
 export const HOME_CLOSE = [
-    { speaker: 'biz', text: 'Ben de bu virüs hakkında edinebileceğim bilgileri toplayayım.' }
+    { speaker: 'biz', text: 'O zaman virüsü daha yakından tanımamız lazım, Fred.' },
+    { speaker: 'biz', text: 'Ben bilgi toplamaya başlıyorum.' }
 ];

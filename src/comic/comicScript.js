@@ -37,7 +37,8 @@ import {
     CLINIC_RESULT, CLINIC_DETAILS, CLINIC_ORIGIN_Q, CLINIC_ORIGIN_A,
     CLINIC_LOOK_Q, CLINIC_LOOK_A,
     HOME_ASK, HOME_HEARD, HOME_DESC, HOME_WARN, HOME_PROPOSE,
-    HOME_AGREE, HOME_CLOSE
+    HOME_AGREE, HOME_CLOSE,
+    LAB_HELP_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH
 } from '../adventure/prologLines.js';
 
 // Konuşma balonlarına konum ekler: metin prologLines.js'te tek yerde durur,
@@ -52,7 +53,8 @@ export const CHAPTERS = [
     { n: 2, title: 'CADDE', subtitle: 'ERTESİ SABAH' },
     { n: 3, title: 'SAĞLIK OCAĞI', subtitle: 'GÜNLER SONRA' },
     { n: 4, title: 'KARANTİNA', subtitle: 'AYNI GÜNLERDE' },
-    { n: 5, title: 'BİR HAFTA SONRA', subtitle: null }
+    { n: 5, title: 'BİR HAFTA SONRA', subtitle: null },
+    { n: 6, title: 'DENEY', subtitle: null }
 ];
 
 export const PANELS = [
@@ -287,6 +289,55 @@ export const PANELS = [
         id: 'hafta-kol', chapter: 5, art: 'greenArm',
         caption: 'ATEŞ. HALSİZLİK. KOLLARDA YEŞİL İZLER.',
         motion: 160, hold: 60
+    },
+
+    // ================= 6. BÖLÜM - DENEY =================
+    // Harry ile Fred'in laboratuvarı, gündüz. Sağlıklılar yardıma geliyor,
+    // gönüllü bir enfekte masaya yatıyor, üç bulgu ekranlardan okunuyor,
+    // denek ölüyor. Ölüm EKRANDA - gizem değil.
+
+    { id: 'baslik-6', chapter: 6, art: 'title', motion: 0, hold: 90 },
+
+    {
+        // HAREKETLİ: sağlıklılar kapıdan girip masanın yanına diziliyor
+        id: 'deney-yardim', chapter: 6, art: 'labHelp',
+        lines: [...at(LAB_HELP_ARRIVE.slice(0, 1), 316, 158), ...at(LAB_HELP_ARRIVE.slice(1), 812, 158)],
+        motion: 120, hold: 20
+    },
+    {
+        id: 'deney-denek', chapter: 6, art: 'labPatient', cont: true,
+        lines: [...at(LAB_PATIENT_START.slice(0, 1), 716, 158), ...at(LAB_PATIENT_START.slice(1), 812, 158)],
+        motion: 60, hold: 20
+    },
+    {
+        // HAREKETLİ: virüs parçalanıp hücreye giriyor
+        id: 'deney-bulgu-1', chapter: 6, art: 'findSplit',
+        caption: 'VİRÜS PARÇALANIP HÜCRELERE YERLEŞİYOR.',
+        motion: 160, hold: 40
+    },
+    {
+        // HAREKETLİ: saniyede on bölünme
+        id: 'deney-bulgu-2', chapter: 6, art: 'findMitosis',
+        caption: 'HÜCRE İÇİNDE SANİYEDE 10 BÖLÜNME.',
+        motion: 160, hold: 40
+    },
+    {
+        // HAREKETLİ: beyne yayılıyor, zeka çubuğu düşüyor
+        id: 'deney-bulgu-3', chapter: 6, art: 'findBrain',
+        caption: 'BİR KISMI BEYNE YERLEŞİYOR. ZEKA KÖRELİYOR.',
+        motion: 160, hold: 40
+    },
+    {
+        // HAREKETLİ: nabız çizgisi düzleşiyor
+        id: 'deney-olum', chapter: 6, art: 'labDeath',
+        caption: 'DENEK ÖLDÜ.',
+        motion: 120, hold: 60,
+        sfx: [{ name: 'faint', at: 0.56 }]
+    },
+    {
+        id: 'deney-yeter', chapter: 6, art: 'labDeath', cont: true,
+        lines: [...at(LAB_ENOUGH.slice(0, 1), 812, 158), ...at(LAB_ENOUGH.slice(1), 716, 158)],
+        motion: 0, hold: 90
     }
 ];
 

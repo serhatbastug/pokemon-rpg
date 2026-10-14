@@ -97,3 +97,20 @@ export const HOME_CLOSE = [
     { speaker: 'biz', text: 'O zaman virüsü daha yakından tanımamız lazım, Fred.' },
     { speaker: 'biz', text: 'Ben bilgi toplamaya başlıyorum.' }
 ];
+
+// --- Prolog 6: deney ---
+
+export const LAB_HELP_ARRIVE = [
+    { speaker: 'saglikli-0', text: 'Çağrınızı duyduk. Size nasıl yardımcı olabiliriz?' },
+    { speaker: 'arkadas', text: 'Hoş geldiniz. Her el bize lazım.' }
+];
+
+export const LAB_PATIENT_START = [
+    { speaker: 'biz', text: 'Gönüllümüz masada. Örnekleri alalım Fred.' },
+    { speaker: 'arkadas', text: 'Hazırım Harry. Başlıyoruz.' }
+];
+
+export const LAB_ENOUGH = [
+    { speaker: 'arkadas', text: 'Bize yeterince yardım etti. Daha fazla araştırmaya gerek yok.' },
+    { speaker: 'biz', text: '...Haklısın Fred.' }
+];

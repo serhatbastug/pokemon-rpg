@@ -23,7 +23,7 @@ const BUBBLE_SCALE = 2;
 const BUBBLE_MAX_W = 520;      // balonun en fazla genişliği (piksel)
 
 // Bölümlere göre müzik: her bölümün kendi havası var
-const CHAPTER_MUSIC = { 1: 'shadow', 2: 'ruin', 3: 'siege', 4: 'sewer' };
+const CHAPTER_MUSIC = { 1: 'shadow', 2: 'ruin', 3: 'siege', 4: 'sewer', 5: 'ruin', 6: 'shadow' };
 
 export class ComicScene {
     constructor({ canvas, input, gamepad, onExit, onFinish }) {

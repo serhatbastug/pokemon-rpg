@@ -84,13 +84,16 @@ export class ComicScene {
         }
     }
 
-    start() {
+    // fromChapter: prologun hangi bölümden başlayacağı (1 = baştan)
+    start(fromChapter = 1) {
         this.frame = 0;
         this.chapter = null;
         this.fired = new Set();
         this.running = true;
         this.ctx.imageSmoothingEnabled = false;
         this.player.start();
+        const first = this.player.panels.findIndex(p => p.chapter === fromChapter);
+        if (first > 0) this.player.enter(first);
 
         if (this.rafId) cancelAnimationFrame(this.rafId);
         const stepMs = 1000 / FRAME_RATE;

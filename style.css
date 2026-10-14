@@ -1144,3 +1144,15 @@ canvas {
     color: var(--text-secondary);
     letter-spacing: 0.05em;
 }
+
+.chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    margin: 0 auto 0.4rem;
+    max-width: 340px;
+}
+
+.chapter-btn {
+    text-align: left;
+}

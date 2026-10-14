@@ -12,6 +12,7 @@ import { showBattleScreen, showGameOver, hideGameOver, showSelectionScreen, show
 import { Game } from './game/Game.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
+import { ChapterSelect } from './ui/chapterSelect.js';
 import { ComicScene } from './comic/ComicScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
@@ -79,18 +80,32 @@ const comic = new ComicScene({
     }
 });
 
-const startPrompt = new StartPrompt({
-    // EVET: ekran yavaşça kararır, sonra prolog çizgi romanı başlar
-    onConfirm: () => menu.beginExit(() => {
+// Bölüm seçme: EVET'ten sonra açılır. Seçilen bölümde ekran yavaşça kararır,
+// sonra çizgi roman o bölümden başlar.
+const chapterSelect = new ChapterSelect({
+    onPick: (chapter) => menu.beginExit(() => {
         menu.stop();
         showComicScreen();
-        comic.start();
+        comic.start(chapter);
     }),
     onCancel: () => menu.setPaused(false)
 });
 
-// Kol: pencere açıkken Çarpı onaylar, Daire kapatır
+const startPrompt = new StartPrompt({
+    onConfirm: () => chapterSelect.show(),
+    onCancel: () => menu.setPaused(false)
+});
+
+// Kol: pencere açıkken Çarpı onaylar, Daire kapatır; bölüm listesinde yön
+// tuşları gezer
 gamepad.onButtonDown(button => {
+    if (chapterSelect.open) {
+        if (button === 'dpadUp') chapterSelect.move(-1);
+        else if (button === 'dpadDown') chapterSelect.move(1);
+        else if (button === 'cross') chapterSelect.pick(chapterSelect.index);
+        else if (button === 'circle') chapterSelect.cancel();
+        return;
+    }
     if (!startPrompt.open) return;
     if (button === 'cross') startPrompt.confirm();
     else if (button === 'circle') startPrompt.cancel();
@@ -125,6 +140,7 @@ document.getElementById('selection-back-btn').addEventListener('click', returnTo
 window.__game = game;
 window.__menu = menu;
 window.__comic = comic;
+window.__chapterSelect = chapterSelect;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;
 window.__characterSelect = characterSelect;

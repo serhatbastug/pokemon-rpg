@@ -154,6 +154,8 @@ async function main() {
     await page.keyboard.press('KeyF');
     await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
     await page.click('#start-prompt-yes');
+    await page.waitForSelector('#chapter-select:not(.hidden)', { timeout: 5000 });
+    await page.click('#chapter-list [data-chapter="1"]');
     await page.waitForFunction(() => window.__comic && window.__comic.running, { timeout: 8000 });
     await wait(400);
     const comicOpen = await page.evaluate(() => ({
@@ -240,6 +242,15 @@ async function main() {
         return [...bad];
     });
     check('Karelerin ses ipuclari tanimli', cues.length === 0, cues.join(','));
+
+    // Bölüm seçme: seçilen bölümün ilk karesinden başlıyor
+    const jumped = await page.evaluate(() => {
+        const c = window.__comic;
+        c.start(4);
+        return { chapter: c.player.panel.chapter, first: c.player.panel.id };
+    });
+    check('Bolum secme: 4. bolum 4. bolumun basindan basliyor',
+        jumped.chapter === 4 && jumped.first === 'baslik-4', JSON.stringify(jumped));
 
     // Son kareden sonra ana menüye dönülüyor (orman henüz yok)
     await page.evaluate(() => {

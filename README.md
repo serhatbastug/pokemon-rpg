@@ -41,7 +41,7 @@ açılır (`src/menu/`). Sahne tek ekrandır, kamera kaymaz:
 | Orta | "MACERA KAPISI" tabelalı taş kemer | Önüne gelip **F** / **ÜÇGEN**: "Oyuna başlamak istiyor musunuz?" penceresi açılır |
 | Sağ | "2 KİŞİLİK OYNA" tabelalı portal | Kemerin **altına yürüyün**: ekran yavaşça kararır, karakter seçimi açılır |
 
-EVET denince ekran yavaşça kararır ve **prologun çizgi romanı** açılır
+EVET denince **bölüm seçme penceresi** açılır (yön tuşları + Enter, 1-9 ile doğrudan, kolda yön tuşu + ÇARPI); seçilen bölümde ekran yavaşça kararır ve **prologun çizgi romanı** o bölümden açılır
 (aşağıya bakın). Oyunun oynanan kısmı prolog bitince, ormanda başlayacak.
 
 > Eski Pokemon macera modu (portallı ana harita, yakalama, jetonlar, dükkan,

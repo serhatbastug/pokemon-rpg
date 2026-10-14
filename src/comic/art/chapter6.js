@@ -32,9 +32,9 @@ const WALL_SEAM = '#b4bec3';
 const HARRY = { coat: '#e8ecee', shade: '#b9c1c6', skin: '#c99a6e', hair: '#8a6238', trouser: '#3a4048' };
 const FRED = { coat: '#e1e5e7', shade: '#aeb6bb', skin: '#caa079', hair: '#1c1612', trouser: '#2c2f33', band: true };
 const HELPERS = [
-    { coat: '#6b7d5e', shade: '#4c5b42', skin: '#a8825f', hair: '#241f1b', trouser: '#3b3630', x: 70, from: -30 },
-    { coat: '#5e6b8a', shade: '#444f68', skin: '#d0aa84', hair: '#5a4326', trouser: '#2c3138', x: 52, from: -52 },
-    { coat: '#8a6a5e', shade: '#68493e', skin: '#8f6a4c', hair: '#161514', trouser: '#333a33', x: 34, from: -74 }
+    { coat: '#6b7d5e', shade: '#4c5b42', skin: '#a8825f', hair: '#241f1b', trouser: '#3b3630', x: 76, from: -24 },
+    { coat: '#5e6b8a', shade: '#444f68', skin: '#d0aa84', hair: '#5a4326', trouser: '#2c3138', x: 58, from: -46 },
+    { coat: '#8a6a5e', shade: '#68493e', skin: '#8f6a4c', hair: '#161514', trouser: '#333a33', x: 40, from: -68 }
 ];
 
 function limbCells(ctx, cam, x0, y0, x1, y1, thick, color) {
@@ -133,7 +133,7 @@ function patient(ctx, cam, { breath = 0, dead = false } = {}) {
 
 // --- Ayakta duran kişi: yüz AYRINTILI, bacaklar yürürken açılıyor ---
 function stander(ctx, cam, p) {
-    const { x, dir = 1, talk = 0, walk = null, band = false } = p;
+    const { x, dir = 1, talk = 0, walk = null, band = false, sick = 0 } = p;
     const { coat, shade, skin, hair, trouser } = p;
     const skinShade = mix(skin, '#000000', 0.22);
     const hipY = FLOOR_Y - 24;
@@ -168,8 +168,8 @@ function stander(ctx, cam, p) {
         const handX = x + s * 10.6 + swing * -s * 2;
         const handY = hipY + 1;
         limbCells(ctx, cam, sx, sy, ex, ey, 3.8, coat);
-        limbCells(ctx, cam, ex, ey, handX, handY - 2, 3.4, coat);
-        cam.rect(ctx, handX - 2, handY - 2, 4, 3.6, skin);
+        limbCells(ctx, cam, ex, ey, handX, handY - 2, 3.4, sick ? mix(coat, GREEN, 0.6 * sick) : coat);
+        cam.rect(ctx, handX - 2, handY - 2, 4, 3.6, sick ? mix(skin, GREEN, 0.65 * sick) : skin);
         if (band && s > 0) {
             cam.rect(ctx, handX - 2.1, handY - 4.6, 4.2, 2.4, BAND_COLOR);
             cam.rect(ctx, handX - 2.1, handY - 4.6, 4.2, 0.8, mix(BAND_COLOR, '#ffffff', 0.3));
@@ -178,7 +178,7 @@ function stander(ctx, cam, p) {
 
     // Baş ve yüz
     const hx = x + dir * 1.2;
-    const hy = shoulderY - 13 + y0;
+    const hy = shoulderY - 13 + y0 + sick * 1.6;
     const headW = 12.4, headH = 13;
     cam.rect(ctx, x - 2.6, shoulderY - 3 + y0, 5.2, 4, skinShade);
     cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
@@ -224,6 +224,18 @@ function labHelp(ctx, A, t) {
         const moving = k > 0 && k < 1;
         return { ...h, x, dir: 1, walk: moving ? t * 44 + i : null };
     });
+    scene(ctx, cam, { helpers, fred: { talk: 1 } });
+}
+
+// Gönüllü kapıda: sağlıklılar dönmüş ona bakıyor
+const VOLUNTEER = { coat: '#7a6a58', shade: '#5a4c3e', skin: '#c99a6e', hair: '#3f2c1e', trouser: '#3b3630', sick: 1 };
+
+function labArrive(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const k = easeOut(span(t, 0, 0.8));
+    const x = lerp(-8, 16, k);
+    const helpers = HELPERS.map(h => ({ ...h, dir: -1 }));
+    helpers.push({ ...VOLUNTEER, x, dir: 1, walk: k < 1 ? t * 40 : null, talk: 1 });
     scene(ctx, cam, { helpers, fred: { talk: 1 } });
 }
 
@@ -341,5 +353,5 @@ function labDeath(ctx, A, t) {
 }
 
 export const CHAPTER_6_ART = {
-    labHelp, labPatient, findSplit, findMitosis, findBrain, labDeath
+    labHelp, labArrive, labPatient, findSplit, findMitosis, findBrain, labDeath
 };

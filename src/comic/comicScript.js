@@ -38,7 +38,7 @@ import {
     CLINIC_LOOK_Q, CLINIC_LOOK_A,
     HOME_ASK, HOME_HEARD, HOME_DESC, HOME_WARN, HOME_PROPOSE,
     HOME_AGREE, HOME_CLOSE,
-    LAB_HELP_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH
+    LAB_HELP_ARRIVE, STREET_SIGN, LAB_VOLUNTEER_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH
 } from '../adventure/prologLines.js';
 
 // Konuşma balonlarına konum ekler: metin prologLines.js'te tek yerde durur,
@@ -305,7 +305,19 @@ export const PANELS = [
         motion: 120, hold: 20
     },
     {
-        id: 'deney-denek', chapter: 6, art: 'labPatient', cont: true,
+        // HAREKETLİ: sokakta bir hasta duvardaki ilanın önünde durup okuyor
+        id: 'deney-sokak', chapter: 6, art: 'streetPoster',
+        lines: at(STREET_SIGN, 412, 216),
+        motion: 120, hold: 20
+    },
+    {
+        // HAREKETLİ: gönüllü laboratuvarın kapısından giriyor
+        id: 'deney-gelis', chapter: 6, art: 'labArrive',
+        lines: [...at(LAB_VOLUNTEER_ARRIVE.slice(0, 1), 100, 158), ...at(LAB_VOLUNTEER_ARRIVE.slice(1), 812, 158)],
+        motion: 80, hold: 20
+    },
+    {
+        id: 'deney-denek', chapter: 6, art: 'labPatient',
         lines: [...at(LAB_PATIENT_START.slice(0, 1), 716, 158), ...at(LAB_PATIENT_START.slice(1), 812, 158)],
         motion: 60, hold: 20
     },

@@ -854,4 +854,44 @@ function streetWeek(ctx, A, t) {
     });
 }
 
-export const CHAPTER_2_ART = { street, streetIgnore, streetWeek };
+// --- 6. bölümden: duvardaki ilan. Aynı cadde; bir hasta ağır ağır gelip
+// "GÖNÜLLÜ ARANIYOR" ilanının önünde durup okuyor. ---
+const POSTER = { x: 160, y: 27, w: 38, h: 24 };
+
+function drawPoster(c, m) {
+    const { x, y, w, h } = POSTER;
+    m.rect(c, x - 1, y - 1, w + 2, h + 2, '#2a2018');
+    m.rect(c, x, y, w, h, '#e8e2cf');
+    m.rect(c, x, y, w, 2, '#b83a2e');
+    const lines = ['GÖNÜLLÜ', 'ARANIYOR', 'LABORATUVAR'];
+    lines.forEach((text, i) => {
+        drawPixelText(c, text, m.px(x + 2), m.py(y + 4 + i * 6), { scale: 2, color: '#1c1a17' });
+    });
+}
+
+const SICK_READER = bakeTones({
+    ...CROWD[7], lane: 1, h: LANES[1].h * 0.97, sick: 1, mark: 0, dir: 1, x: 94
+});
+
+function streetPoster(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const k = easeOut(span(t, 0.05, 0.55));
+    const x = lerp(-10, 94, k);
+    const walking = k < 1;
+    scene(ctx, cam, {
+        area: A,
+        t: 0,
+        time: t * CLOCK,
+        glint: 0,
+        marks: [],
+        people: (c, m, time) => {
+            person(c, m, { ...SICK_READER, x, moving: walking, dist: x + 10 }, time);
+        },
+        draw: (c, m) => {
+            drawBanner(c, m);
+            drawPoster(c, m);
+        }
+    });
+}
+
+export const CHAPTER_2_ART = { street, streetIgnore, streetWeek, streetPoster };

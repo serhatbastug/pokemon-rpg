@@ -100,6 +100,18 @@ export const HOME_CLOSE = [
 
 // --- Prolog 6: deney ---
 
+// Sokakta duvardaki ilanı okuyan enfekte
+export const STREET_SIGN = [
+    { speaker: 'hasta', text: 'Laboratuvar gönüllü enfekte arıyormuş...' },
+    { speaker: 'hasta', text: 'Belki buraya gitsem iyi olabilir.' }
+];
+
+// Gönüllü laboratuvarın kapısında
+export const LAB_VOLUNTEER_ARRIVE = [
+    { speaker: 'hasta', text: 'Merhaba... Gönüllü olmak için geldim.' },
+    { speaker: 'arkadas', text: 'Hoş geldiniz. Harry, gönüllümüz geldi.' }
+];
+
 export const LAB_HELP_ARRIVE = [
     { speaker: 'saglikli-0', text: 'Çağrınızı duyduk. Size nasıl yardımcı olabiliriz?' },
     { speaker: 'arkadas', text: 'Hoş geldiniz. Her el bize lazım.' }

@@ -90,7 +90,7 @@ yazılacak (karantina, bir hafta sonra, deney, hap, şehirden kaçış, orman):
 | 3. SAĞLIK OCAĞI | Doktor hastaya V-986'yı anlatıyor. |
 | 4. KARANTİNA | Harry ve Fred birbirlerine adıyla seslenerek haberi konuşuyor, karantina çağrısı reddediliyor, virüsü tanımaya karar veriyorlar. |
 | 5. BİR HAFTA SONRA | Boşalan cadde, kolları yeşillenen hastalar, ateşli yeşil bir kol. |
-| 6. DENEY | Sağlıklılar yardıma geliyor, gönüllü enfekte masada, üç bulgu (parçalanma, saniyede 10 bölünme, beyin), denek ölüyor. |
+| 6. DENEY | Sağlıklılar yardıma geliyor, sokakta bir hasta "gönüllü aranıyor" ilanını okuyor, laboratuvara geliyor, masaya yatıyor, üç bulgu (parçalanma, saniyede 10 bölünme, beyin), denek ölüyor. |
 
 Kurallar:
 

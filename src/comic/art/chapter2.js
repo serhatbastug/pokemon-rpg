@@ -460,6 +460,15 @@ function person(ctx, cam, p, time) {
     cam.rect(ctx, hx + fx - a.headW * 0.1, eyeY + eyeH * 3, a.headW * 0.28, eyeH * 0.8,
         mouth);                                                                  // ağız
 
+    // Ağır hasta: yüzde belirgin yeşil damarlar
+    if ((p.sick || 0) > 1) {
+        const vein = '#2a6a1c';
+        cam.rect(ctx, hx - a.headW * 0.3, hy + a.headH * 0.12, a.headW * 0.07, a.headH * 0.3, vein);
+        cam.rect(ctx, hx + a.headW * 0.22, hy + a.headH * 0.2, a.headW * 0.07, a.headH * 0.34, vein);
+        cam.rect(ctx, hx - a.headW * 0.18, hy + a.headH * 0.62, a.headW * 0.07, a.headH * 0.28, vein);
+        cam.rect(ctx, hx + a.headW * 0.3, hy + a.headH * 0.64, a.headW * 0.07, a.headH * 0.26, vein);
+    }
+
     // Saç: alnın üstünde, ense hafif aşağı iniyor
     cam.rect(ctx, hx - a.headW / 2 - a.h * 0.006, hy - a.h * 0.012,
         a.headW + a.h * 0.012, a.headH * 0.4, hair);
@@ -894,4 +903,103 @@ function streetPoster(ctx, A, t) {
     });
 }
 
-export const CHAPTER_2_ART = { street, streetIgnore, streetWeek, streetPoster };
+// --- 7. bölümden: hap dağıtımı. Beyaz önlüklü biri küçük bir tezgâhta hap
+// veriyor; hastalar durmadan yanından geçip gidiyor. ---
+const PILL_HELPER = bakeTones({
+    ...CROWD[2], lane: 1, h: LANES[1].h, coat: '#e8ecee', sick: 0, mark: 0, dir: -1, x: 118
+});
+
+function drawPillStall(c, m) {
+    // Tezgâh: üst yüzey, beyaz örtü, ayaklar
+    m.rect(c, 100, 69, 36, 2, '#a8b4ba');
+    m.rect(c, 100, 69, 36, 0.8, '#d4dde0');
+    m.rect(c, 101, 71, 34, 10, '#e6ecee');
+    m.rect(c, 101, 71, 34, 1, '#bcc7cb');
+    m.rect(c, 101, 80, 34, 1, '#9aa6ab');
+    // Üstünde hap kutuları ve şişeler
+    for (let i = 0; i < 5; i++) {
+        m.rect(c, 103 + i * 6, 64, 4.4, 5, i % 2 ? '#d8a24a' : '#f4f1e4');
+        m.rect(c, 103 + i * 6, 64, 4.4, 1, '#ffffff');
+        m.rect(c, 104.6 + i * 6, 65.6, 1.4, 1.4, '#c8322e');
+    }
+    // Levha
+    m.rect(c, 137, 52, 1.4, 20, '#4a3a2c');
+    m.rect(c, 134, 40, 46, 12, '#2a2018');
+    m.rect(c, 135, 41, 44, 10, '#f4f1e4');
+    m.rect(c, 135, 41, 44, 2, '#c8322e');
+    drawPixelText(c, 'ÜCRETSİZ HAP', m.px(137), m.py(44.4), { scale: 2, color: '#1c1a17' });
+}
+
+function streetPill(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        area: A,
+        t: 0,
+        time: t * CLOCK,
+        glint: 0,
+        marks: [],
+        people: (c, m, time) => {
+            for (const p of SICK_FOLK) if (p.lane === 0) person(c, m, sickAt(p, time), time);
+            person(c, m, { ...PILL_HELPER, dist: 0, moving: false }, time);
+            drawPillStall(c, m);
+            for (const p of SICK_FOLK) if (p.lane === 2) person(c, m, sickAt(p, time), time);
+        },
+        draw: (c, m) => drawBanner(c, m)
+    });
+}
+
+// --- 7. bölümden: zamanla. Kolları tamamen yeşil, yüzleri damarlı, zekâsı
+// körelmiş insanlar; iki kişi öfkeyle yüz yüze, biri yere yığılmış. ---
+const WORSE_FOLK = (() => {
+    const pick = (i, lane, extra) => bakeTones({
+        ...CROWD[i], lane, h: LANES[lane].h * 0.96, sick: 1.7, mark: 0, ...extra
+    });
+    return [
+        pick(3, 0, { x0: 40, speed: 3, dir: 1 }),
+        pick(14, 0, { x0: 190, speed: 3, dir: -1 }),
+        pick(5, 1, { x0: 40, speed: 0, dir: 1, still: true, x: 40 }),
+        pick(20, 1, { x0: 60, speed: 0, dir: -1, still: true, x: 62 }),
+        pick(9, 2, { x0: 100, speed: 5, dir: 1 }),
+        pick(23, 2, { x0: 200, speed: 0, dir: -1, still: true, x: 190 })
+    ];
+})();
+
+const FALLEN = bakeTones({ ...CROWD[11], lane: 2, h: LANES[2].h * 0.96, sick: 1.7, mark: 0 });
+
+// Yere yığılmış: gövde yatay, kafa yerde, yeşil kol uzanmış
+function drawFallen(c, m) {
+    const t = FALLEN.tones;
+    const y = 96, x = 128;
+    m.rect(c, x - 4, y + 1, 56, 1.2, t.ground);
+    m.rect(c, x, y - 7, 30, 7, t.coat);
+    m.rect(c, x, y - 7, 30, 1.2, t.lit);
+    m.rect(c, x + 30, y - 6, 20, 5, t.trouser);
+    m.rect(c, x + 49, y - 3, 5, 3, '#1d2126');
+    m.rect(c, x - 9, y - 7, 9, 8, t.skin);
+    m.rect(c, x - 9, y - 7, 9, 3, FALLEN.hair);
+    m.rect(c, x - 6, y - 3.4, 1.6, 0.8, '#20242a');
+    for (const [vx, vy] of [[-8, -6], [-4, -5], [-7, -2]]) m.rect(c, x + vx, y + vy, 0.9, 2, '#2a6a1c');
+    // Uzanan yeşil kol ve el
+    m.rect(c, x - 22, y - 1.6, 16, 3, mix(t.coat, '#3f9a28', 0.8));
+    m.rect(c, x - 28, y - 1.8, 6, 3.4, '#4aa832');
+}
+
+function streetWorse(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    scene(ctx, cam, {
+        area: A,
+        t: 0,
+        time: t * CLOCK,
+        glint: 0,
+        marks: [],
+        people: (c, m, time) => {
+            for (let lane = 0; lane < LANES.length; lane++) {
+                for (const p of WORSE_FOLK) if (p.lane === lane) person(c, m, sickAt(p, time), time);
+                if (lane === 2) drawFallen(c, m);
+            }
+        },
+        draw: (c, m) => drawBanner(c, m)
+    });
+}
+
+export const CHAPTER_2_ART = { street, streetIgnore, streetWeek, streetPoster, streetPill, streetWorse };

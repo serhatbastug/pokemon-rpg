@@ -368,9 +368,15 @@ export const PANELS = [
         motion: 60, hold: 20
     },
     {
-        // HAREKETLİ: sokak, insanlar haptan uzak duruyor
-        id: 'hap-sokak', chapter: 7, art: 'streetWeek',
+        // HAREKETLİ: sokakta hap tezgâhı; hastalar durmadan geçiyor
+        id: 'hap-dagitim', chapter: 7, art: 'streetPill',
         caption: 'ETKİSİ GEÇ FARK EDİLDİ. İNSANLAR HAPTAN UZAKLAŞTI.',
+        motion: 240, hold: 30
+    },
+    {
+        // HAREKETLİ: zamanla - damarlı yüzler, öfke, yere yığılan biri
+        id: 'hap-toplum', chapter: 7, art: 'streetWorse',
+        caption: 'ZAMANLA: ÖFKE. ZEKA DÜŞÜŞÜ. İLK ÖLÜMLER.',
         motion: 240, hold: 30
     },
     {

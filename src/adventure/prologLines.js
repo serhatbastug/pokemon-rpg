@@ -148,5 +148,5 @@ export const LAB_QUARREL = [
 
 // Harry tek başına hap üzerinde çalışırken
 export const LAB_SOLO = [
-    { speaker: 'biz', text: 'Biraz daha... Etkiyi daha uzun tutmalıyım.' }
+    { speaker: 'biz', text: 'Etkiyi uzatmalıyım...' }
 ];

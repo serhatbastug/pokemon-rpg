@@ -122,6 +122,18 @@ export const LAB_PATIENT_START = [
     { speaker: 'arkadas', text: 'Hazırım Harry. Başlıyoruz.' }
 ];
 
+// 6. bölümün sonu: bulgulardan sonra ne yapacakları
+export const LAB_FINDINGS_END = [
+    { speaker: 'biz', text: 'Hücreye yerleşiyor, durmadan çoğalıyor, beyne de ulaşıyor. Yok edemeyiz.' },
+    { speaker: 'arkadas', text: 'Yok edemesek de yavaşlatabiliriz. Bir şey geliştirelim Harry.' }
+];
+
+// 7. bölüm: hap hazır
+export const LAB_PILL = [
+    { speaker: 'biz', text: 'Hap hazır Fred. Etkiyi azaltıyor ama yok etmiyor.' },
+    { speaker: 'arkadas', text: 'Yavaşlatması bile bir şey. Herkese dağıtalım.' }
+];
+
 export const LAB_ENOUGH = [
     { speaker: 'arkadas', text: 'Bize yeterince yardım etti. Daha fazla araştırmaya gerek yok.' },
     { speaker: 'biz', text: '...Haklısın Fred.' }

@@ -44,15 +44,15 @@ const FLOOR_A = '#8a6a42';
 const FLOOR_B = '#7d5f3a';
 const FLOOR_SEAM = '#5f4728';
 
-const BIZ_HAIR = '#5a3d24';
-const BIZ_SKIN = '#c99a6e';
+const BIZ_HAIR = '#9a6a36';       // Harry: 6. bölümdeki laboratuvar haliyle aynı
+const BIZ_SKIN = '#e0b48c';
 const BIZ_CARDIGAN = '#6b3232';
 const BIZ_CARDIGAN_SHADE = '#4a2020';
 const BIZ_SHIRT = '#d8cdb8';
 const BIZ_TROUSER = '#3a4048';
 
-const FRIEND_HAIR = '#332920';
-const FRIEND_SKIN = '#caa079';
+const FRIEND_HAIR = '#120e0c';    // Fred: esmer, simsiyah dik saç, kirli sakal
+const FRIEND_SKIN = '#a8754c';
 const FRIEND_COAT = '#4a5560';
 const FRIEND_COAT_SHADE = '#33393f';
 const FRIEND_TROUSER = '#2c2f33';
@@ -277,9 +277,21 @@ function bizPerson(ctx, cam, p) {
     cam.rect(ctx, hx + fx - 1.5 + talk * 0.3, eyeY + eyeH * 3, 3.2 - talk * 0.6, 0.6, mix(mouth, '#000000', 0.25));
     cam.rect(ctx, hx + fx - 1.4 + talk * 0.3, eyeY + eyeH * 3.5, 3 - talk * 0.6, 1 + talk * 0.9, mouth);
 
+    // Gözlük (laboratuvardaki Harry ile aynı)
+    const frame = '#1e1a16';
+    for (const s of [-1, 1]) {
+        const ex = hx + fx + s * gap;
+        cam.rect(ctx, ex - 2, eyeY - 1, 4, 0.6, frame);
+        cam.rect(ctx, ex - 2, eyeY + 2, 4, 0.6, frame);
+        cam.rect(ctx, ex - 2, eyeY - 1, 0.6, 3.6, frame);
+        cam.rect(ctx, ex + 1.4, eyeY - 1, 0.6, 3.6, frame);
+    }
+    cam.rect(ctx, hx + fx - 0.5, eyeY, 1, 0.6, frame);
+
     cam.rect(ctx, hx - headW / 2 - 0.8, hy - 1.6, headW + 1.6, headH * 0.34, BIZ_HAIR);
     cam.rect(ctx, hx - headW * 0.3, hy - 1.6, headW * 0.22, headH * 0.14, mix(BIZ_HAIR, '#ffffff', 0.14));
     cam.rect(ctx, hx - headW * 0.52, hy + headH * 0.1, headW * 0.2, headH * 0.5, BIZ_HAIR);
+    cam.rect(ctx, hx + headW * 0.06, hy, headW * 0.44, headH * 0.4, BIZ_HAIR);
     // Dağınık bir tutam - evde rahat oturuyor
     cam.rect(ctx, hx - headW * 0.05, hy - 2.6, headW * 0.16, 2, BIZ_HAIR);
 
@@ -291,10 +303,10 @@ function bizPerson(ctx, cam, p) {
 function friendPerson(ctx, cam, p) {
     const { x, dir = -1, talk = 0 } = p;
     const skin = FRIEND_SKIN, skinShade = mix(skin, '#000000', 0.22);
-    const hipY = FLOOR_Y - 24;
-    const torsoH = 29;
+    const hipY = FLOOR_Y - 22;
+    const torsoH = 26;
     const shoulderY = hipY - torsoH;
-    const coatW = 21;
+    const coatW = 17;
 
     // Bacaklar: üstte kalın, aşağıda daralıyor - paltonun altından çıkıyor
     for (const s of [-1, 1]) {
@@ -333,19 +345,24 @@ function friendPerson(ctx, cam, p) {
         }
     }
 
-    cam.rect(ctx, x - 2.4, shoulderY, 4.8, 3, mix(FRIEND_COAT, '#000000', 0.12));
+    cam.rect(ctx, x - 2.6, shoulderY + 1, 5.2, torsoH * 0.55, '#1b1d20');
+    cam.rect(ctx, x - 2.6, shoulderY + 1, 5.2, 1.4, '#34383d');
+    cam.rect(ctx, x - 2.4, shoulderY, 4.8, 1.2, '#1b1d20');
 
     // Baş: YÜZ YOK. Düz ten yüzey, üstte ve arkada saç. Siyah değil.
     const hx = x + dir * -1.2;
-    const hy = shoulderY - 13;
-    const headW = 12.4, headH = 13;
+    const hy = shoulderY - 12;
+    const headW = 11.2, headH = 12;
     cam.rect(ctx, x - 2.6, shoulderY - 3, 5.2, 4, skinShade);
     cam.rect(ctx, hx - headW / 2, hy, headW, headH, skin);
     cam.rect(ctx, hx - headW / 2, hy + headH * 0.55, headW * 0.18, headH * 0.45, skinShade);
     cam.rect(ctx, hx + headW * 0.3, hy + headH * 0.2, headW * 0.2, headH * 0.8, mix(skin, '#ffffff', 0.1));
-    cam.rect(ctx, hx - headW / 2 - 0.6, hy - 0.6, headW + 1.2, headH * 0.36, FRIEND_HAIR);
-    cam.rect(ctx, hx + headW / 2 - headW * 0.2 + 0.6, hy, headW * 0.2, headH * 0.6, FRIEND_HAIR);
-    cam.rect(ctx, hx - headW * 0.05, hy - 2, headW * 0.22, 2.2, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2 - 0.2, hy - 0.4, headW + 0.4, headH * 0.26, FRIEND_HAIR);
+    for (let i = 0; i < 4; i++) cam.rect(ctx, hx - headW * 0.36 + i * headW * 0.22, hy - 2.4 - (i % 2) * 0.8, headW * 0.14, 2.4, FRIEND_HAIR);
+    cam.rect(ctx, hx - headW / 2 - 0.2, hy, headW * 0.1, headH * 0.34, FRIEND_HAIR);
+    cam.rect(ctx, hx + headW / 2 - headW * 0.06, hy, headW * 0.1, headH * 0.34, FRIEND_HAIR);
+    // Kirli sakal
+    cam.rect(ctx, hx - headW / 2 + 0.6, hy + headH * 0.62, headW - 1.2, headH * 0.36, mix(skin, FRIEND_HAIR, 0.45));
 
     // Yüz: sola bakıyor (dir = -1), özellikler yüzün ön yarısına kayık
     const mouthTone = mix(skin, '#7a3f38', 0.4);

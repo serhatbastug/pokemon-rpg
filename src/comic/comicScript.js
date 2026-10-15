@@ -38,7 +38,8 @@ import {
     CLINIC_LOOK_Q, CLINIC_LOOK_A,
     HOME_ASK, HOME_HEARD, HOME_DESC, HOME_WARN, HOME_PROPOSE,
     HOME_AGREE, HOME_CLOSE,
-    LAB_HELP_ARRIVE, STREET_SIGN, LAB_VOLUNTEER_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH
+    LAB_HELP_ARRIVE, STREET_SIGN, LAB_VOLUNTEER_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH,
+    LAB_FINDINGS_END, LAB_PILL
 } from '../adventure/prologLines.js';
 
 // Konuşma balonlarına konum ekler: metin prologLines.js'te tek yerde durur,
@@ -54,7 +55,8 @@ export const CHAPTERS = [
     { n: 3, title: 'SAĞLIK OCAĞI', subtitle: 'GÜNLER SONRA' },
     { n: 4, title: 'KARANTİNA', subtitle: 'AYNI GÜNLERDE' },
     { n: 5, title: 'BİR HAFTA SONRA', subtitle: null },
-    { n: 6, title: 'DENEY', subtitle: null }
+    { n: 6, title: 'DENEY', subtitle: null },
+    { n: 7, title: 'HAP', subtitle: 'GÜNLER SONRA' }
 ];
 
 export const PANELS = [
@@ -294,7 +296,7 @@ export const PANELS = [
     // ================= 6. BÖLÜM - DENEY =================
     // Harry ile Fred'in laboratuvarı, gündüz. Sağlıklılar yardıma geliyor,
     // gönüllü bir enfekte masaya yatıyor, üç bulgu ekranlardan okunuyor,
-    // denek ölüyor. Ölüm EKRANDA - gizem değil.
+    // Fred "yavaşlatabiliriz" diyor. Denek ölümü 7. bölümde (hapın ardından).
 
     { id: 'baslik-6', chapter: 6, art: 'title', motion: 0, hold: 90 },
 
@@ -340,14 +342,45 @@ export const PANELS = [
         motion: 160, hold: 40
     },
     {
+        id: 'deney-sonuc', chapter: 6, art: 'labPatient', cont: true,
+        lines: [...at(LAB_FINDINGS_END.slice(0, 1), 716, 158), ...at(LAB_FINDINGS_END.slice(1), 812, 158)],
+        motion: 0, hold: 90
+    },
+
+    // ================= 7. BÖLÜM - HAP =================
+    // Etkiyi azaltan ama yok etmeyen hap. Etkisi geç fark edildiği için insanlar
+    // ondan uzaklaşıyor. Zamanla kollar tamamen yeşil, damarlar belirgin; denek
+    // ölüyor. Ölüm EKRANDA - gizem değil. Ardından silah çalışması (bölüm 8).
+
+    { id: 'baslik-7', chapter: 7, art: 'title', motion: 0, hold: 90 },
+
+    {
+        // Laboratuvarda hap hazır; denek hâlâ masada
+        id: 'hap-hazir', chapter: 7, art: 'labPill',
+        lines: [...at(LAB_PILL.slice(0, 1), 716, 158), ...at(LAB_PILL.slice(1), 812, 158)],
+        motion: 60, hold: 20
+    },
+    {
+        // HAREKETLİ: sokak, insanlar haptan uzak duruyor
+        id: 'hap-sokak', chapter: 7, art: 'streetWeek',
+        caption: 'ETKİSİ GEÇ FARK EDİLDİ. İNSANLAR HAPTAN UZAKLAŞTI.',
+        motion: 240, hold: 30
+    },
+    {
+        // HAREKETLİ: denek daha da kötü; kol tamamen yeşil, yüzde damarlar
+        id: 'hap-kotulesme', chapter: 7, art: 'labWorse',
+        caption: 'KOLLAR TAMAMEN YEŞİL. YÜZDE DAMARLAR. ZEKA DÜŞÜYOR.',
+        motion: 120, hold: 40
+    },
+    {
         // HAREKETLİ: nabız çizgisi düzleşiyor
-        id: 'deney-olum', chapter: 6, art: 'labDeath',
+        id: 'hap-olum', chapter: 7, art: 'labDeath',
         caption: 'DENEK ÖLDÜ.',
         motion: 120, hold: 60,
         sfx: [{ name: 'faint', at: 0.56 }]
     },
     {
-        id: 'deney-yeter', chapter: 6, art: 'labDeath', cont: true,
+        id: 'hap-yeter', chapter: 7, art: 'labDeath', cont: true,
         lines: [...at(LAB_ENOUGH.slice(0, 1), 812, 158), ...at(LAB_ENOUGH.slice(1), 716, 158)],
         motion: 0, hold: 90
     }

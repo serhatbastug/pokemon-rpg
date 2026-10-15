@@ -10,13 +10,12 @@
 
 import { MENU_AVATAR_FRAMES } from '../world/menuAvatarSprite.js';
 
-// Görünüşler. coat/trouser: önlük ve pantolon; stubble/glasses/spiky/band/
-// messy: ayrıntı bayrakları; sick: ellerin yeşil rengine kayma oranı.
+// Görünüşler. coat/trouser: önlük ve pantolon; stubble/spiky/band/messy:
+// ayrıntı bayrakları (Harry'de gözlük yok: 12x16'da tek göz gibi görünüyordu); sick: ellerin yeşil rengine kayma oranı.
 export const LOOKS = {
     harry: {
         hair: '#9a6a36', skin: '#e0b48c', skinShade: '#c0906a',
-        coat: '#e8ecee', coatShade: '#b9c1c6', trouser: '#3a4048',
-        glasses: true
+        coat: '#e8ecee', coatShade: '#b9c1c6', trouser: '#3a4048'
     },
     fred: {
         hair: '#120e0c', skin: '#a8754c', skinShade: '#86593a',
@@ -99,8 +98,8 @@ function framesFor(look) {
                 rows[1] = '..hhhhhhhh..';
             }
             if (look.messy) {
-                rows[0] = '..hh.hhh.hh.';
-                rows[1] = '.hhhhhhhhhhh';
+                // Kapı deliğindeki yüzle aynı: yan ayrık, tepede birkaç tutam
+                rows[0] = '..h.hhhh.h..';
             }
             return rows;
         });

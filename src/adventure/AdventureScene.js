@@ -6,8 +6,11 @@
 // yürüyemez, yalnızca balonları F ile ilerletir.
 //
 //   talkFred -> (kapı vuruşu) -> toDoor -> (kapı deliği) -> openDoor ->
-//   (Andrew girer, konuşur) -> toScope -> (DNA taraması) -> talkAndrew ->
-//   (Andrew cam odaya yürür) -> lock -> (kilit, final) -> bitiş
+//   (Andrew izin ister, girer, konuşur) -> toScope -> (DNA taraması) ->
+//   talkAndrew -> openAnnex (izolasyon kapısı açılır, ikinci oda görünür) ->
+//   (Andrew cam hücreye yürür) -> lock -> (kilit, final) -> bitiş
+//
+// Dünya iki ekran genişliğinde; kamera Harry'yi (kesitlerde Andrew'ı) izler.
 //
 // Veri (replikler, bulgular) adventureScript.js'te; yerleşim labLayout.js'te.
 
@@ -18,10 +21,10 @@ import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { hash } from '../pixel/pixelDraw.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
 import { drawPerson } from './charSprites.js';
-import { bakeLab, drawDoor, drawCellDoor, drawConsole } from './labArt.js';
+import { bakeLab, drawDoor, drawAnnexDoor, drawAnnexCover, drawCellDoor, drawConsole } from './labArt.js';
 import {
-    PX, SCENE, START, NPCS, SPOTS, PLAYER_SPEED, PLAYER_SCALE, CELL_INSIDE,
-    blocked, near
+    PX, VIEW, START, NPCS, SPOTS, PLAYER_SPEED, PLAYER_SCALE, CELL_INSIDE,
+    blocked, near, cameraX
 } from './labLayout.js';
 import {
     LINES, OBJECTIVES, CONTROL_HINT, SCAN_TARGETS, ENDING_CAPTION
@@ -85,6 +88,11 @@ export class AdventureScene {
         // Andrew kapı açılana kadar sahnede değil
         this.npcs.andrew = { id: 'andrew', who: 'andrew', x: 84, y: 140, dir: 'down', moving: false, visible: false };
 
+        this.annexOpen = 0;          // izolasyon kapısı: 0 kapalı .. 1 açık (perde de buna bağlı)
+        this.annexTarget = 0;
+        this.camX = 0;
+        this.camFocus = 'player';    // kameranın izlediği: 'player' ya da NPC kimliği
+        this.camOverride = null;     // verilirse kamera bu x'e bakar (kesit)
         this.doorOpen = 0;
         this.doorTarget = 0;
         this.cellClosed = 0;
@@ -235,6 +243,8 @@ export class AdventureScene {
             case 'talkAndrew':
                 return near(x, y, SPOTS.andrew, this.npcs.andrew.x, this.npcs.andrew.y)
                     ? { id: 'andrew', label: 'KONUŞ' } : null;
+            case 'openAnnex':
+                return near(x, y, SPOTS.annexDoor) ? { id: 'annex', label: 'AÇ' } : null;
             case 'lock':
                 return near(x, y, SPOTS.console) ? { id: 'lock', label: 'KİLİTLE' } : null;
             default:
@@ -249,6 +259,7 @@ export class AdventureScene {
             openDoor: OBJECTIVES.openDoor,
             toScope: OBJECTIVES.toScope,
             talkAndrew: OBJECTIVES.talkAndrew,
+            openAnnex: OBJECTIVES.openAnnex,
             lock: OBJECTIVES.lock
         }[this.phase] || null;
     }
@@ -283,6 +294,7 @@ export class AdventureScene {
                 { wait: 20 },
                 { do: () => { npcs.andrew.visible = true; } },
                 ...this.facing('left'),
+                { say: LINES.entryAsk },
                 { walk: 'andrew', path: [[84, 184], [150, 300], [214, 318]] },
                 { do: () => { npcs.andrew.dir = 'right'; this.faceEachOther(npcs.andrew); } },
                 { say: LINES.entry },
@@ -304,8 +316,19 @@ export class AdventureScene {
         } else if (id === 'andrew') {
             this.run([
                 { say: LINES.andrewCell },
-                { walk: 'andrew', path: [[214, 358], [740, 358], [740, 292], [830, 292], [880, 272]] },
-                { do: () => { npcs.andrew.dir = 'left'; this.consoleState = 'ready'; } },
+                { phase: 'openAnnex' }
+            ]);
+        } else if (id === 'annex') {
+            this.run([
+                { do: () => { this.annexTarget = 1; Sfx.slide(); } },
+                { until: () => this.annexOpen >= 1 },
+                // Kamera izolasyon odasına kayar: içerisi ilk kez görünüyor
+                { do: () => { this.camOverride = 1300; } },
+                { wait: 120 },
+                { say: LINES.annexOpen },
+                { do: () => { this.camOverride = null; this.camFocus = 'andrew'; } },
+                { walk: 'andrew', speed: 3.2, path: [[214, 358], [1040, 358], [1380, 344], [1450, 344], [1560, 332]] },
+                { do: () => { npcs.andrew.dir = 'left'; this.camFocus = 'player'; this.consoleState = 'ready'; } },
                 { phase: 'lock' }
             ]);
         } else if (id === 'lock') {
@@ -416,6 +439,9 @@ export class AdventureScene {
         this.doorOpen += Math.sign(this.doorTarget - this.doorOpen) * Math.min(0.035, Math.abs(this.doorTarget - this.doorOpen));
         this.cellClosed += Math.sign(this.cellTarget - this.cellClosed) * Math.min(0.04, Math.abs(this.cellTarget - this.cellClosed));
 
+        this.annexOpen += Math.sign(this.annexTarget - this.annexOpen) * Math.min(0.025, Math.abs(this.annexTarget - this.annexOpen));
+        this.updateCamera();
+
         if (this.overlay?.type === 'peep') this.overlay.t++;
         this.dialogue.step();
         this.stepScan();
@@ -433,6 +459,17 @@ export class AdventureScene {
                 this.onFinish();
             }
         }
+    }
+
+    // Kamera: odak (Harry ya da Andrew) yatayda izlenir; kapı kapalıyken ara
+    // duvarın ötesine geçemez. camOverride kesitlerde odağı sabitler.
+    updateCamera() {
+        let fx;
+        if (this.camOverride !== null) fx = this.camOverride;
+        else fx = (this.camFocus === 'player' ? this.player : this.npcs[this.camFocus]).x;
+        const target = cameraX(fx, this.annexOpen > 0.5);
+        this.camX += (target - this.camX) * 0.07;
+        if (Math.abs(target - this.camX) < 0.5) this.camX = target;
     }
 
     movePlayer() {
@@ -458,7 +495,7 @@ export class AdventureScene {
         const len = Math.hypot(dx, dy) || 1;
         const vx = (dx / len) * speed;
         const vy = (dy / len) * speed;
-        const opts = { cellDoorClosed: this.cellClosed > 0.4 };
+        const opts = { cellDoorClosed: this.cellClosed > 0.4, annexDoorClosed: this.annexOpen < 0.6 };
         if (!blocked(player.x + vx, player.y, opts)) player.x += vx;
         if (!blocked(player.x, player.y + vy, opts)) player.y += vy;
 
@@ -508,12 +545,15 @@ export class AdventureScene {
 
     drawLab() {
         const { ctx } = this;
+        const camX = Math.round(this.camX);
         ctx.save();
         if (this.shake > 0) {
             ctx.translate(Math.round((hash(this.frame, 1, 5) - 0.5) * 8), Math.round((hash(this.frame, 2, 6) - 0.5) * 6));
         }
+        ctx.translate(-camX, 0);
         ctx.drawImage(this.baked.ground, 0, 0);
-        drawDoor(ctx, this.doorOpen, this.frame);
+        drawDoor(ctx, this.doorOpen);
+        drawAnnexDoor(ctx, this.annexOpen, this.frame);
 
         // Arkadan öne: eşyalar ve karakterler ayak/dip hizasına göre sıralanır
         const list = [];
@@ -523,25 +563,27 @@ export class AdventureScene {
             list.push({ y: npc.y, draw: () => this.drawNpc(npc) });
         }
         list.push({ y: this.player.y, draw: () => this.drawHarry() });
-        list.push({ y: 260, draw: () => drawConsole(ctx, this.consoleState, this.frame) });
+        list.push({ y: 272, draw: () => drawConsole(ctx, this.consoleState, this.frame) });
         list.sort((a, b) => a.y - b.y);
         for (const item of list) item.draw();
 
         drawCellDoor(ctx, this.cellClosed);
         this.drawGreenEyes();
+        // İzolasyon kapısı açılana kadar ara duvarın ardı görünmez
+        drawAnnexCover(ctx, this.annexOpen);
+        ctx.restore();
 
         if (this.dim > 0) {
             ctx.fillStyle = `rgba(4, 10, 20, ${this.dim})`;
-            ctx.fillRect(0, 0, SCENE.w, SCENE.h);
-            // Cam odanın içi aydınlık kalır
+            ctx.fillRect(0, 0, VIEW.w, VIEW.h);
+            // Cam hücrenin içi aydınlık kalır
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = 0.08;
             ctx.fillStyle = '#9cc4d0';
-            ctx.fillRect(CELL_INSIDE.x - 12, CELL_INSIDE.y - 20, CELL_INSIDE.w + 24, CELL_INSIDE.h + 20);
+            ctx.fillRect(CELL_INSIDE.x - 12 - camX, CELL_INSIDE.y - 20, CELL_INSIDE.w + 24, CELL_INSIDE.h + 20);
             ctx.restore();
         }
-        ctx.restore();
 
         this.drawHud();
     }
@@ -601,18 +643,18 @@ export class AdventureScene {
             [ax, ay] = [500, 108];
         } else {
             const who = this.speakerPos(dialogue.speaker);
-            ax = who.x;
+            ax = who.x - this.camX;
             ay = who.y - SPRITE_H - 6;
         }
         const lines = wrapPixelText(dialogue.visibleText, BUBBLE_MAX_W, BUBBLE_SCALE);
-        drawSpeechBubble(ctx, ax, ay, lines, { scale: BUBBLE_SCALE, viewLeft: 0, viewW: SCENE.w });
+        drawSpeechBubble(ctx, ax, ay, lines, { scale: BUBBLE_SCALE, viewLeft: 0, viewW: VIEW.w });
     }
 
     drawCaption() {
         if (!this.caption) return;
         const { ctx } = this;
         const w = measurePixelText(this.caption, 3);
-        const x = Math.round((SCENE.w - w) / 2 / PX) * PX;
+        const x = Math.round((VIEW.w - w) / 2 / PX) * PX;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
         ctx.fillRect(x - 16, 236, w + 32, 52);
         drawPixelText(ctx, this.caption, x, 250, { scale: 3, color: '#f4f1e4', shadow: '#0f172a' });
@@ -631,10 +673,10 @@ export class AdventureScene {
         }
         if (this.frame < HINT_FRAMES && this.intro === 0) {
             const w = measurePixelText(CONTROL_HINT, 2);
-            const x = Math.round((SCENE.w - w) / 2 / PX) * PX;
+            const x = Math.round((VIEW.w - w) / 2 / PX) * PX;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
-            ctx.fillRect(x - 12, SCENE.h - 44, w + 24, 32);
-            drawPixelText(ctx, CONTROL_HINT, x, SCENE.h - 36, { scale: 2, color: '#e2e8f0' });
+            ctx.fillRect(x - 12, VIEW.h - 44, w + 24, 32);
+            drawPixelText(ctx, CONTROL_HINT, x, VIEW.h - 36, { scale: 2, color: '#e2e8f0' });
         }
         if (!this.seq && !this.overlay && !this.dialogue.active) {
             const spot = this.currentSpot();
@@ -648,7 +690,7 @@ export class AdventureScene {
         const cap = PX * 7;
         const gap = PX * 2;
         const width = cap + gap + measurePixelText(label, 2);
-        const x = Math.round((player.x - width / 2) / PX) * PX;
+        const x = Math.round((player.x - this.camX - width / 2) / PX) * PX;
         const y = Math.round((player.y - SPRITE_H - 36) / PX) * PX + bob;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
         ctx.fillRect(x - PX * 2, y - PX * 2, width + PX * 4, cap + PX * 4);
@@ -673,7 +715,7 @@ export class AdventureScene {
         const { ctx } = this;
         const t = this.overlay.t;
         ctx.fillStyle = '#05080a';
-        ctx.fillRect(0, 0, SCENE.w, SCENE.h);
+        ctx.fillRect(0, 0, VIEW.w, VIEW.h);
 
         const cx = 500, cy = 290, R = 236, U = 8;
         const shakeX = t < 90 && Math.floor(t / 6) % 2 === 0 ? 4 : 0;
@@ -780,10 +822,10 @@ export class AdventureScene {
     drawScan() {
         const { ctx, scan } = this;
         ctx.fillStyle = '#050c09';
-        ctx.fillRect(0, 0, SCENE.w, SCENE.h);
+        ctx.fillRect(0, 0, VIEW.w, VIEW.h);
         ctx.strokeStyle = '#1c3a2a';
         ctx.lineWidth = 4;
-        ctx.strokeRect(34, 84, SCENE.w - 68, 410);
+        ctx.strokeRect(34, 84, VIEW.w - 68, 410);
 
         drawPixelText(ctx, 'ÖRNEK TARAMASI', 40, 24, { scale: 4, color: '#6bdc5a' });
         drawPixelText(ctx, `ANORMALLİK ${scan.found.length} / ${SCAN_TARGETS.length}`, 40, 60, { scale: 2, color: '#8fd480' });
@@ -791,7 +833,7 @@ export class AdventureScene {
         // Dizilim çubukları
         const cell = 12;
         const x0 = 46, y0 = 96;
-        const cols = Math.floor((SCENE.w - 92) / cell), rows = Math.floor(386 / cell);
+        const cols = Math.floor((VIEW.w - 92) / cell), rows = Math.floor(386 / cell);
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const h = hash(c, r, 9);

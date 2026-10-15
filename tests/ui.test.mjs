@@ -315,8 +315,12 @@ async function main() {
         log.push(['bulunan', a.scan.found.length]);
         log.push(['scope', await drain(), a.phase]);
         at(a.npcs.andrew.x + 40, a.npcs.andrew.y); await wait(80); a.action();
-        log.push(['andrew', await drain(), a.phase, Math.round(a.npcs.andrew.x)]);
-        at(744, 284); await wait(80); a.action();
+        log.push(['andrew', await drain(), a.phase]);
+        // Izolasyon kapisi: kapaliyken arkasi gorunmuyor, acilinca ikinci oda cikiyor
+        log.push(['perde-kapali', a.annexOpen, a.camX <= 44]);
+        at(950, 348); await wait(80); a.action();
+        log.push(['annex', await drain(), a.phase, Math.round(a.npcs.andrew.x), Math.round(a.annexOpen * 10) / 10, a.camX > 100]);
+        at(1338, 316); await wait(80); a.action();
         for (let i = 0; i < 40 && a.cellClosed < 1; i++) await wait(50);
         log.push(['cam-kapi', Math.round(a.cellClosed * 10) / 10, a.consoleState]);
         return log;
@@ -330,7 +334,10 @@ async function main() {
     check('Oynanis: mikroskopta tarama ekrani aciliyor', f['scan-overlay'][0] === 'scan');
     check('Oynanis: bos yere F anomali saymiyor', f.yanlis[0] === 0);
     check('Oynanis: uc anomali bulununca tarama bitiyor', f.bulunan[0] === 3 && f.scope[1] === 'talkAndrew', JSON.stringify(f.scope));
-    check('Oynanis: Andrew cam odaya yuruyor', f.andrew[1] === 'lock' && f.andrew[2] > 800, JSON.stringify(f.andrew));
+    check('Oynanis: Andrew ile konusunca izolasyon kapisini acma gorevi', f.andrew[1] === 'openAnnex', JSON.stringify(f.andrew));
+    check('Oynanis: izolasyon kapisi kapaliyken perde ve kamera sinirli', f['perde-kapali'][0] === 0 && f['perde-kapali'][1] === true);
+    check('Oynanis: kapi acilinca ikinci oda cikiyor, Andrew cam hucreye yuruyor',
+        f.annex[1] === 'lock' && f.annex[2] > 1500 && f.annex[3] === 1 && f.annex[4] === true, JSON.stringify(f.annex));
     check('Oynanis: cam oda kilitleniyor', f['cam-kapi'][0] === 1 && f['cam-kapi'][1] === 'locked', JSON.stringify(f['cam-kapi']));
     await shot('00d5-oynanis-cam-oda');
 

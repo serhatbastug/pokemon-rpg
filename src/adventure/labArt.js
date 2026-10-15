@@ -1,15 +1,18 @@
-// Laboratuvar sahnesinin çizimi (3/4 görünüm).
+// Laboratuvar dünyasının çizimi (3/4 görünüm): ana laboratuvar, ara duvar ve
+// izolasyon odası.
 //
 // Zemin + duvar bir kez çizilip saklanıyor. Eşyalar ayrı canvas'lar: dibi
 // (baseY) karakterlerin ayak noktasıyla kıyaslanıp arkadan öne sırayla
 // basılıyor, böylece karakter masanın arkasına geçince masa onu örtüyor.
-// Kapı, kontrol paneli ve cam kapı gibi durumu değişenler her karede çiziliyor.
+// Kapılar, kontrol paneli ve izolasyon odasının perdesi her karede çiziliyor.
 
 import { PX, newCanvas, blk, hash } from '../pixel/pixelDraw.js';
 import { drawPixelText } from '../pixel/pixelFont.js';
 import {
-    SCENE, WALL_BASE, DOOR, DESK, WHITEBOARD, WALL_MONITOR, BENCH, WEAPON_TABLE,
-    CONSOLE, CELL, CELL_DOOR, CELL_INSIDE, CRATES, PLANT, TRASH
+    WORLD, WALL_BASE, PARTITION, ANNEX, ANNEX_DOOR, DOOR, DESK, WHITEBOARD,
+    WALL_MONITOR, BENCH, FRIDGE, SINK, WEAPON_TABLE, CENTRIFUGE, STRETCHER,
+    CRATES, PLANT, TRASH, RACKS, SHOWER, BARRELS, CONSOLE, ANNEX_MONITOR,
+    CELL, CELL_DOOR, CELL_INSIDE
 } from './labLayout.js';
 
 const WALL = '#cfd6d9';
@@ -27,57 +30,77 @@ function slab(ctx, x, y, w, h, fill, hi = null, lo = null) {
     if (lo) blk(ctx, x, y + h - PX, w, PX, lo);
 }
 
-// --- Zemin ve duvar ---
+function lighten(hex, amount = 60) {
+    const n = [1, 3, 5].map(i => Math.min(255, parseInt(hex.slice(i, i + 2), 16) + amount));
+    return '#' + n.map(v => v.toString(16).padStart(2, '0')).join('');
+}
 
-function bakeGround() {
-    const { canvas, ctx } = newCanvas(SCENE.w, SCENE.h);
+// =================== ZEMİN VE DUVARLAR ===================
+
+function paintMainRoom(ctx) {
+    const W = PARTITION.x;
 
     // Duvar: açık karolu
-    blk(ctx, 0, 0, SCENE.w, WALL_BASE, WALL);
-    for (let y = 16; y < WALL_BASE - 12; y += 32) blk(ctx, 0, y, SCENE.w, PX, SEAM);
-    for (let x = 0; x < SCENE.w; x += 48) blk(ctx, x, 16, PX, WALL_BASE - 28, SEAM);
-    // Duvarın alt yarısı biraz koyu: derinlik
-    blk(ctx, 0, 88, SCENE.w, 28, WALL_LO);
-    for (let y = 88; y < WALL_BASE - 12; y += 28) blk(ctx, 0, y, SCENE.w, PX, SEAM);
-    for (let x = 0; x < SCENE.w; x += 48) blk(ctx, x, 88, PX, 28, SEAM);
+    blk(ctx, 0, 0, W, WALL_BASE, WALL);
+    for (let y = 16; y < WALL_BASE - 12; y += 32) blk(ctx, 0, y, W, PX, SEAM);
+    for (let x = 0; x < W; x += 48) blk(ctx, x, 16, PX, WALL_BASE - 28, SEAM);
+    blk(ctx, 0, 88, W, 28, WALL_LO);
+    for (let y = 88; y < WALL_BASE - 12; y += 28) blk(ctx, 0, y, W, PX, SEAM);
+    for (let x = 0; x < W; x += 48) blk(ctx, x, 88, PX, 28, SEAM);
     // Tavan şeridi ve ışıklar
-    blk(ctx, 0, 0, SCENE.w, 16, '#9aa4a9');
-    blk(ctx, 0, 12, SCENE.w, PX, '#7c868b');
+    blk(ctx, 0, 0, W, 16, '#9aa4a9');
+    blk(ctx, 0, 12, W, PX, '#7c868b');
     for (const lx of [160, 420, 680, 900]) {
         blk(ctx, lx - 44, 4, 88, 8, '#f4f7f0');
         blk(ctx, lx - 44, 12, 88, PX, '#cfd8d4');
     }
     // Süpürgelik
-    blk(ctx, 0, WALL_BASE - 12, SCENE.w, 12, TRIM);
-    blk(ctx, 0, WALL_BASE - 12, SCENE.w, PX, '#a3adb2');
+    blk(ctx, 0, WALL_BASE - 12, W, 12, TRIM);
+    blk(ctx, 0, WALL_BASE - 12, W, PX, '#a3adb2');
 
     // Zemin: karo karo, hafif kirli
-    for (let y = WALL_BASE, row = 0; y < SCENE.h; y += 48, row++) {
-        for (let x = 0, col = 0; x < SCENE.w; x += 48, col++) {
+    for (let y = WALL_BASE, row = 0; y < WORLD.h; y += 48, row++) {
+        for (let x = 0, col = 0; x < W; x += 48, col++) {
             const even = (row + col) % 2 === 0;
             blk(ctx, x, y, 48, 48, even ? FLOOR_A : FLOOR_B);
             blk(ctx, x, y, 48, PX, FLOOR_SEAM);
             blk(ctx, x, y, PX, 48, FLOOR_SEAM);
-            // Karoda küçük lekeler
             const r = hash(col, row, 3);
-            if (r > 0.7) blk(ctx, x + 8 + Math.floor(r * 20) * 1, y + 12, 8, 4, even ? '#98a1a6' : '#7d868c');
+            if (r > 0.7) blk(ctx, x + 8 + Math.floor(r * 20), y + 12, 8, 4, even ? '#98a1a6' : '#7d868c');
         }
     }
-    // Duvarın zemine düşen gölgesi
     for (let i = 0; i < 3; i++) {
         ctx.globalAlpha = 0.16 - i * 0.05;
-        blk(ctx, 0, WALL_BASE + i * PX, SCENE.w, PX, '#000000');
+        blk(ctx, 0, WALL_BASE + i * PX, W, PX, '#000000');
     }
     ctx.globalAlpha = 1;
 
-    // Beyaz tahta: silah şeması
+    // Silah masasının önünde mavi halı
+    slab(ctx, 252, 344, 372, 84, '#44597a', '#5c7396', '#2c3d58');
+    blk(ctx, 260, 352, 356, 4, '#8aa0c0');
+    blk(ctx, 260, 416, 356, 4, '#8aa0c0');
+    for (let i = 0; i < 8; i++) blk(ctx, 284 + i * 40, 368, 16, 36, '#3a4e6c');
+    // Sarı-siyah dikkat bandı: kapının önü
+    for (let i = 0; i < 12; i++) {
+        blk(ctx, 44 + i * 16, 148, 8, 4, i % 2 ? '#d8b030' : '#2a2a2a');
+    }
+    // Zemindeki kablolar: bilgisayar masasından silah masasına
+    blk(ctx, 252, 200, 4, 56, '#1f2528');
+    blk(ctx, 252, 252, 44, 4, '#1f2528');
+    blk(ctx, 656, 200, 4, 76, '#1f2528');
+    blk(ctx, 600, 272, 60, 4, '#1f2528');
+    // Gider kapağı ve sıvı lekesi
+    slab(ctx, 780, 520, 28, 20, '#4a555b', '#6d797f');
+    for (let i = 0; i < 4; i++) blk(ctx, 784, 522 + i * 4, 20, 2, '#2f3a40');
+    blk(ctx, 520, 500, 24, 8, '#7fb87a');
+    blk(ctx, 528, 496, 8, 4, '#7fb87a');
+
+    // --- Duvardakiler ---
     drawWhiteboard(ctx);
-    // Duvar monitörü
     drawWallMonitor(ctx);
     // Bilgisayar masasının üstündeki raf
     slab(ctx, 164, 44, 120, 8, '#79858b', '#a8b4ba', '#566268');
-    const jars = ['#7fb8a4', '#d8b46a', '#a68fc4', '#8fb7d8', '#c98a7a', '#9fc48f'];
-    jars.forEach((c, i) => {
+    ['#7fb8a4', '#d8b46a', '#a68fc4', '#8fb7d8', '#c98a7a', '#9fc48f'].forEach((c, i) => {
         const h = 20 + (i % 2) * 8;
         blk(ctx, 172 + i * 18, 44 - h, 12, h, c);
         blk(ctx, 172 + i * 18, 44 - h, 4, h, lighten(c));
@@ -87,37 +110,138 @@ function bakeGround() {
     slab(ctx, 644, 32, 96, 48, '#e8e2cf', '#fffdf2', '#b9b39c');
     for (let i = 0; i < 4; i++) blk(ctx, 652, 40 + i * 8, 56 - (i % 2) * 12, 4, '#8a8472');
     blk(ctx, 716, 40, 16, 16, '#c8322e');
-
-    // Cam odanın zemini hafif mavi: içerisi ayrı bir bölüm gibi
-    ctx.globalAlpha = 0.32;
-    blk(ctx, CELL_INSIDE.x - 12, WALL_BASE, CELL.w - 28, CELL.h - (WALL_BASE - CELL.y) - 12, '#9cc4d0');
-    ctx.globalAlpha = 1;
-    // Cam odanın arka duvarı: kamera ve havalandırma
-    blk(ctx, 800, 40, 160, 72, '#c3cbcf');
-    blk(ctx, 820, 56, 40, 28, '#4a555b');
-    blk(ctx, 824, 60, 32, 20, '#1b2226');
-    blk(ctx, 836, 66, 8, 8, '#c8322e');
-    for (let i = 0; i < 4; i++) blk(ctx, 880, 52 + i * 12, 64, 4, '#9aa4a9');
-    // Odanın içindeki yatak (sedye) ve tabure
-    slab(ctx, 892, 232, 56, 28, '#e6ecee', '#ffffff', '#bcc7cb');
-    slab(ctx, 892, 260, 56, 8, '#7b878d', null, '#566268');
-    slab(ctx, 820, 276, 24, 12, '#a8b4ba', '#d4dde0', '#7b878d');
-    blk(ctx, 824, 288, 4, 12, '#7b878d');
-    blk(ctx, 836, 288, 4, 12, '#7b878d');
-
-    return canvas;
+    // Duvar saati
+    slab(ctx, 488, 28, 28, 28, '#f1f3ef', '#ffffff', '#b8c2b6');
+    blk(ctx, 500, 32, 4, 12, '#1c1a17');
+    blk(ctx, 500, 40, 10, 4, '#1c1a17');
+    // Biyolojik tehlike levhası (buzdolabının üstü)
+    slab(ctx, 776, 28, 48, 44, '#d8b030', '#f0cc50', '#a88818');
+    blk(ctx, 796, 36, 8, 8, '#2a2a2a');
+    blk(ctx, 788, 48, 8, 8, '#2a2a2a');
+    blk(ctx, 804, 48, 8, 8, '#2a2a2a');
+    blk(ctx, 796, 50, 8, 4, '#d8b030');
+    // İlan panosu (lavabo üstü): notlar ve raptiyeler
+    slab(ctx, 860, 28, 112, 52, '#9a7a4a', '#b8966a', '#6e5430');
+    [[868, 36, '#f4f1e4'], [896, 36, '#ffe9a8'], [924, 40, '#f4f1e4'], [872, 56, '#ffd0d0'], [908, 56, '#f4f1e4'], [940, 54, '#cfe6f2']].forEach(([x, y, c]) => {
+        slab(ctx, x, y, 20, 16, c, null, '#bdb7a2');
+        blk(ctx, x + 8, y + 2, 4, 4, '#c8322e');
+        blk(ctx, x + 4, y + 8, 12, 2, '#8a8472');
+    });
 }
 
-function lighten(hex) {
-    const n = [1, 3, 5].map(i => Math.min(255, parseInt(hex.slice(i, i + 2), 16) + 60));
-    return '#' + n.map(v => v.toString(16).padStart(2, '0')).join('');
+function paintPartition(ctx) {
+    const { x, w } = PARTITION;
+    // Ara duvar: yukarıdan aşağıya uzanan kalın çelik bölme
+    blk(ctx, x, 0, w, WORLD.h, '#5f6a70');
+    blk(ctx, x, 0, w, 128, '#6c777d');
+    // Üst yüz (kapak): daha açık, derinlik veriyor
+    blk(ctx, x, 100, w, 20, '#97a4aa');
+    blk(ctx, x, 100, w, PX, '#c2ccd0');
+    // Yan yüzler: ışık soldan
+    blk(ctx, x, 120, PX * 2, WORLD.h - 120, '#7b878d');
+    blk(ctx, x + w - PX * 2, 120, PX * 2, WORLD.h - 120, '#454f55');
+    for (let y = 136; y < WORLD.h; y += 56) blk(ctx, x, y, w, PX, '#4f5a60');
+    // Kapının yeri: eşik
+    blk(ctx, x, ANNEX_DOOR.y, w, ANNEX_DOOR.h, '#3a444c');
+}
+
+function paintAnnex(ctx) {
+    const x0 = ANNEX.x, W = ANNEX.w;
+    const wallBase = '#566874', wallLo = '#4b5c68', wallSeam = '#3f4e58';
+
+    // Arka duvar: koyu mavi-gri paneller
+    blk(ctx, x0, 0, W, WALL_BASE, wallBase);
+    for (let x = x0; x < x0 + W; x += 64) blk(ctx, x, 16, PX, WALL_BASE - 28, wallSeam);
+    for (let y = 40; y < WALL_BASE - 12; y += 28) blk(ctx, x0, y, W, PX, wallSeam);
+    blk(ctx, x0, 88, W, 28, wallLo);
+    // Tavan: koyu, kırmızı uyarı şeridi
+    blk(ctx, x0, 0, W, 16, '#2a343a');
+    blk(ctx, x0, 12, W, PX, '#1c252a');
+    for (let x = x0 + 40; x < x0 + W; x += 160) {
+        blk(ctx, x, 4, 56, 8, '#c8322e');
+        blk(ctx, x, 12, 56, PX, '#7a1f1c');
+    }
+    // Borular
+    blk(ctx, x0, 56, W, 8, '#6d797f');
+    blk(ctx, x0, 56, W, PX, '#97a4aa');
+    for (let x = x0 + 70; x < x0 + W; x += 180) blk(ctx, x, 52, 8, 16, '#3f4e58');
+    // Sarı-siyah uyarı bandı (duvar dibi)
+    for (let x = x0; x < x0 + W; x += 24) {
+        blk(ctx, x, 104, 12, 8, '#d8b030');
+        blk(ctx, x + 12, 104, 12, 8, '#2a2a2a');
+    }
+    blk(ctx, x0, WALL_BASE - 12, W, 12, '#3a444c');
+    blk(ctx, x0, WALL_BASE - 12, W, PX, '#6d797f');
+
+    // Zemin: koyu çelik karolar
+    for (let y = WALL_BASE, row = 0; y < WORLD.h; y += 48, row++) {
+        for (let x = x0, col = 0; x < x0 + W; x += 48, col++) {
+            const even = (row + col) % 2 === 0;
+            blk(ctx, x, y, 48, 48, even ? '#5d686e' : '#556067');
+            blk(ctx, x, y, 48, PX, '#444e54');
+            blk(ctx, x, y, PX, 48, '#444e54');
+            blk(ctx, x + 8, y + 8, 4, 4, '#6d797f');
+            blk(ctx, x + 36, y + 36, 4, 4, '#6d797f');
+        }
+    }
+    for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = 0.22 - i * 0.07;
+        blk(ctx, x0, WALL_BASE + i * PX, W, PX, '#000000');
+    }
+    ctx.globalAlpha = 1;
+
+    // Zemin işaretleri: kapıdan hücreye sarı kesik çizgi, hücre önünde kırmızı şerit
+    for (let x = x0 + 8; x < 1380; x += 32) blk(ctx, x, 340, 20, 4, '#d8b030');
+    for (let y = 148; y < 560; y += 24) blk(ctx, 1384, y, 4, 12, '#c8322e');
+    // Havalandırma ızgarası
+    slab(ctx, 1100, 360, 40, 28, '#3a444c', '#4f5a60');
+    for (let i = 0; i < 5; i++) blk(ctx, 1104, 364 + i * 4, 32, 2, '#1f2528');
+    // Kablo oluğu
+    blk(ctx, x0, 500, W, 12, '#2f3a40');
+    blk(ctx, x0, 500, W, PX, '#4f5a60');
+    for (let x = x0 + 20; x < x0 + W; x += 40) blk(ctx, x, 504, 4, 4, '#c8322e');
+
+    // İzolasyon levhası (duvar)
+    slab(ctx, 1096, 24, 176, 28, '#7a1f1c', '#b03a34', '#4a1210');
+    drawPixelText(ctx, 'İZOLASYON', 1108, 32, { scale: 2, color: '#f4f1e4' });
+    // Duvardaki büyük monitör: hücrenin yaşam bulguları
+    drawAnnexMonitor(ctx);
+    // Küçük kontrol panelleri
+    [[1380, 40], [1430, 40]].forEach(([x, y]) => {
+        slab(ctx, x, y, 36, 28, '#2f3a40', '#4a555b');
+        blk(ctx, x + 8, y + 8, 8, 8, '#6bdc5a');
+        blk(ctx, x + 20, y + 8, 8, 8, '#c8322e');
+    });
+
+    // --- Cam hücrenin içi ---
+    ctx.globalAlpha = 0.28;
+    blk(ctx, CELL_INSIDE.x - 8, CELL_INSIDE.y - 8, CELL_INSIDE.w + 16, CELL_INSIDE.h + 16, '#9cc4d0');
+    ctx.globalAlpha = 1;
+    // Arka duvar şeridi (camın ardındaki)
+    slab(ctx, 1416, 216, 328, 16, '#6d797f', '#97a4aa', '#3a444c');
+    // Kamera ve hoparlör
+    slab(ctx, 1560, 232, 36, 20, '#2f3a40', '#4a555b');
+    blk(ctx, 1572, 238, 12, 8, '#1b2226');
+    blk(ctx, 1576, 240, 4, 4, '#c8322e');
+    for (let i = 0; i < 4; i++) blk(ctx, 1448, 236 + i * 4, 28, 2, '#2f3a40');
+    // Yatak: minder, yastık, battaniye
+    slab(ctx, 1636, 252, 100, 52, '#dfe6e8', '#ffffff', '#a8b4ba');
+    slab(ctx, 1640, 256, 24, 20, '#ffffff', null, '#bcc7cb');
+    slab(ctx, 1668, 264, 64, 36, '#8aa0b4', '#a8bccc', '#5d7488');
+    slab(ctx, 1636, 304, 100, 8, '#5f6a70', null, '#3a444c');
+    // Tabure ve lavabo bloğu
+    slab(ctx, 1500, 336, 28, 14, '#a8b4ba', '#d4dde0', '#7b878d');
+    blk(ctx, 1504, 350, 4, 14, '#7b878d');
+    blk(ctx, 1520, 350, 4, 14, '#7b878d');
+    slab(ctx, 1436, 256, 52, 24, '#c9d2d6', '#ffffff', '#8b969c');
+    blk(ctx, 1452, 260, 20, 10, '#6d797f');
+    blk(ctx, 1460, 248, 4, 10, '#8b969c');
 }
 
 function drawWhiteboard(ctx) {
     const { x, y, w, h } = WHITEBOARD;
     slab(ctx, x - 4, y - 4, w + 8, h + 8, '#6c777d');
     slab(ctx, x, y, w, h, '#f1f3ef', '#ffffff', '#cfd5d0');
-    // Silah şeması: gövde, namlu, çekirdek, ölçü çizgileri
     blk(ctx, x + 16, y + 28, 88, 12, '#4b5560');
     blk(ctx, x + 104, y + 32, 36, 4, '#4b5560');
     blk(ctx, x + 36, y + 24, 24, 4, '#4b5560');
@@ -145,7 +269,25 @@ function drawWallMonitor(ctx) {
     blk(ctx, x + 40, y + h - 12, 16, 4, '#d8c45a');
 }
 
-// --- Eşyalar (arkadan öne sıralanan canvas'lar) ---
+function drawAnnexMonitor(ctx) {
+    const { x, y, w, h } = ANNEX_MONITOR;
+    slab(ctx, x - 4, y - 4, w + 8, h + 8, '#1b2226');
+    slab(ctx, x, y, w, h, '#0a1210');
+    // Hücrenin planı
+    blk(ctx, x + 12, y + 10, 88, 2, '#2f7a3a');
+    blk(ctx, x + 12, y + 52, 88, 2, '#2f7a3a');
+    blk(ctx, x + 12, y + 10, 2, 44, '#2f7a3a');
+    blk(ctx, x + 98, y + 10, 2, 44, '#2f7a3a');
+    blk(ctx, x + 20, y + 20, 24, 12, '#2f7a3a');
+    blk(ctx, x + 62, y + 28, 28, 18, '#2f7a3a');
+    // Yaşam bulguları: nabız, oksijen, sıcaklık çubukları
+    [['#6bdc5a', 56], ['#d8c45a', 38], ['#c8322e', 24]].forEach(([c, v], i) => {
+        blk(ctx, x + 116, y + 12 + i * 16, 80, 2, '#1c3a2a');
+        blk(ctx, x + 116, y + 16 + i * 16, v, 8, c);
+    });
+}
+
+// =================== EŞYALAR (arkadan öne sıralanan canvas'lar) ===================
 
 function prop(x, y, w, h, baseY, draw) {
     const { canvas, ctx } = newCanvas(w, h);
@@ -157,25 +299,21 @@ function bakeDesk() {
     const { x, y, w, h } = DESK;
     return prop(x - 8, 76, w + 16, 124, y + h, (ctx, ox, oy) => {
         const X = (v) => v + ox, Y = (v) => v + oy;
-        // Masa: üst yüzey ve ön yüz
         slab(ctx, X(x), Y(152), w, 24, '#b9c3c8', '#e2e8ea');
         slab(ctx, X(x), Y(176), w, 20, '#79858b', '#93a0a6', '#566268');
         blk(ctx, X(x + 8), Y(180), 36, 12, '#6d797f');
         blk(ctx, X(x + 20), Y(184), 12, 4, '#c2cbcf');
         blk(ctx, X(x + 88), Y(180), 36, 12, '#6d797f');
         blk(ctx, X(x + 100), Y(184), 12, 4, '#c2cbcf');
-        // Monitör: ekran, çerçeve, ayak
         slab(ctx, X(196), Y(92), 64, 48, '#1b2226');
         slab(ctx, X(200), Y(96), 56, 36, '#0e1d14');
-        for (let i = 0; i < 6; i++) blk(ctx, X(204), Y(100 + i * 5), 18 + hash(i, 1, 2) * 30 | 0, 2, '#4fb246');
+        for (let i = 0; i < 6; i++) blk(ctx, X(204), Y(100 + i * 5), (18 + hash(i, 1, 2) * 30) | 0, 2, '#4fb246');
         blk(ctx, X(224), Y(140), 12, 8, '#4a555b');
         blk(ctx, X(216), Y(148), 28, 4, '#4a555b');
-        // Klavye ve kâğıtlar
         slab(ctx, X(204), Y(158), 44, 8, '#d8dede', '#ffffff', '#a8b0b4');
         slab(ctx, X(164), Y(158), 28, 16, '#f1f3ef', '#ffffff', '#cfd5d0');
         blk(ctx, X(168), Y(164), 20, 2, '#8a8472');
         blk(ctx, X(168), Y(168), 16, 2, '#8a8472');
-        // Kupa
         slab(ctx, X(264), Y(156), 10, 10, '#c8322e', '#e0584a');
     });
 }
@@ -188,7 +326,6 @@ function bakeBench() {
         slab(ctx, X(x), Y(176), w, 20, '#79858b', '#93a0a6', '#566268');
         blk(ctx, X(x + 12), Y(180), 88, 12, '#6d797f');
         blk(ctx, X(x + 48), Y(184), 16, 4, '#c2cbcf');
-        // Mikroskop: taban, kol, tüp, mercek, tabla
         slab(ctx, X(660), Y(146), 44, 8, '#262f34', '#46545b');
         blk(ctx, X(688), Y(104), 12, 44, '#2f3a40');
         blk(ctx, X(688), Y(104), 4, 44, '#46545b');
@@ -198,7 +335,6 @@ function bakeBench() {
         blk(ctx, X(668), Y(112), 8, 16, '#7d8b92');
         blk(ctx, X(664), Y(128), 16, 6, '#c8d3d8');
         blk(ctx, X(672), Y(140), 24, 4, '#9cc4d4');
-        // Erlenmayer + tüpler + kapsül tepsisi
         blk(ctx, X(712), Y(138), 16, 14, '#a9d4c0');
         blk(ctx, X(716), Y(126), 8, 14, '#d2ebe6');
         blk(ctx, X(718), Y(118), 4, 8, '#d2ebe6');
@@ -207,21 +343,62 @@ function bakeBench() {
     });
 }
 
+// Numune buzdolabı: duvara dayalı, uzun, kapağında ekran ve kol
+function bakeFridge() {
+    const { x, y, w, h } = FRIDGE;
+    return prop(x - 4, 72, w + 8, 140, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        slab(ctx, X(x), Y(84), w, 120, '#dfe5e7', '#ffffff', '#9aa4a9');
+        blk(ctx, X(x), Y(84), 4, 120, '#f1f5f6');
+        blk(ctx, X(x + w - 4), Y(84), 4, 120, '#aab4b8');
+        blk(ctx, X(x), Y(136), w, 4, '#8b969c');
+        blk(ctx, X(x + w - 16), Y(100), 4, 24, '#7b878d');
+        blk(ctx, X(x + w - 16), Y(148), 4, 28, '#7b878d');
+        slab(ctx, X(x + 10), Y(96), 24, 12, '#0e1d14');
+        blk(ctx, X(x + 14), Y(100), 16, 4, '#6bdc5a');
+        blk(ctx, X(x + 10), Y(116), 12, 12, '#2b63b8');
+        blk(ctx, X(x + 4), Y(196), w - 8, 8, '#6d797f');
+        blk(ctx, X(x + 8), Y(152), 20, 14, '#fff1a8');
+        blk(ctx, X(x + 32), Y(156), 16, 10, '#ffd0d0');
+    });
+}
+
+// Lavabo tezgâhı: gömme eviye, musluk, sabun, kâğıt havlu
+function bakeSink() {
+    const { x, y, w, h } = SINK;
+    return prop(x - 4, 84, w + 8, 120, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        slab(ctx, X(x), Y(152), w, 24, '#b9c3c8', '#e2e8ea');
+        slab(ctx, X(x), Y(176), w, 20, '#79858b', '#93a0a6', '#566268');
+        for (let i = 0; i < 3; i++) {
+            blk(ctx, X(x + 8 + i * 40), Y(180), 32, 12, '#6d797f');
+            blk(ctx, X(x + 20 + i * 40), Y(184), 8, 4, '#c2cbcf');
+        }
+        slab(ctx, X(x + 24), Y(156), 40, 16, '#5d686e', '#3a444c', '#8b969c');
+        blk(ctx, X(x + 28), Y(160), 32, 8, '#2a3237');
+        blk(ctx, X(x + 42), Y(128), 6, 28, '#b8c2c6');
+        blk(ctx, X(x + 36), Y(126), 18, 6, '#b8c2c6');
+        blk(ctx, X(x + 36), Y(132), 4, 6, '#b8c2c6');
+        blk(ctx, X(x + 76), Y(140), 12, 16, '#6aa0d8');
+        blk(ctx, X(x + 78), Y(134), 8, 6, '#e8ecee');
+        slab(ctx, X(x + 96), Y(92), 24, 36, '#e8ecee', '#ffffff', '#aeb6bb');
+        blk(ctx, X(x + 100), Y(118), 16, 6, '#cfd5d8');
+        blk(ctx, X(x + 104), Y(122), 8, 8, '#f4f1e4');
+    });
+}
+
 function bakeWeaponTable() {
     const { x, y, w, h } = WEAPON_TABLE;
     return prop(x - 8, y - 40, w + 16, h + 56, y + h, (ctx, ox, oy) => {
         const X = (v) => v + ox, Y = (v) => v + oy;
-        // Ayaklar
         for (const lx of [x + 8, x + w - 16]) {
             blk(ctx, X(lx), Y(y + h - 8), 8, 24, '#6d797f');
             blk(ctx, X(lx), Y(y + h - 8), 8, 4, '#566268');
         }
-        // Üst yüzey (derinlik) ve ön yüz
         slab(ctx, X(x), Y(y), w, 48, '#b4bfc5', '#e6ecee');
         slab(ctx, X(x), Y(y + 48), w, 28, '#7b878d', '#97a4aa', '#566268');
         blk(ctx, X(x), Y(y + 76), w, 4, '#4b5560');
 
-        // Silah prototipi: gövde, namlu, yeşil çekirdek, tutacak
         const px = x + 56, py = y + 12;
         slab(ctx, X(px), Y(py), 96, 16, '#4b5560', '#6a7682', '#2f3a40');
         slab(ctx, X(px + 96), Y(py + 4), 56, 8, '#3a444c', '#5c6872', '#222a30');
@@ -230,15 +407,61 @@ function bakeWeaponTable() {
         blk(ctx, X(px + 28), Y(py + 4), 8, 4, '#a9ee86');
         blk(ctx, X(px + 8), Y(py + 16), 12, 16, '#2f3a40');
         blk(ctx, X(px + 64), Y(py - 4), 20, 4, '#9aa4a9');
-        // Çevrede parçalar, aletler, kâğıt
         for (let i = 0; i < 4; i++) {
             blk(ctx, X(x + 12 + i * 12), Y(y + 28), 8, 8, ['#c8322e', '#d8a24a', '#9aa4a9', '#6aa0d8'][i]);
         }
         slab(ctx, X(x + w - 84), Y(y + 24), 40, 20, '#f1f3ef', '#ffffff', '#cfd5d0');
         blk(ctx, X(x + w - 80), Y(y + 30), 28, 2, '#8a8472');
         blk(ctx, X(x + w - 80), Y(y + 36), 20, 2, '#8a8472');
-        blk(ctx, X(x + w - 32), Y(y + 22), 4, 24, '#6d797f');   // tornavida
+        blk(ctx, X(x + w - 32), Y(y + 22), 4, 24, '#6d797f');
         blk(ctx, X(x + w - 36), Y(y + 22), 12, 4, '#c8322e');
+    });
+}
+
+// Santrifüj masası: rotor gövdesi, tüp sehpası, dizüstü
+function bakeCentrifuge() {
+    const { x, y, w, h } = CENTRIFUGE;
+    return prop(x - 4, y - 44, w + 8, h + 52, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        for (const lx of [x + 6, x + w - 14]) blk(ctx, X(lx), Y(y + h - 8), 8, 12, '#6d797f');
+        slab(ctx, X(x), Y(y), w, 32, '#b9c3c8', '#e2e8ea');
+        slab(ctx, X(x), Y(y + 32), w, 28, '#79858b', '#93a0a6', '#566268');
+        blk(ctx, X(x + 12), Y(y + 38), 60, 14, '#6d797f');
+        blk(ctx, X(x + 36), Y(y + 42), 12, 4, '#c2cbcf');
+        slab(ctx, X(x + 10), Y(y - 28), 56, 52, '#e8ecee', '#ffffff', '#aeb6bb');
+        slab(ctx, X(x + 16), Y(y - 24), 44, 20, '#2a3237', '#4a555b');
+        blk(ctx, X(x + 24), Y(y - 20), 28, 12, '#7fb8d0');
+        blk(ctx, X(x + 20), Y(y + 2), 8, 6, '#6bdc5a');
+        blk(ctx, X(x + 32), Y(y + 2), 24, 6, '#9aa4a9');
+        slab(ctx, X(x + 84), Y(y - 6), 40, 14, '#8a6a42', '#b08a5a', '#5f4728');
+        ['#d86a5a', '#6aa0d8', '#e8d070', '#a9d4c0', '#c98a7a'].forEach((c, i) => {
+            blk(ctx, X(x + 88 + i * 7), Y(y - 18), 4, 14, c);
+            blk(ctx, X(x + 88 + i * 7), Y(y - 18), 4, 4, '#4a555b');
+        });
+        slab(ctx, X(x + 126), Y(y + 4), 24, 12, '#d8dede', '#ffffff', '#a8b0b4');
+        slab(ctx, X(x + 130), Y(y - 14), 20, 16, '#2a3237');
+        blk(ctx, X(x + 134), Y(y - 10), 12, 8, '#4fb246');
+    });
+}
+
+// Sedye: tekerlekli, korkuluklu, beyaz çarşaflı
+function bakeStretcher() {
+    const { x, y, w, h } = STRETCHER;
+    return prop(x - 4, y - 12, w + 8, h + 24, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        for (const lx of [x + 8, x + w - 20]) {
+            blk(ctx, X(lx), Y(y + 40), 6, 18, '#6d797f');
+            blk(ctx, X(lx - 2), Y(y + 56), 10, 8, '#1f2528');
+        }
+        slab(ctx, X(x), Y(y + 28), w, 12, '#8b969c', '#c2ccd0', '#566268');
+        slab(ctx, X(x + 4), Y(y), w - 8, 28, '#e6ecee', '#ffffff', '#bcc7cb');
+        slab(ctx, X(x + 4), Y(y + 20), w - 8, 8, '#cfd8dc', null, '#9aa4a9');
+        slab(ctx, X(x + 8), Y(y + 4), 32, 16, '#ffffff', null, '#cfd8dc');
+        slab(ctx, X(x + 44), Y(y + 4), w - 56, 18, '#9fb3c4', '#c3d3e0', '#7f95a8');
+        blk(ctx, X(x + 70), Y(y + 4), 4, 18, '#7f95a8');
+        blk(ctx, X(x + 4), Y(y - 8), w - 8, 4, '#8b969c');
+        blk(ctx, X(x + 4), Y(y - 8), 4, 12, '#8b969c');
+        blk(ctx, X(x + w - 8), Y(y - 8), 4, 12, '#8b969c');
     });
 }
 
@@ -255,6 +478,7 @@ function bakeCrates() {
         crate(x, y, 48, 56);
         crate(x + 52, y + 12, 44, 44);
         crate(x + 8, y - 28, 36, 28);
+        blk(ctx, X(x + 14), Y(y - 20), 16, 8, '#c8322e');
     });
 }
 
@@ -282,54 +506,111 @@ function bakeTrash() {
     });
 }
 
-// Cam odanın ön yüzü: yarı saydam cam, çerçeve. Odanın içindekiler cama göre
-// ARKADA kaldığı için baseY odanın alt kenarında; içerideki karakterler bu
-// eşyadan önce çizilir ve camın ardından görünür.
+// --- İzolasyon odası eşyaları ---
+
+// Sunucu rafları: üç dolap, ışıklar
+function bakeRacks() {
+    const { x, y, w, h } = RACKS;
+    return prop(x - 4, 60, w + 8, 144, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        for (let k = 0; k < 3; k++) {
+            const rx = x + k * 52;
+            slab(ctx, X(rx), Y(72), 48, 132, '#2f3a40', '#4a555b', '#1b2226');
+            for (let r = 0; r < 7; r++) {
+                blk(ctx, X(rx + 6), Y(82 + r * 16), 36, 10, '#1b2226');
+                blk(ctx, X(rx + 8), Y(84 + r * 16), 8, 4, hash(k, r, 7) > 0.5 ? '#6bdc5a' : '#d8c45a');
+                blk(ctx, X(rx + 20), Y(84 + r * 16), 8, 4, hash(k, r, 9) > 0.6 ? '#c8322e' : '#2f7a22');
+                blk(ctx, X(rx + 32), Y(88 + r * 16), 8, 2, '#4a555b');
+            }
+        }
+    });
+}
+
+// Dekontaminasyon duşu: cam kabin, duş başlığı
+function bakeShower() {
+    const { x, y, w, h } = SHOWER;
+    return prop(x - 4, 76, w + 8, 140, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        slab(ctx, X(x), Y(84), w, 124, '#4a5b66', '#6d8290', '#2f3e48');
+        ctx.globalAlpha = 0.42;
+        blk(ctx, X(x + 8), Y(92), w - 16, 108, '#bfe4ee');
+        ctx.globalAlpha = 1;
+        blk(ctx, X(x + 8), Y(92), 4, 108, '#e0f3f8');
+        blk(ctx, X(x + 30), Y(96), 12, 8, '#9aa4a9');
+        blk(ctx, X(x + 34), Y(88), 4, 8, '#9aa4a9');
+        for (let i = 0; i < 4; i++) blk(ctx, X(x + 28 + i * 6), Y(108 + (i % 2) * 6), 2, 10, '#a8d8e8');
+        blk(ctx, X(x + w - 16), Y(150), 8, 8, '#c8322e');
+        slab(ctx, X(x), Y(200), w, 8, '#2f3a40', '#4a555b');
+    });
+}
+
+// Tehlikeli madde fıçıları
+function bakeBarrels() {
+    const { x, y, w, h } = BARRELS;
+    return prop(x - 4, y - 36, w + 8, h + 40, y + h, (ctx, ox, oy) => {
+        const X = (v) => v + ox, Y = (v) => v + oy;
+        const barrel = (bx, by, c) => {
+            slab(ctx, X(bx), Y(by), 36, 48, c, lighten(c, 40), '#1f2528');
+            blk(ctx, X(bx), Y(by + 12), 36, 4, '#2a2a2a');
+            blk(ctx, X(bx), Y(by + 32), 36, 4, '#2a2a2a');
+            blk(ctx, X(bx + 10), Y(by + 18), 16, 12, '#d8b030');
+            blk(ctx, X(bx + 16), Y(by + 20), 4, 4, '#2a2a2a');
+            blk(ctx, X(bx + 4), Y(by - 4), 28, 4, '#8b969c');
+        };
+        barrel(x, y, '#3f9a28');
+        barrel(x + 44, y + 8, '#3f9a28');
+        barrel(x + 22, y - 24, '#b8b030');
+    });
+}
+
+// Cam hücrenin ÖN yüzü ve yan sütunları: yarı saydam cam, çerçeve. Hücrenin
+// içindekiler cama göre ARKADA kaldığı için baseY hücrenin alt kenarında.
 function bakeCellFront() {
     const { x, y, w, h } = CELL;
     return prop(x - 4, y, w + 8, h + 4, y + h, (ctx, ox, oy) => {
         const X = (v) => v + ox, Y = (v) => v + oy;
-        // Alt cam bandı (ön yüz)
-        ctx.globalAlpha = 0.28;
-        blk(ctx, X(x + 12), Y(y + h - 76), w - 24, 64, '#bfe4ee');
+        ctx.globalAlpha = 0.3;
+        blk(ctx, X(x + 16), Y(y + h - 52), w - 32, 44, '#bfe4ee');
         ctx.globalAlpha = 1;
-        for (let gx = x + 28; gx < x + w - 24; gx += 40) blk(ctx, X(gx), Y(y + h - 76), 2, 64, '#dff2f6');
-        // Parıltı çizgileri
-        blk(ctx, X(x + 40), Y(y + h - 68), 20, 4, '#ffffff');
-        blk(ctx, X(x + 100), Y(y + h - 52), 12, 4, '#ffffff');
-        // Metal çerçeve
-        slab(ctx, X(x), Y(y + h - 80), w, 8, '#5f6a70', '#8b969c', '#3a444c');
+        for (let gx = x + 48; gx < x + w - 24; gx += 72) blk(ctx, X(gx), Y(y + h - 52), 2, 44, '#dff2f6');
+        blk(ctx, X(x + 60), Y(y + h - 44), 24, 4, '#ffffff');
+        blk(ctx, X(x + 180), Y(y + h - 28), 16, 4, '#ffffff');
+        slab(ctx, X(x), Y(y + h - 56), w, 8, '#5f6a70', '#8b969c', '#3a444c');
         slab(ctx, X(x), Y(y + h - 12), w, 12, '#4a555b', '#6d797f', '#2f3a40');
-        slab(ctx, X(x), Y(y), 16, h, '#5f6a70', '#8b969c');
         slab(ctx, X(x + w - 16), Y(y), 16, h, '#5f6a70', '#8b969c');
+        slab(ctx, X(x), Y(y), 16, CELL_DOOR.y - y, '#5f6a70', '#8b969c');
+        slab(ctx, X(x), Y(CELL_DOOR.y + CELL_DOOR.h), 16, y + h - (CELL_DOOR.y + CELL_DOOR.h), '#5f6a70', '#8b969c');
+        slab(ctx, X(x), Y(y), w, 8, '#5f6a70', '#8b969c', '#3a444c');
     });
 }
 
 export function bakeLab() {
-    const props = [bakeDesk(), bakeBench(), bakeWeaponTable(), bakeCrates(), bakePlant(), bakeTrash(), bakeCellFront()];
+    const { canvas: ground, ctx } = newCanvas(WORLD.w, WORLD.h);
+    paintMainRoom(ctx);
+    paintAnnex(ctx);
+    paintPartition(ctx);
+    const props = [
+        bakeDesk(), bakeBench(), bakeFridge(), bakeSink(), bakeWeaponTable(), bakeCentrifuge(),
+        bakeStretcher(), bakeCrates(), bakePlant(), bakeTrash(),
+        bakeRacks(), bakeShower(), bakeBarrels(), bakeCellFront()
+    ];
     props.sort((a, b) => a.baseY - b.baseY);
-    return { ground: bakeGround(), props };
+    return { ground, props };
 }
 
-// --- Durumu değişenler ---
+// =================== DURUMU DEĞİŞENLER ===================
 
-// Giriş kapısı (duvarda). open: 0 kapalı, 1 sonuna kadar açık.
-export function drawDoor(ctx, open, frame) {
+// Giriş kapısı (ana laboratuvarın duvarında). open: 0 kapalı, 1 sonuna kadar açık.
+export function drawDoor(ctx, open) {
     const { x, y, w, h } = DOOR;
-    // Çerçeve
     slab(ctx, x - 4, y - 4, w + 8, h + 4, '#6c777d');
     if (open > 0) {
-        // Açıklık: dışarıdaki koridorun ışığı
         blk(ctx, x, y, w, h, '#2a3036');
         blk(ctx, x + 8, y + 8, w - 16, h - 8, '#dfe6d8');
         blk(ctx, x + 8, y + 8, w - 16, 8, '#f4f7ee');
         blk(ctx, x + 8, y + h - 8, w - 16, 8, '#a9b3a4');
-        // Açılan kanat: kenara doğru daralıyor
         const pw = Math.max(0, Math.round((w * (1 - open)) / PX) * PX);
-        if (pw > 0) {
-            slab(ctx, x, y, pw, h, '#e9efe6', '#ffffff', '#b8c2b6');
-        }
-        // Işık hüzmesi yere sızıyor
+        if (pw > 0) slab(ctx, x, y, pw, h, '#e9efe6', '#ffffff', '#b8c2b6');
         ctx.globalAlpha = 0.22 * open;
         blk(ctx, x + 4, WALL_BASE, w - 8, 40, '#f4f7ee');
         ctx.globalAlpha = 1;
@@ -340,15 +621,50 @@ export function drawDoor(ctx, open, frame) {
         blk(ctx, x + w - 16, y + 56, 8, 12, '#8b969c');
         blk(ctx, x + 8, y + h - 20, w - 16, 4, '#c9d2c7');
     }
-    // Üstte kapı levhası
     blk(ctx, x + 16, y - 20, 48, 12, '#2a2018');
     blk(ctx, x + 20, y - 16, 40, 4, '#c8322e');
 }
 
-// Cam odanın kapısı. closed: 0 açık, 1 kapalı
+// İzolasyon odasının çelik kapısı (ara duvarda). open: 0 kapalı .. 1 açık.
+// İki yarı, dikey eksende birbirinden ayrılarak açılır.
+export function drawAnnexDoor(ctx, open, frame) {
+    const { x, y, w, h } = ANNEX_DOOR;
+    const half = h / 2;
+    const slide = Math.round((half * open) / PX) * PX;
+    blk(ctx, x, y, w, h, '#2a3237');
+    for (let i = 0; i < w; i += 16) blk(ctx, x + i, y + h / 2 - 2, 8, 4, '#d8b030');
+    const panel = (py, ph, up) => {
+        if (ph <= 0) return;
+        slab(ctx, x, py, w, ph, '#7b868c', '#aab4b8', '#4a555b');
+        blk(ctx, x + 4, py + 6, w - 8, 4, '#2a3237');
+        for (let i = 0; i < w; i += 16) {
+            blk(ctx, x + i, up ? py + ph - 10 : py + 2, 8, 8, '#d8b030');
+            blk(ctx, x + i + 8, up ? py + ph - 10 : py + 2, 8, 8, '#2a2a2a');
+        }
+    };
+    panel(y - slide, half, true);
+    panel(y + half + slide, half, false);
+    if (open < 1) {
+        const blink = Math.floor(frame / 30) % 2 === 0;
+        blk(ctx, x + w / 2 - 6, y + half - 6, 12, 12, blink ? '#e0584a' : '#7a1f1c');
+        blk(ctx, x + 6, y + half - 16, w - 12, 6, '#7a1f1c');
+    }
+}
+
+// Kapalı izolasyon odasının üstündeki perde: açılana kadar içerisi görünmez.
+// reveal: 0 tamamen karanlık .. 1 görünür. Ara duvarın sağındaki bütün bölge.
+export function drawAnnexCover(ctx, reveal) {
+    if (reveal >= 1) return;
+    ctx.save();
+    ctx.globalAlpha = 1 - reveal;
+    ctx.fillStyle = '#05080a';
+    ctx.fillRect(PARTITION.x + PARTITION.w, 0, WORLD.w - PARTITION.x - PARTITION.w, WORLD.h);
+    ctx.restore();
+}
+
+// Cam hücrenin kapısı. closed: 0 açık, 1 kapalı
 export function drawCellDoor(ctx, closed) {
     const { x, y, w, h } = CELL_DOOR;
-    // Kapı yolu (zeminde ray)
     blk(ctx, x - 4, y, 4, h, '#3a444c');
     if (closed > 0) {
         const ph = Math.round((h * closed) / PX) * PX;
@@ -363,7 +679,7 @@ export function drawCellDoor(ctx, closed) {
     }
 }
 
-// Kapının yanındaki kilit paneli. state: 'idle' | 'ready' | 'locked'
+// Hücre kapısının yanındaki kilit paneli. state: 'idle' | 'ready' | 'locked'
 export function drawConsole(ctx, state, frame) {
     const { x, y, w, h } = CONSOLE;
     slab(ctx, x, y + 8, w, h - 8, '#4a555b', '#6d797f', '#2f3a40');

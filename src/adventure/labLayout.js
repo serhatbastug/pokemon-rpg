@@ -1,19 +1,25 @@
-// Oynanış 1. bölümün sahnesi: Harry, Fred ve üç yardımcının silah üzerinde
-// çalıştığı laboratuvar, 3/4 (yukarıdan eğik) görünüm. Burada DOM/canvas yok -
-// yalnızca sayılar; böylece çizimden bağımsız test edilebilir
-// (tests/data.test.mjs).
+// Oynanış 1. bölümün dünyası: Harry, Fred ve üç yardımcının silah üzerinde
+// çalıştığı ANA LABORATUVAR ile kapısı kilitli İZOLASYON ODASI, 3/4 (yukarıdan
+// eğik) görünüm. Burada DOM/canvas yok - yalnızca sayılar; böylece çizimden
+// bağımsız test edilebilir (tests/data.test.mjs).
 //
-// Sahne tek ekrandır, kamera kaymaz. Piksel birimi PX = 4: karakter
-// sprite'ları da 4 ölçeğiyle çizilir, bütün sahne aynı ızgaraya oturur.
+// Dünya iki ekran genişliğinde: kamera Harry'yi yatayda izler. Ana laboratuvarın
+// sağ ucunda bir ara duvar var; içindeki çelik kapı açılana kadar arkasındaki
+// oda GÖRÜNMEZ. Açılınca içeride, ikinci bir cam oda (hücre) çıkar.
 //
-//   üst duvar  -> kapı (sol), bilgisayar masası, beyaz tahta, monitör,
-//                 mikroskop tezgâhı, cam oda (sağ)
-//   orta       -> silah masası (Fred ve yardımcılar burada)
-//   alt        -> boş zemin: Harry'nin başladığı yer
+//   ana lab (x < 996)   kapı, bilgisayar masası, beyaz tahta, monitör,
+//                       mikroskop tezgâhı, buzdolabı, lavabo, silah masası,
+//                       santrifüj masası, sedye
+//   ara duvar (996-1044) çelik izolasyon kapısı
+//   izolasyon odası     sunucu rafları, duş, fıçılar, kontrol paneli, cam hücre
+//
+// Piksel birimi PX = 4: karakter sprite'ları da 4 ölçeğiyle çizilir.
 
 export { PX } from '../pixel/pixelDraw.js';
 
-export const SCENE = { w: 1000, h: 560 };
+// Ekranda görünen alan ve bütün dünya
+export const VIEW = { w: 1000, h: 560 };
+export const WORLD = { w: 1800, h: 560 };
 
 // Duvarın zemine değdiği çizgi. Karakterin ayakları bunun altında durur.
 export const WALL_BASE = 128;
@@ -25,32 +31,51 @@ export const PLAYER_SPEED = 3.0;
 export const PLAYER_SCALE = 4;
 export const START = { x: 430, y: 372, dir: 'up' };
 
+// --- Ana laboratuvar ---
 export const DOOR = { x: 44, y: 32, w: 80, h: 96 };
 export const DESK = { x: 156, y: 128, w: 132, h: 68 };
 export const WHITEBOARD = { x: 316, y: 24, w: 160, h: 68 };
 export const WALL_MONITOR = { x: 520, y: 24, w: 104, h: 64 };
 export const BENCH = { x: 636, y: 128, w: 112, h: 68 };
+export const FRIDGE = { x: 768, y: 128, w: 64, h: 76 };
+export const SINK = { x: 848, y: 128, w: 124, h: 68 };
 export const WEAPON_TABLE = { x: 296, y: 256, w: 272, h: 80 };
-export const CONSOLE = { x: 724, y: 224, w: 40, h: 36 };
-
-// Cam oda: duvarın dibinde sağ köşe. Girişi sol kenarda, kapısı kapanabiliyor.
-export const CELL = { x: 772, y: 128, w: 208, h: 224 };
-export const CELL_DOOR = { x: 772, y: 244, w: 16, h: 80 };
-export const CELL_INSIDE = { x: 800, y: 160, w: 160, h: 168 };
-
-// Zemindeki diğer eşyalar (dekor, ama engel)
-export const CRATES = { x: 48, y: 440, w: 96, h: 56 };
-export const PLANT = { x: 904, y: 432, w: 40, h: 44 };
+export const CENTRIFUGE = { x: 176, y: 420, w: 156, h: 60 };
+export const STRETCHER = { x: 700, y: 400, w: 144, h: 64 };
+export const CRATES = { x: 40, y: 470, w: 96, h: 56 };
+export const PLANT = { x: 928, y: 440, w: 40, h: 44 };
 export const TRASH = { x: 600, y: 452, w: 36, h: 36 };
 
-// Her zaman engel olan dikdörtgenler (ayak izi). Kapı kapalı/açık durumu ayrı.
+// --- Ara duvar ve izolasyon kapısı ---
+export const PARTITION = { x: 996, w: 48 };
+export const ANNEX_DOOR = { x: 996, y: 300, w: 48, h: 96 };
+
+// --- İzolasyon odası ---
+export const ANNEX = { x: 1044, w: 756 };
+export const RACKS = { x: 1092, y: 128, w: 152, h: 72 };
+export const SHOWER = { x: 1272, y: 128, w: 72, h: 80 };
+export const BARRELS = { x: 1084, y: 440, w: 88, h: 56 };
+export const CONSOLE = { x: 1316, y: 236, w: 40, h: 36 };
+export const ANNEX_MONITOR = { x: 1488, y: 24, w: 208, h: 64 };
+
+// İkinci cam oda (hücre): girişi sol kenarda, kapısı kapanabiliyor
+export const CELL = { x: 1400, y: 200, w: 360, h: 240 };
+export const CELL_DOOR = { x: 1400, y: 300, w: 16, h: 80 };
+export const CELL_INSIDE = { x: 1424, y: 224, w: 320, h: 192 };
+
+// Her zaman engel olan dikdörtgenler (ayak izi). Kapıların durumu ayrı.
 export const OBSTACLES = [
-    DESK, BENCH, WEAPON_TABLE, CONSOLE, CRATES, PLANT, TRASH,
-    // Cam odanın duvarları: üst-sol, alt-sol, alt, sağ
-    { x: 772, y: 128, w: 16, h: 116 },
-    { x: 772, y: 324, w: 16, h: 28 },
-    { x: 772, y: 340, w: 208, h: 12 },
-    { x: 964, y: 128, w: 16, h: 224 }
+    DESK, BENCH, FRIDGE, SINK, WEAPON_TABLE, CENTRIFUGE, STRETCHER, CRATES, PLANT, TRASH,
+    // Ara duvar: kapı aralığının üstü ve altı
+    { x: PARTITION.x, y: 100, w: PARTITION.w, h: ANNEX_DOOR.y - 100 },
+    { x: PARTITION.x, y: ANNEX_DOOR.y + ANNEX_DOOR.h, w: PARTITION.w, h: 560 - (ANNEX_DOOR.y + ANNEX_DOOR.h) },
+    RACKS, SHOWER, BARRELS, CONSOLE,
+    // Cam hücrenin duvarları: üst, alt, sağ, sol-üst, sol-alt
+    { x: 1400, y: 200, w: 360, h: 16 },
+    { x: 1400, y: 424, w: 360, h: 16 },
+    { x: 1744, y: 200, w: 16, h: 240 },
+    { x: 1400, y: 200, w: 16, h: 100 },
+    { x: 1400, y: 380, w: 16, h: 60 }
 ];
 
 // NPC'ler (ayak noktası). who: charSprites.js'teki görünüş anahtarı.
@@ -63,9 +88,10 @@ export const NPCS = {
 
 // Etkileşim noktaları: yaklaşınca F
 export const SPOTS = {
-    door:       { x: 84,  y: 156, r: 64 },
-    microscope: { x: 692, y: 214, r: 68 },
-    console:    { x: 744, y: 284, r: 56 },
+    door:       { x: 84,   y: 156, r: 64 },
+    microscope: { x: 692,  y: 214, r: 68 },
+    annexDoor:  { x: 950,  y: 348, r: 70 },
+    console:    { x: 1338, y: 316, r: 60 },
     fred:       { r: 72 },
     andrew:     { r: 72 }
 };
@@ -89,13 +115,21 @@ export function feetBox(x, y) {
     return { x: x - PLAYER_BOX.w / 2, y: y - PLAYER_BOX.h, w: PLAYER_BOX.w, h: PLAYER_BOX.h };
 }
 
-// cellDoorClosed: cam odanın kapısı kapalıysa girişi de engeller
-export function blocked(x, y, { cellDoorClosed = false } = {}) {
+// Kapılar kapalıysa aralıklarını da engeller: cam hücre ve izolasyon kapısı
+export function blocked(x, y, { cellDoorClosed = false, annexDoorClosed = false } = {}) {
     if (y < FEET_MIN_Y) return true;
-    if (x < PLAYER_BOX.w / 2 || x > SCENE.w - PLAYER_BOX.w / 2) return true;
-    if (y > SCENE.h - 4) return true;
+    if (x < PLAYER_BOX.w / 2 || x > WORLD.w - PLAYER_BOX.w / 2) return true;
+    if (y > WORLD.h - 4) return true;
     const box = feetBox(x, y);
     for (const rect of OBSTACLES) if (rectsOverlap(box, rect)) return true;
     if (cellDoorClosed && rectsOverlap(box, CELL_DOOR)) return true;
+    if (annexDoorClosed && rectsOverlap(box, ANNEX_DOOR)) return true;
     return false;
+}
+
+// Kamera: Harry'yi yatayda izler. İzolasyon kapısı kapalıyken arkası görünmez,
+// bu yüzden kamera ara duvarın kenarından öteye kayamaz.
+export function cameraX(focusX, annexOpen) {
+    const max = annexOpen ? WORLD.w - VIEW.w : PARTITION.x + PARTITION.w - VIEW.w;
+    return Math.max(0, Math.min(max, focusX - VIEW.w / 2));
 }

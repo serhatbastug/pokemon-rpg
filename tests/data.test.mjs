@@ -770,9 +770,17 @@ check('oynanış: bilgisayar masasının içine girilemiyor', lab.blocked(220, 1
 check('oynanış: kapının önünde durulabiliyor', !lab.blocked(lab.SPOTS.door.x, lab.SPOTS.door.y));
 check('oynanış: mikroskop masasının önünde durulabiliyor', !lab.blocked(lab.SPOTS.microscope.x, lab.SPOTS.microscope.y));
 check('oynanış: kilit panelinin önünde durulabiliyor', !lab.blocked(lab.SPOTS.console.x, lab.SPOTS.console.y));
-check('oynanış: cam odaya kapı AÇIKKEN girilebiliyor', !lab.blocked(800, 290));
-check('oynanış: cam oda kapısı KAPALIYKEN girilemiyor', lab.blocked(780, 290, { cellDoorClosed: true }));
-check('oynanış: cam odanın duvarından geçilemiyor', lab.blocked(780, 200) && lab.blocked(900, 346));
+check('oynanış: izolasyon kapısı KAPALIYKEN geçilemiyor', lab.blocked(1020, 348, { annexDoorClosed: true }));
+check('oynanış: izolasyon kapısı AÇIKKEN geçilebiliyor', !lab.blocked(1020, 348));
+check('oynanış: ara duvardan geçilemiyor', lab.blocked(1020, 250) && lab.blocked(1020, 450));
+check('oynanış: cam hücrenin kapısı AÇIKKEN girilebiliyor', !lab.blocked(1408, 340));
+check('oynanış: cam hücrenin kapısı KAPALIYKEN girilemiyor', lab.blocked(1408, 340, { cellDoorClosed: true }));
+check('oynanış: cam hücrenin duvarından geçilemiyor', lab.blocked(1500, 212) && lab.blocked(1500, 430) && lab.blocked(1750, 300));
+check('oynanış: hücrenin içinde yürünebiliyor', !lab.blocked(1560, 330));
+check('oynanış: kamera kapı kapalıyken ara duvarı geçmiyor', lab.cameraX(2000, false) <= 44);
+check('oynanış: kamera kapı açıkken dünyanın sonuna gidebiliyor', lab.cameraX(2000, true) === lab.WORLD.w - lab.VIEW.w);
+check('oynanış: kamera solda sıfırın altına inmiyor', lab.cameraX(0, true) === 0);
+
 // Başlangıçtan her etkileşim noktasına yürünebilmeli (ızgarada taşma araması)
 {
     const step = 12;
@@ -788,10 +796,24 @@ check('oynanış: cam odanın duvarından geçilemiyor', lab.blocked(780, 200) &
             queue.push([nx, ny]);
         }
     }
-    for (const id of ['door', 'microscope', 'console']) {
+    for (const id of ['door', 'microscope', 'annexDoor', 'console']) {
         const s = lab.SPOTS[id];
         check('oynanış: başlangıçtan ' + id + ' noktasına yürünebiliyor', seen.has(key(s.x, s.y)));
     }
+    // Kapı kapalıyken izolasyon odası ve kontrol paneli ulaşılamaz olmalı
+    const seen2 = new Set([key(lab.START.x, lab.START.y)]);
+    const queue2 = [[lab.START.x, lab.START.y]];
+    while (queue2.length) {
+        const [x, y] = queue2.shift();
+        for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+            const nx = x + dx, ny = y + dy;
+            if (seen2.has(key(nx, ny)) || lab.blocked(nx, ny, { annexDoorClosed: true })) continue;
+            seen2.add(key(nx, ny));
+            queue2.push([nx, ny]);
+        }
+    }
+    check('oynanış: izolasyon kapısı kapalıyken kontrol paneline varılamıyor',
+        !seen2.has(key(lab.SPOTS.console.x, lab.SPOTS.console.y)));
 }
 
 const playLines = Object.values(script.LINES).flat();

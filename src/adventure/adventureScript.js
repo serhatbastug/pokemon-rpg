@@ -17,7 +17,8 @@ export const OBJECTIVES = {
     openDoor: 'KAPIYI AÇ',
     toScope: 'MİKROSKOBA GİT',
     talkAndrew: 'ANDREW İLE KONUŞ',
-    lock: 'CAM ODAYI KİLİTLE'
+    openAnnex: 'İZOLASYON KAPISINI AÇ',
+    lock: 'CAM HÜCREYİ KİLİTLE'
 };
 
 // Kontrol ipucu: oyun açılırken kısa süre görünür
@@ -47,9 +48,13 @@ export const LINES = {
         { speaker: 'arkadas', text: 'Harry, emin misin?' },
         { speaker: 'biz', text: 'Eminim. Açıyorum.' }
     ],
+    // Andrew eşikte duruyor: içeri girmeden önce soruyor
+    entryAsk: [
+        { speaker: 'andrew', text: 'Girebilir miyim? Lütfen.' },
+        { speaker: 'biz', text: 'Gir. Çabuk ol.' }
+    ],
     entry: [
-        { speaker: 'andrew', text: 'Teşekkür ederim... İçeri girmek için izin istiyorum.' },
-        { speaker: 'andrew', text: 'Buranın profesörleriyle konuşmak istiyorum.' },
+        { speaker: 'andrew', text: 'Teşekkür ederim. Buranın profesörleriyle konuşmak istiyorum.' },
         { speaker: 'biz', text: 'Biziz. Seni dinliyoruz.' }
     ],
     monologue: [
@@ -75,8 +80,12 @@ export const LINES = {
         { speaker: 'biz', text: 'Cam odaya alalım. Ama ona kötü davranmayacağız.' }
     ],
     andrewCell: [
-        { speaker: 'biz', text: 'Andrew, seni cam odaya alacağız. Güvenlik için.' },
+        { speaker: 'biz', text: 'Andrew, seni izolasyon odasındaki cam hücreye alacağız. Güvenlik için.' },
         { speaker: 'andrew', text: 'Anlıyorum. Gerekirse beni kullanın, yeter ki bir çare bulun.' }
+    ],
+    annexOpen: [
+        { speaker: 'biz', text: 'Yıllardır kimse girmedi buraya. Hücre hala çalışıyor.' },
+        { speaker: 'biz', text: 'İyi. Andrew'i oraya alalım.' }
     ],
     locked: [
         { speaker: 'arkadas', text: 'Kilitlendi.' },

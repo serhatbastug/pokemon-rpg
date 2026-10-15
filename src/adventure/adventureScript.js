@@ -153,7 +153,7 @@ export const LINES = {
     ],
     afterThrow: [
         { speaker: 'andrew', text: 'Aaah... Başım... Ne oldu bana?' },
-        { speaker: 'arkadas', text: 'Aah... Harry...' },
+        { speaker: 'arkadas', text: 'Ah... Andrew...' },
         { speaker: 'biz', text: 'Fred! Dayan, yanındayım!' }
     ]
 };

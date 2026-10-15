@@ -679,6 +679,21 @@ export function drawCellDoor(ctx, closed) {
     }
 }
 
+// Mikroskop tezgâhında Andrew'dan alınan DNA örneği: yeşil sıvılı tüp, hafif parıltı
+export function drawSample(ctx, frame) {
+    const x = 740, y = 128;
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.08);
+    ctx.globalAlpha = 0.18 + 0.12 * pulse;
+    blk(ctx, x - 12, y - 4, 32, 40, '#9dff6a');
+    ctx.globalAlpha = 1;
+    slab(ctx, x - 4, y + 22, 16, 6, '#4a555b', '#6d797f');          // tüp yuvası
+    blk(ctx, x, y, 8, 26, '#d2ebe6');                               // cam
+    blk(ctx, x, y + 10, 8, 16, '#3f9a28');                          // sıvı
+    blk(ctx, x + 4, y + 10, 4, 16, '#2f7a22');
+    blk(ctx, x, y - 4, 8, 4, '#c8322e');                            // kapak
+    blk(ctx, x, y, 4, 22, '#eef8f4');
+}
+
 // Hücre kapısının yanındaki kilit paneli. state: 'idle' | 'ready' | 'locked'
 export function drawConsole(ctx, state, frame) {
     const { x, y, w, h } = CONSOLE;

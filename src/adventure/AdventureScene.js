@@ -21,7 +21,7 @@ import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { hash } from '../pixel/pixelDraw.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
 import { drawPerson } from './charSprites.js';
-import { bakeLab, drawDoor, drawAnnexDoor, drawAnnexCover, drawCellDoor, drawConsole } from './labArt.js';
+import { bakeLab, drawDoor, drawAnnexDoor, drawAnnexCover, drawCellDoor, drawConsole, drawSample } from './labArt.js';
 import {
     PX, VIEW, START, NPCS, SPOTS, PLAYER_SPEED, PLAYER_SCALE, CELL_INSIDE,
     blocked, near, cameraX
@@ -98,6 +98,7 @@ export class AdventureScene {
         this.cellClosed = 0;
         this.cellTarget = 0;
         this.consoleState = 'idle';
+        this.sampleOnBench = false;  // Andrew'dan alınan DNA örneği mikroskop tezgâhında
         this.greenEyes = 0;
 
         this.phase = 'talkFred';
@@ -300,6 +301,12 @@ export class AdventureScene {
                 { say: LINES.entry },
                 { say: LINES.monologue },
                 { say: LINES.mathBeat },
+                // Andrew mikroskop tezgâhına yaklaşıp DNA örneğini veriyor
+                { walk: 'andrew', speed: 2.6, path: [[214, 358], [640, 358], [640, 236], [742, 234]] },
+                { do: () => { npcs.andrew.dir = 'up'; } },
+                { say: LINES.sampleAsk },
+                { do: () => { this.sampleOnBench = true; Sfx.token(); } },
+                { say: LINES.sampleDone },
                 { do: () => { this.doorTarget = 0; Sfx.slide(); } },
                 { phase: 'toScope' }
             ]);
@@ -564,6 +571,7 @@ export class AdventureScene {
         }
         list.push({ y: this.player.y, draw: () => this.drawHarry() });
         list.push({ y: 272, draw: () => drawConsole(ctx, this.consoleState, this.frame) });
+        if (this.sampleOnBench) list.push({ y: 198, draw: () => drawSample(ctx, this.frame) });
         list.sort((a, b) => a.y - b.y);
         for (const item of list) item.draw();
 

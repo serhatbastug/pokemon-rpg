@@ -302,7 +302,7 @@ async function main() {
         at(84, 168); await wait(80); a.action(); await wait(200);
         log.push(['peep-overlay', a.overlay?.type]);
         log.push(['peep', await drain(), a.phase]);
-        a.action(); log.push(['open', await drain(), a.phase, Math.round(a.doorOpen * 10) / 10 + '/' + a.npcs.andrew.visible]);
+        a.action(); log.push(['open', await drain(), a.phase, Math.round(a.doorOpen * 10) / 10 + '/' + a.npcs.andrew.visible + '/' + a.sampleOnBench + '/' + Math.round(a.npcs.andrew.x)]);
         at(692, 214); await wait(80); a.action();
         for (let i = 0; i < 100 && !a.scan; i++) { if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); } await wait(40); }
         log.push(['scan-overlay', a.overlay?.type]);
@@ -330,7 +330,7 @@ async function main() {
         f.fred[0] === true && f.fred[1] === 'toDoor', JSON.stringify(f.fred));
     check('Oynanis: kapi deligi ekrani aciliyor', f['peep-overlay'][0] === 'peep');
     check('Oynanis: kapi deligi bitince kapiyi acma gorevi', f.peep[1] === 'openDoor', JSON.stringify(f.peep));
-    check('Oynanis: kapi acilinca Andrew iceri giriyor', f.open[1] === 'toScope' && f.open[2].endsWith('true'), JSON.stringify(f.open));
+    check('Oynanis: kapi acilinca Andrew iceri giriyor', f.open[1] === 'toScope' && /\/true\/true\/7\d\d$/.test(f.open[2]), JSON.stringify(f.open));
     check('Oynanis: mikroskopta tarama ekrani aciliyor', f['scan-overlay'][0] === 'scan');
     check('Oynanis: bos yere F anomali saymiyor', f.yanlis[0] === 0);
     check('Oynanis: uc anomali bulununca tarama bitiyor', f.bulunan[0] === 3 && f.scope[1] === 'talkAndrew', JSON.stringify(f.scope));

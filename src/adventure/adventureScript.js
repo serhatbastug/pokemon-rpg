@@ -70,7 +70,15 @@ export const LINES = {
         { speaker: 'arkadas', text: 'Mutasyon mu? Bu virüs hücre içinde saniyede 10 bölünme yapıyor, biliyor musun?' },
         { speaker: 'andrew', text: 'Saniyede on... Saatte otuz altı bin. Bu yüzden bu kadar acele ediyorsunuz.' },
         { speaker: 'arkadas', text: 'Hesabı nasıl bu kadar çabuk yaptın?' },
-        { speaker: 'biz', text: 'Mutasyonu inceleyelim. Örnek alıyoruz. Mikroskop masası hazır.' }
+        { speaker: 'biz', text: 'Mutasyonu inceleyelim. Önce bir DNA örneği almamız lazım.' }
+    ],
+    // Andrew mikroskop tezgâhına yaklaşıp örneğini veriyor
+    sampleAsk: [
+        { speaker: 'andrew', text: 'Tabii. Kolumdan alabilirsiniz.' },
+        { speaker: 'biz', text: 'Bir damla yeter. Dur biraz.' }
+    ],
+    sampleDone: [
+        { speaker: 'biz', text: 'Aldım. Hemen mikroskoba bakıyorum.' }
     ],
     scanStart: [
         { speaker: 'biz', text: 'Dizilimi tarayalım. Üç anormallik arayacağım.' }

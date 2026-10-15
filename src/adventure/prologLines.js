@@ -135,6 +135,18 @@ export const LAB_PILL = [
 ];
 
 export const LAB_ENOUGH = [
-    { speaker: 'arkadas', text: 'Bize yeterince yardım etti. Daha fazla araştırmaya gerek yok.' },
-    { speaker: 'biz', text: '...Haklısın Fred.' }
+    { speaker: 'arkadas', text: 'Bize yeterince yardım etti. Daha fazla araştırmaya gerek yok.' }
+];
+
+// Harry dönüp Fred'le tartışıyor
+export const LAB_QUARREL = [
+    { speaker: 'biz', text: 'O bir gönüllüydü Fred, bir deney malzemesi değil.' },
+    { speaker: 'arkadas', text: 'Biliyorum. Ama dışarıda binlercesi var.' },
+    { speaker: 'biz', text: 'Yine de bu kadar kolay geçiştirme.' },
+    { speaker: 'arkadas', text: 'Geçiştirmiyorum Harry. Zamanımız yok.' }
+];
+
+// Harry tek başına hap üzerinde çalışırken
+export const LAB_SOLO = [
+    { speaker: 'biz', text: 'Biraz daha... Etkiyi daha uzun tutmalıyım.' }
 ];

@@ -274,7 +274,7 @@ function patient(ctx, cam, { breath = 0, dead = false, worse = false } = {}) {
 
 // --- Ayakta duran kişi: yüz AYRINTILI, bacaklar yürürken açılıyor ---
 function stander(ctx, cam, p) {
-    const { x, dir = 1, talk = 0, walk = null, band = false, sick = 0 } = p;
+    const { x, dir = 1, talk = 0, walk = null, band = false, sick = 0, work = null } = p;
     const { coat, shade, skin, hair, trouser } = p;
     const skinShade = mix(skin, '#000000', 0.22);
     const { torsoH = 29, coatW = 20, leg = 24, headW = 12.4, headH = 13, hairStyle = 'plain',
@@ -315,10 +315,18 @@ function stander(ctx, cam, p) {
         const sy = shoulderY + 2 + y0;
         const ex = sx + s * 1.2;
         const ey = sy + torsoH * 0.5;
-        const handX = x + s * 10.6 + swing * -s * 2;
-        const handY = hipY + 1;
-        limbCells(ctx, cam, sx, sy, ex, ey, 3.8, coat);
-        limbCells(ctx, cam, ex, ey, handX, handY - 2, 3.4, sick ? mix(coat, GREEN, 0.6 * sick) : coat);
+        let handX = x + s * 10.6 + swing * -s * 2;
+        let handY = hipY + 1;
+        let elbowX = ex, elbowY = ey;
+        if (work && s === dir) {
+            // Ön kol tezgâha uzanıyor: dirsek öne, el tezgâh üstünde çalışıyor
+            elbowX = sx + s * 6;
+            elbowY = sy + torsoH * 0.34;
+            handX = x + s * 15;
+            handY = work.y + 3;
+        }
+        limbCells(ctx, cam, sx, sy, elbowX, elbowY, 3.8, coat);
+        limbCells(ctx, cam, elbowX, elbowY, handX, handY - 2, 3.4, sick ? mix(coat, GREEN, 0.6 * sick) : coat);
         cam.rect(ctx, handX - 2, handY - 2, 4, 3.6, sick ? mix(skin, GREEN, 0.65 * sick) : skin);
         if (band && s > 0) {
             cam.rect(ctx, handX - 2.1, handY - 4.6, 4.2, 2.4, BAND_COLOR);
@@ -460,6 +468,41 @@ function labWorse(ctx, A, t) {
     scene(ctx, cam, { pill: true, patient: { breath: t * 5, worse: true }, harry: { sick: 0 } });
 }
 
+// Tezgâhta hap tepsisi: kapsüller sıralı
+function pillTray(ctx, cam) {
+    cam.rect(ctx, 223, 68.6, 11, 1.4, '#c2cbcf');
+    for (let i = 0; i < 4; i++) {
+        cam.rect(ctx, 224 + i * 2.6, 67, 1.6, 1.6, '#c8322e');
+        cam.rect(ctx, 225.4 + i * 2.6, 67, 1.2, 1.6, '#f4f1e4');
+    }
+}
+
+// Harry tek başına, çalışma tezgâhında hap üzerinde çalışıyor (denek ve Fred yok)
+function labSolo(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    room(ctx, cam);
+    pillTray(ctx, cam);
+    const stir = Math.sin(t * 14) * 1.2;
+    stander(ctx, cam, { ...HARRY, x: 188, dir: 1, talk: Math.sin(t * 8) > 0 ? 1 : 0,
+        work: { y: 66 + stir } });
+    // Pipetten sarkan damla
+    const k = (t * 3) % 1;
+    cam.rect(ctx, 205.4, 70.6 + k * 4, 1.2, 1.6, '#e8d070');
+    vignette(ctx, 0.3);
+}
+
+// Ölümden sonra: Harry yüzünü Fred'e çevirmiş, ikisi tartışıyor
+function labQuarrel(ctx, A, t) {
+    const cam = createCam(A, WIDE);
+    const who = Math.floor(t * 4) % 2;
+    scene(ctx, cam, {
+        patient: { breath: 0, dead: true },
+        flat: true,
+        harry: { dir: 1, talk: who === 0 ? 1 : 0 },
+        fred: { dir: -1, talk: who === 1 ? 1 : 0 }
+    });
+}
+
 // --- Monitör kareleri: tam kadraj ---
 
 function screenFrame(ctx, cam) {
@@ -562,5 +605,5 @@ function labDeath(ctx, A, t) {
 }
 
 export const CHAPTER_6_ART = {
-    labHelp, labArrive, labPatient, labPill, labWorse, findSplit, findMitosis, findBrain, labDeath
+    labHelp, labArrive, labPatient, labPill, labWorse, labSolo, labQuarrel, findSplit, findMitosis, findBrain, labDeath
 };

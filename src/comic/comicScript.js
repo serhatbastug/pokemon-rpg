@@ -39,7 +39,7 @@ import {
     HOME_ASK, HOME_HEARD, HOME_DESC, HOME_WARN, HOME_PROPOSE,
     HOME_AGREE, HOME_CLOSE,
     LAB_HELP_ARRIVE, STREET_SIGN, LAB_VOLUNTEER_ARRIVE, LAB_PATIENT_START, LAB_ENOUGH,
-    LAB_FINDINGS_END, LAB_PILL
+    LAB_FINDINGS_END, LAB_PILL, LAB_QUARREL, LAB_SOLO
 } from '../adventure/prologLines.js';
 
 // Konuşma balonlarına konum ekler: metin prologLines.js'te tek yerde durur,
@@ -355,6 +355,13 @@ export const PANELS = [
     { id: 'baslik-7', chapter: 7, art: 'title', motion: 0, hold: 90 },
 
     {
+        // HAREKETLİ: Harry tek başına çalışma tezgâhında hap üzerinde çalışıyor
+        id: 'hap-calisma', chapter: 7, art: 'labSolo',
+        caption: 'HARRY, HAP ÜZERİNDE ÇALIŞIYOR.',
+        lines: at(LAB_SOLO, 330, 158),
+        motion: 160, hold: 40
+    },
+    {
         // Laboratuvarda hap hazır; denek hâlâ masada
         id: 'hap-hazir', chapter: 7, art: 'labPill',
         lines: [...at(LAB_PILL.slice(0, 1), 716, 158), ...at(LAB_PILL.slice(1), 812, 158)],
@@ -381,8 +388,19 @@ export const PANELS = [
     },
     {
         id: 'hap-yeter', chapter: 7, art: 'labDeath', cont: true,
-        lines: [...at(LAB_ENOUGH.slice(0, 1), 812, 158), ...at(LAB_ENOUGH.slice(1), 716, 158)],
+        lines: at(LAB_ENOUGH, 812, 158),
         motion: 0, hold: 90
+    },
+    {
+        // Harry yüzünü Fred'e çeviriyor, ikisi tartışıyor
+        id: 'hap-tartisma', chapter: 7, art: 'labQuarrel', cont: true,
+        lines: [
+            ...at(LAB_QUARREL.slice(0, 1), 716, 158),
+            ...at(LAB_QUARREL.slice(1, 2), 812, 158),
+            ...at(LAB_QUARREL.slice(2, 3), 716, 158),
+            ...at(LAB_QUARREL.slice(3), 812, 158)
+        ],
+        motion: 240, hold: 60
     }
 ];
 

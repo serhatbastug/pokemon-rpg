@@ -659,6 +659,7 @@ export class AdventureScene {
         v.pain = 1;
         v.moving = false;
         this.revert = { t: 0 };
+        this.phase = 'ending';
         this.bolts = 400;
         this.shake = 30;
         this.flash = 0.6;
@@ -835,6 +836,9 @@ export class AdventureScene {
                 v.pain = 0;
                 this.virusGlow = 0;
                 a.alpha = 1;
+                // Andrew bayıldı: kıpırdamıyor; Fred toparlanıp ayağa kalkıyor
+                a.limp = true;
+                if (this.fredDown) this.fredDown.up = 0;
             }
         }
         if (v.visible) {
@@ -856,6 +860,7 @@ export class AdventureScene {
         const fd = this.fredDown;
         if (fd) {
             fd.t++;
+            if (fd.up !== undefined && fd.up < 1) fd.up = Math.min(1, fd.up + 1 / 60);
             if (fd.t === 30) {
                 this.shake = Math.max(this.shake, 12);
                 Sfx.metalSlam();
@@ -1111,8 +1116,8 @@ export class AdventureScene {
     // Andrew yerde acı içinde kıvranıyor
     drawLyingAndrew(a) {
         const { ctx } = this;
-        const wr = Math.sin(this.frame * 0.5) * 0.12 + Math.sin(this.frame * 1.3) * 0.05;
-        const jx = Math.sin(this.frame * 0.9) * 2;
+        const wr = a.limp ? 0 : Math.sin(this.frame * 0.5) * 0.12 + Math.sin(this.frame * 1.3) * 0.05;
+        const jx = a.limp ? 0 : Math.sin(this.frame * 0.9) * 2;
         ctx.save();
         ctx.globalAlpha = a.alpha ?? 1;
         this.drawShadow(a.x + 18, a.y);
@@ -1345,7 +1350,11 @@ export class AdventureScene {
         const x1 = f.x1, y1 = f.y1 - 14;
         let cx = f.x0 + (x1 - f.x0) * u, cy = f.y0 + (y1 - f.y0) * u * u;
         let angle = Math.PI + (Math.PI / 2) * u;
-        if (f.t > 30) {
+        if (f.up !== undefined) {
+            const k = f.up * f.up * (3 - 2 * f.up);
+            angle = Math.PI * 1.5 + (Math.PI / 2) * k;
+            cy = (f.y1 - 14) + (-18) * k;
+        } else if (f.t > 30) {
             angle += Math.sin(this.frame * 0.5) * 0.09;
             cx += Math.sin(this.frame * 0.9) * 1.5;
         }

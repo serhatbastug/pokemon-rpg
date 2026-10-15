@@ -358,7 +358,8 @@ function person(ctx, cam, p, time) {
     //   look   arada bir başını çeviriyor
     //   fidget arada bir ayağını oynatıyor
     const idle = moving ? 0 : 1;
-    const lean = idle * Math.sin(time * 0.42 + p.phase) * a.h * 0.012;
+    const fight = p.fight ? 0.5 + 0.5 * Math.sin(time * 6 + p.phase) : 0;
+    const lean = idle * Math.sin(time * 0.42 + p.phase) * a.h * 0.012 + (p.fight ? dir * a.h * (0.05 + fight * 0.035) : 0);
     const look = idle * Math.sin(time * 0.27 + p.phase * 2);
     const fidget = idle * Math.max(0, Math.sin(time * 0.55 + p.phase * 3) - 0.86) * 7;
 
@@ -425,10 +426,22 @@ function person(ctx, cam, p, time) {
         const sw = -swing * s;
         const sx = px(s * (cw * 0.5 - a.h * 0.012));
         const sy = a.shoulderY + a.h * 0.05 + y0;
-        const ex = sx + sw * stepX * 0.5 * dir;
-        const ey = sy + torsoH * 0.55;
-        const hx2 = ex + sw * stepX * 0.4 * dir;
-        const hy2 = a.hipY + a.h * 0.06 + y0;
+        let ex = sx + sw * stepX * 0.5 * dir;
+        let ey = sy + torsoH * 0.55;
+        let hx2 = ex + sw * stepX * 0.4 * dir;
+        let hy2 = a.hipY + a.h * 0.06 + y0;
+        if (p.fight && s === dir) {
+            // Öndeki kol rakibe doğru uzanıp itiyor
+            ex = sx + dir * a.h * 0.1;
+            ey = sy + torsoH * 0.18;
+            hx2 = ex + dir * a.h * (0.1 + fight * 0.1);
+            hy2 = ey - a.h * 0.02;
+        } else if (p.fight) {
+            // Arkadaki kol yumruk, kalçada
+            ex = sx + s * a.h * 0.02;
+            hx2 = ex + dir * a.h * 0.05;
+            hy2 = a.hipY - a.h * 0.02 + y0;
+        }
         const tone = s < 0 ? lit : shade;
         limbCells(ctx, cam, sx, sy, ex, ey, a.h * 0.07, tone);
         // Hastanın kolu: ön kol ve el yeşile dönmüş
@@ -457,8 +470,12 @@ function person(ctx, cam, p, time) {
         cam.rect(ctx, hx + fx + s * gap - eyeW / 2, eyeY, eyeW, eyeH, '#20242a');                      // göz
     }
     cam.rect(ctx, hx + fx + dir * a.headW * 0.1, eyeY + eyeH * 1.2, eyeW * 0.7, eyeH * 1.1, skinShade); // burun
-    cam.rect(ctx, hx + fx - a.headW * 0.1, eyeY + eyeH * 3, a.headW * 0.28, eyeH * 0.8,
-        mouth);                                                                  // ağız
+    cam.rect(ctx, hx + fx - a.headW * 0.1, eyeY + eyeH * 3, a.headW * 0.28, eyeH * (p.fight ? 0.8 + 1.4 * fight : 0.8),
+        p.fight ? '#3a1a18' : mouth);                                           // ağız
+    if (p.fight) {
+        // Çatık kaşlar
+        for (const s of [-1, 1]) cam.rect(ctx, hx + fx + s * gap - eyeW / 2 + s * 0.2, eyeY - eyeH * 2.1, eyeW * 1.3, eyeH * 0.6, hair);
+    }
 
     // Ağır hasta: yüzde belirgin yeşil damarlar
     if ((p.sick || 0) > 1) {
@@ -957,31 +974,49 @@ const WORSE_FOLK = (() => {
     return [
         pick(3, 0, { x0: 40, speed: 3, dir: 1 }),
         pick(14, 0, { x0: 190, speed: 3, dir: -1 }),
-        pick(5, 1, { x0: 40, speed: 0, dir: 1, still: true, x: 40 }),
-        pick(20, 1, { x0: 60, speed: 0, dir: -1, still: true, x: 62 }),
-        pick(9, 2, { x0: 100, speed: 5, dir: 1 }),
-        pick(23, 2, { x0: 200, speed: 0, dir: -1, still: true, x: 190 })
+        pick(5, 1, { x0: 20, speed: 0, dir: 1, still: true, x: 20 }),
+        pick(20, 1, { x0: 170, speed: 0, dir: -1, still: true, x: 172 }),
+        // Kavga: yüz yüze, biri öbürünü itiyor
+        pick(9, 2, { x0: 70, speed: 0, dir: 1, still: true, x: 76, fight: 1, phase: 0 }),
+        pick(23, 2, { x0: 100, speed: 0, dir: -1, still: true, x: 102, fight: 1, phase: 2.4 })
     ];
 })();
 
 const FALLEN = bakeTones({ ...CROWD[11], lane: 2, h: LANES[2].h * 0.96, sick: 1.7, mark: 0 });
 
-// Yere yığılmış: gövde yatay, kafa yerde, yeşil kol uzanmış
+// Yere yığılmış: yan yatmış; bacaklar dizden bükük, bir kol gövdenin altında,
+// öbürü öne uzanmış. Boyu ayakta olduğu yüksekliğin kadar.
 function drawFallen(c, m) {
     const t = FALLEN.tones;
-    const y = 96, x = 128;
-    m.rect(c, x - 4, y + 1, 56, 1.2, t.ground);
-    m.rect(c, x, y - 7, 30, 7, t.coat);
-    m.rect(c, x, y - 7, 30, 1.2, t.lit);
-    m.rect(c, x + 30, y - 6, 20, 5, t.trouser);
-    m.rect(c, x + 49, y - 3, 5, 3, '#1d2126');
-    m.rect(c, x - 9, y - 7, 9, 8, t.skin);
-    m.rect(c, x - 9, y - 7, 9, 3, FALLEN.hair);
-    m.rect(c, x - 6, y - 3.4, 1.6, 0.8, '#20242a');
-    for (const [vx, vy] of [[-8, -6], [-4, -5], [-7, -2]]) m.rect(c, x + vx, y + vy, 0.9, 2, '#2a6a1c');
-    // Uzanan yeşil kol ve el
-    m.rect(c, x - 22, y - 1.6, 16, 3, mix(t.coat, '#3f9a28', 0.8));
-    m.rect(c, x - 28, y - 1.8, 6, 3.4, '#4aa832');
+    const y = 97, x = 150;                        // y: zemin
+    const green = '#3f9a28', greenLo = '#2f7a20';
+    m.rect(c, x - 14, y, 54, 1.4, t.ground);
+    // Bacaklar: kalçadan sağa, diz bükük
+    m.rect(c, x + 22, y - 6.4, 11, 3.6, t.trouser);                  // üstteki bacak
+    m.rect(c, x + 32, y - 8.4, 6, 4, t.trouser);                     // diz hafif yukarıda
+    m.rect(c, x + 22, y - 3, 17, 3, mix(t.trouser, '#000000', 0.18)); // alttaki bacak
+    m.rect(c, x + 38, y - 3.6, 4, 3.6, '#1d2126');
+    m.rect(c, x + 37, y - 8.6, 3.4, 2.6, '#1d2126');
+    // Gövde: palto, yatay
+    m.rect(c, x + 2, y - 9, 22, 9, t.coat);
+    m.rect(c, x + 2, y - 9, 22, 1.6, t.lit);
+    m.rect(c, x + 2, y - 2, 22, 2, t.shade);
+    m.rect(c, x + 12, y - 9, 1, 7, t.shade);
+    m.rect(c, x + 22, y - 9, 2, 9, mix(t.coat, '#000000', 0.2));
+    // Baş: yere yaslanmış, kapalı gözler
+    m.rect(c, x - 8, y - 8, 9, 8, t.skin);
+    m.rect(c, x - 8, y - 8, 9, 3, FALLEN.hair);
+    m.rect(c, x - 9, y - 7, 2, 4, FALLEN.hair);
+    m.rect(c, x - 5, y - 4.6, 1.8, 0.8, '#20242a');
+    m.rect(c, x - 2, y - 4.6, 1.8, 0.8, '#20242a');
+    m.rect(c, x - 4.4, y - 2, 2.6, 0.7, t.mouth);
+    for (const [vx, vy] of [[-7, -7], [-3, -6.4], [-6, -3]]) m.rect(c, x + vx, y + vy, 0.8, 2, '#2a6a1c');
+    // Gövdenin altındaki kol ve öne uzanmış kol
+    m.rect(c, x + 0, y - 3, 6, 3, mix(t.coat, green, 0.8));
+    m.rect(c, x - 18, y - 3.4, 11, 3, mix(t.coat, green, 0.85));
+    m.rect(c, x - 18, y - 3.4, 11, 0.8, mix(green, '#ffffff', 0.2));
+    m.rect(c, x - 23, y - 3.6, 5, 3.4, green);
+    for (let i = 0; i < 4; i++) m.rect(c, x - 26 - (i % 2) * 0.6, y - 3.6 + i * 0.9, 3, 0.7, greenLo);
 }
 
 function streetWorse(ctx, A, t) {

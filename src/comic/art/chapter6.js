@@ -254,22 +254,53 @@ function patient(ctx, cam, { breath = 0, dead = false, worse = false } = {}) {
     cam.rect(ctx, x0 + 36, top - 9.4, 2.6, 2, sheet);
     cam.rect(ctx, x0 + 39.4, top - 8.6, 2.2, 1.4, sheet);
 
-    // Kol: omuzdan çıkıp örtünün önünden masa kenarına iniyor, sonra sarkıyor
-    const green = mix('#c99a6e', GREEN, gone ? 0.95 : 0.75);
-    const hang = top + (dead ? 15 : 11);
-    const ax = x0 + 18;
-    limbCells(ctx, cam, x0 + 5, top - 8, ax, top - 2.5, 3.2, mix('#c99a6e', GREEN, 0.5));
-    limbCells(ctx, cam, ax, top - 2.5, ax + 1, hang, 3.2, green);
-    // El: avuç ve parmak ucu
-    cam.rect(ctx, ax - 1, hang - 1, 4.6, 3.6, mix('#c99a6e', GREEN, 0.7));
-    cam.rect(ctx, ax - 0.6, hang + 2.4, 1, 1.6, mix('#c99a6e', GREEN, 0.7));
-    cam.rect(ctx, ax + 1, hang + 2.6, 1, 1.8, mix('#c99a6e', GREEN, 0.7));
-    cam.rect(ctx, ax + 2.4, hang + 2.4, 1, 1.4, mix('#c99a6e', GREEN, 0.7));
-    // Damarlar
-    limbCells(ctx, cam, ax + 0.4, top - 1.5, ax + 1, hang - 1, 0.8, '#1f5a16');
-    limbCells(ctx, cam, x0 + 6, top - 7.4, ax - 1, top - 3.4, 0.8, '#2a6a1c');
-    // Masa kenarındaki gölge
-    cam.rect(ctx, ax - 1.4, top, 4.6, 1, 'rgba(0,0,0,0.2)');
+    // Kol: omuzdan masanın ÖN yüzüne sarkıyor. Yandan bakıldığı için üst kol
+    // kısalıyor; dirsekten sonra ön kol gevşekçe aşağı iniyor, el sarkık.
+    const gown = '#b9cddb', gownLo = '#93a9ba';
+    const armGreen = mix('#c99a6e', GREEN, gone ? 0.95 : 0.78);
+    const armLo = mix(armGreen, '#000000', 0.22), armHi = mix(armGreen, '#ffffff', 0.14);
+    const sx = x0 + 3.4, sy = top - 7.4;
+    const ex = x0 + 6.4, ey = top + 1.2;                   // dirsek
+    const wx = x0 + 7.4, wy = top + (dead ? 11.8 : 10.4);   // bilek
+    // Üst kol: gömlek kolu + altında çıplak kısım
+    for (let i = 0; i <= 10; i++) {
+        const k = i / 10;
+        const cx = sx + (ex - sx) * k, cy = sy + (ey - sy) * k;
+        cam.rect(ctx, cx - 2.2, cy - 0.5, 4.4, 1.3, k < 0.55 ? gown : armGreen);
+        cam.rect(ctx, cx + 1.2, cy - 0.5, 1, 1.3, k < 0.55 ? gownLo : armLo);
+    }
+    cam.rect(ctx, sx - 2.4, sy - 1, 4.8, 1.2, gown);        // omuz kapağı
+    // Ön kol: dirsekte kalın, bilekte ince
+    for (let i = 0; i <= 12; i++) {
+        const k = i / 12;
+        const cx = ex + (wx - ex) * k, cy = ey + (wy - ey) * k;
+        const w = 3.8 - k * 1.2;
+        cam.rect(ctx, cx - w / 2, cy, w, 1.1, armGreen);
+        cam.rect(ctx, cx - w / 2, cy, 0.8, 1.1, armHi);
+        cam.rect(ctx, cx + w / 2 - 0.9, cy, 0.9, 1.1, armLo);
+    }
+    // Dirsek yuvarlağı
+    cam.rect(ctx, ex - 2.2, ey - 0.4, 4.4, 1.6, armGreen);
+    cam.rect(ctx, ex - 2.2, ey - 0.4, 0.8, 1.6, armHi);
+    // Damarlar: ön kol boyunca koyu yeşil, dallanan
+    const vein = '#1f5a16';
+    cam.rect(ctx, ex + 0.2, ey + 1.4, 0.7, 3, vein);
+    cam.rect(ctx, ex + 0.8, ey + 4.2, 0.7, 2.6, vein);
+    cam.rect(ctx, ex - 0.6, ey + 3.4, 0.7, 1.6, vein);
+    cam.rect(ctx, ex + 0.9, ey + 6.8, 0.7, 2, vein);
+    // El: gevşek, parmaklar hafif kıvrık ve ayrık
+    const hx2 = wx - 1.8, hy2 = wy;
+    cam.rect(ctx, hx2, hy2, 3.8, 2.8, armGreen);
+    cam.rect(ctx, hx2, hy2, 0.8, 2.8, armHi);
+    cam.rect(ctx, hx2 + 3, hy2, 0.8, 2.8, armLo);
+    const fingers = [[0, 2.2], [1.05, 3.0], [2.1, 3.2], [3.0, 2.4]];
+    fingers.forEach(([fx, fl], i) => {
+        cam.rect(ctx, hx2 + fx, hy2 + 2.8, 0.85, fl * 0.6, armGreen);
+        cam.rect(ctx, hx2 + fx + (i < 2 ? -0.2 : 0.2), hy2 + 2.8 + fl * 0.6, 0.85, fl * 0.4, armLo);
+    });
+    cam.rect(ctx, hx2 + 3.8, hy2 + 0.4, 1.2, 1.6, armGreen);   // başparmak
+    // Masanın kenarında kolun gölgesi
+    cam.rect(ctx, ex - 2, top + 0.4, 5, 0.8, 'rgba(0,0,0,0.18)');
 }
 
 // --- Ayakta duran kişi: yüz AYRINTILI, bacaklar yürürken açılıyor ---

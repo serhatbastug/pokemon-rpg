@@ -10,8 +10,10 @@
 //   talkAndrew -> openAnnex (izolasyon kapısı açılır, ikinci oda görünür) ->
 //   (Andrew cam hücreye yürür) -> lock -> (kilit) -> GECE: hücrede Andrew ile
 //   içindeki ses konuşur -> patlama, elektrik kesilir, Andrew virüse dönüşür ->
-//   Harry fenerle gelir, kaçar, Fred'i uyarır -> virüs duvarı yıkıp Fred'i
-//   yakalar -> getBattery -> throwBattery -> (virüs Fred'i bırakır) -> bitiş
+//   (dönüşüm uzun sürer) -> Harry fenerle gelir, virüs onu KOVALAR (chase:
+//   oynanır; sol çubuk yürür, sağ çubuk feneri çevirir) -> Fred'e varınca
+//   uyarır, virüs duvarı yıkıp Fred'i yakalar -> getBattery (süre sınırlı) ->
+//   throwBattery -> pil virüse değince Andrew'a döner, yerde kıvranır -> bitiş
 //
 // Dünya iki ekran genişliğinde; kamera Harry'yi (kesitlerde Andrew'ı) izler.
 //
@@ -24,6 +26,7 @@ import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { hash } from '../pixel/pixelDraw.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
 import { drawPerson } from './charSprites.js';
+import { drawPortrait, PORTRAIT } from './portraits.js';
 import { virusSprite } from '../game/fighterArt.js';
 import {
     bakeLab, drawDoor, drawAnnexDoor, drawAnnexCover, drawCellDoor, drawConsole, drawSample,
@@ -31,10 +34,12 @@ import {
 } from './labArt.js';
 import {
     PX, VIEW, START, NPCS, SPOTS, PLAYER_SPEED, PLAYER_SCALE, VIRUS_SCALE, CELL_INSIDE,
+    VIRUS_CHASE_SPEED, FRED_SECONDS,
     blocked, near, cameraX
 } from './labLayout.js';
 import {
-    LINES, OBJECTIVES, CONTROL_HINT, SCAN_TARGETS, NIGHT_CAPTION
+    LINES, OBJECTIVES, CONTROL_HINT, SCAN_TARGETS, NIGHT_CAPTION,
+    CHASE_HINT_KEYS, CHASE_HINT_PAD, CAUGHT_CAPTION, FRED_LOST_CAPTION
 } from './adventureScript.js';
 
 const INTRO_FRAMES = 40;
@@ -43,6 +48,9 @@ const BUBBLE_SCALE = 2;
 const BUBBLE_MAX_W = 460;
 const SPRITE_H = 64;
 const HINT_FRAMES = 420;
+const MORPH_FRAMES = 380;       // Andrew'ın virüse dönüşümü
+const REVERT_FRAMES = 110;      // pilin değmesiyle Andrew'a dönüş
+const DIR_ANGLE = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
 const ANCHOR_PEEP = { andrew: [500, 150], other: [500, 520] };
 
@@ -95,7 +103,7 @@ export class AdventureScene {
         // Andrew kapı açılana kadar sahnede değil
         this.npcs.andrew = { id: 'andrew', who: 'andrew', x: 84, y: 140, dir: 'down', moving: false, visible: false };
         // Patlamadan sonra Andrew'ın yerini alan dev virüs (2 kişilik moddaki sprite)
-        this.npcs.virus = { id: 'virus', kind: 'virus', x: 1580, y: 332, dir: 'left', moving: false, visible: false, grow: 1, pain: 0 };
+        this.npcs.virus = { id: 'virus', kind: 'virus', x: 1580, y: 332, dir: 'left', moving: false, visible: false, grow: 1, pain: 0, alpha: 1 };
 
         this.annexOpen = 0;          // izolasyon kapısı: 0 kapalı .. 1 açık (perde de buna bağlı)
         this.annexTarget = 0;
@@ -124,6 +132,13 @@ export class AdventureScene {
         this.grab = null;            // virüsün Fred'i yakalaması
         this.fredDown = null;        // yere düşen Fred
         this.battery = { floor: false, projectile: null };
+        this.morph = null;           // Andrew -> virüs dönüşümü
+        this.revert = null;          // virüs -> Andrew (pil değince)
+        this.chase = null;           // kovalamaca durumu
+        this.hintUntil = 0;
+        this.fredClock = 0;          // Fred'i kurtarma süresi (kare)
+        this.aim = 0;                // fenerin yönü (radyan)
+        this.moveAngle = 0;
 
         this.phase = 'talkFred';
         this.overlay = null;
@@ -203,14 +218,17 @@ export class AdventureScene {
                 if (!s.until()) return;
             } else if (s.walk) {
                 const npc = this.actor(s.walk);
+                const escort = s.escort ? this.actor(s.escort) : null;
                 if (seq.walking === null) seq.walking = 0;
-                seq.playerWalk = s.walk === 'player';
+                seq.playerWalk = s.walk === 'player' || s.escort === 'player';
                 if (seq.walking < s.path.length) {
                     this.walkToward(npc, s.path[seq.walking], s.speed || 2.2)
                         && seq.walking++;
+                    if (escort) this.followBeside(escort, npc, (s.speed || 2.2) + 0.5);
                     return;
                 }
                 npc.moving = false;
+                if (escort) escort.moving = false;
                 seq.walking = null;
                 seq.playerWalk = false;
             }
@@ -239,6 +257,13 @@ export class AdventureScene {
         if (Math.abs(dy) >= Math.abs(dx)) npc.dir = dy < 0 ? 'up' : 'down';
         else npc.dir = dx < 0 ? 'left' : 'right';
         return false;
+    }
+
+    // Yürüyen birinin hemen arkasında ve yanında yürür (eşlik)
+    followBeside(follower, leader, speed) {
+        const tx = leader.x - 52, ty = leader.y + 12;
+        if (Math.hypot(tx - follower.x, ty - follower.y) > 8) this.walkToward(follower, [tx, ty], speed);
+        else follower.moving = false;
     }
 
     // --- Girdi ---
@@ -297,6 +322,7 @@ export class AdventureScene {
             talkAndrew: OBJECTIVES.talkAndrew,
             openAnnex: OBJECTIVES.openAnnex,
             lock: OBJECTIVES.lock,
+            chase: OBJECTIVES.chase,
             getBattery: OBJECTIVES.getBattery,
             throwBattery: OBJECTIVES.throwBattery
         }[this.phase] || null;
@@ -339,7 +365,7 @@ export class AdventureScene {
                 { say: LINES.monologue },
                 { say: LINES.mathBeat },
                 // Andrew mikroskop tezgâhına yaklaşıp DNA örneğini veriyor
-                { walk: 'andrew', speed: 2.6, path: [[214, 358], [640, 358], [640, 236], [742, 234]] },
+                { walk: 'andrew', escort: 'player', speed: 2.6, path: [[214, 358], [640, 358], [640, 236], [742, 234]] },
                 { do: () => { npcs.andrew.dir = 'up'; } },
                 { say: LINES.sampleAsk },
                 { do: () => { this.sampleOnBench = true; Sfx.token(); } },
@@ -371,7 +397,7 @@ export class AdventureScene {
                 { wait: 120 },
                 { say: LINES.annexOpen },
                 { do: () => { this.camOverride = null; this.camFocus = 'andrew'; } },
-                { walk: 'andrew', speed: 3.2, path: [[214, 358], [1040, 358], [1380, 344], [1450, 344], [1560, 332]] },
+                { walk: 'andrew', speed: 3.2, path: [[742, 358], [1040, 358], [1380, 344], [1450, 344], [1560, 332]] },
                 { do: () => { npcs.andrew.dir = 'left'; this.camFocus = 'player'; this.consoleState = 'ready'; } },
                 { phase: 'lock' }
             ]);
@@ -384,9 +410,7 @@ export class AdventureScene {
                 { phase: 'night' },
                 ...this.nightSteps(),
                 { say: LINES.cellTalk },
-                ...this.blastSteps(),
-                ...this.fleeSteps(),
-                ...this.rampageSteps()
+                ...this.blastSteps()
             ]);
         } else if (id === 'battery') {
             this.run([
@@ -456,13 +480,15 @@ export class AdventureScene {
         ];
     }
 
-    // Patlama: cam paramparça, elektrik kesilir, Andrew dev virüse dönüşür;
-    // ardından Harry fenerle içeri girer.
+    // Patlama: cam paramparça, elektrik kesilir; Andrew'ın dönüşümü uzun sürer
+    // (önce kıvranır, gözleri yanar, sonra virüs belirir). Ardından Harry fenerle
+    // içeri girer, virüsü görür ve KOVALAMACA başlar.
     blastSteps() {
         return [
             { wait: 40 },
             { do: () => this.blast() },
-            { wait: 170 },
+            { until: () => !this.morph },
+            { wait: 40 },
             { do: () => {
                 this.player.x = 1004; this.player.y = 348; this.player.dir = 'right';
                 this.flashlight = true;
@@ -471,29 +497,85 @@ export class AdventureScene {
             } },
             { say: LINES.harryIn },
             { walk: 'player', speed: 2.2, path: [[1210, 348]] },
-            { do: () => { this.virusGlow = 190; Sfx.ooze(); } },
+            { do: () => { this.virusGlow = 260; Sfx.ooze(); } },
             { wait: 50 },
             { say: LINES.harryShock },
-            { wait: 20 }
+            { wait: 20 },
+            { do: () => this.startChase() }
         ];
     }
 
-    // Harry koşarak kaçar, Fred'i uyarır; virüs duvarı yıkıp gelir
+    startChase() {
+        const { npcs } = this;
+        this.phase = 'chase';
+        this.chase = { stall: 0 };
+        this.player.x = 1210; this.player.y = 348; this.player.dir = 'right';
+        Object.assign(npcs.virus, { x: 1580, y: 332, dir: 'left', moving: true });
+        this.virusGlow = 260;
+        this.hintUntil = this.frame + 600;
+        playMusic('boss');
+    }
+
+    // Virüs oyuncuyu yavaşça kovalar. Kapıdan geçemeyecek kadar iri: ara
+    // duvarı yıkar. Oyuncu Fred'e varırsa uyarı sahnesi başlar; virüs
+    // dokunursa sahne baştan.
+    stepChase() {
+        const v = this.npcs.virus, p = this.player, c = this.chase;
+        if (c.stall > 0) {
+            c.stall--;
+            v.moving = false;
+        } else {
+            const dx = p.x - v.x, dy = Math.max(310, Math.min(390, p.y)) - v.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            v.x += (dx / dist) * VIRUS_CHASE_SPEED;
+            v.y += (dy / dist) * VIRUS_CHASE_SPEED * 0.6;
+            v.dir = dx < 0 ? 'left' : 'right';
+            v.moving = true;
+        }
+        if (!this.wallBroken && v.x <= 1100) {
+            this.breakWall();
+            c.stall = 60;
+        }
+        if (Math.abs(p.x - v.x) < 90 && Math.abs(p.y - v.y) < 48) {
+            this.failScene(CAUGHT_CAPTION, () => {
+                p.x = 1210; p.y = 348; p.dir = 'right';
+                Object.assign(v, { x: 1580, y: 332, dir: 'left' });
+                this.chase = { stall: 0 };
+                this.phase = 'chase';
+            });
+            return;
+        }
+        if (p.x < 580) {
+            this.phase = 'warn';
+            this.chase = null;
+            this.run([...this.fleeSteps(), ...this.rampageSteps()]);
+        }
+    }
+
+    // Yenilgi: perde iner, yazı çıkar, sahne geri sarılır
+    failScene(text, reset) {
+        this.phase = 'failing';
+        this.run([
+            { do: () => { this.caption = text; this.curtainTarget = 1; Sfx.deny(); } },
+            { until: () => this.curtain >= 1 },
+            { do: reset },
+            { wait: 100 },
+            { do: () => { this.caption = null; this.curtainTarget = 0; } },
+            { wait: 40 }
+        ]);
+    }
+
+    // Harry Fred'in yanına varır, uyarır; virüs duvardan gelip Fred'i yakalar
     fleeSteps() {
         const { npcs } = this;
         return [
-            { walk: 'player', speed: 4.6, path: [[1010, 348], [380, 410]] },
+            { do: () => { npcs.virus.moving = false; } },
+            { walk: 'player', speed: 3.4, path: [[380, 410]] },
             { do: () => { this.faceEachOther(npcs.fred); this.camOverride = 560; } },
             { say: LINES.harryWarn },
-            { do: () => {
-                npcs.virus.x = 1300; npcs.virus.y = 348; npcs.virus.dir = 'left';
-                this.virusGlow = 330;
-                playMusic('boss');
-            } },
-            { walk: 'virus', speed: 2.8, path: [[1240, 348]] },
-            { do: () => this.breakWall() },
+            { do: () => { if (!this.wallBroken) this.breakWall(); } },
             { do: () => { npcs.fred.dir = 'right'; this.player.dir = 'right'; } },
-            { wait: 40 },
+            { wait: 30 },
             { say: LINES.wallBreak }
         ];
     }
@@ -501,13 +583,29 @@ export class AdventureScene {
     // Virüs Fred'i yakalayıp yerden yere vurur; Harry'ye pil kalır
     rampageSteps() {
         return [
-            { walk: 'virus', speed: 2.8, path: [[1000, 350], [800, 352], [560, 350]] },
+            { walk: 'virus', speed: 3.2, path: [[560, 350]] },
             { do: () => { this.grab = { state: 'reach', t: 0, hand: null }; this.battery.floor = true; } },
             { until: () => this.grab.state === 'swing' },
             { say: LINES.fredCaught },
-            { do: () => { this.camOverride = null; this.camFocus = 'player'; this.player.dir = 'right'; } },
+            { do: () => {
+                this.camOverride = null; this.camFocus = 'player'; this.player.dir = 'right';
+                this.fredClock = FRED_SECONDS * FRAME_RATE;
+            } },
             { phase: 'getBattery' }
         ];
+    }
+
+    // Süre dolunca Fred dayanamaz: yakalanma anına dönülür
+    fredLost() {
+        this.failScene(FRED_LOST_CAPTION, () => {
+            const p = this.player;
+            p.x = 380; p.y = 410; p.dir = 'right';
+            this.battery.floor = true;
+            this.battery.projectile = null;
+            if (this.grab) this.grab.t = 0;
+            this.fredClock = FRED_SECONDS * FRAME_RATE;
+            this.phase = 'getBattery';
+        });
     }
 
     blast() {
@@ -519,10 +617,11 @@ export class AdventureScene {
         this.cellBroken = true;
         this.lightsOut = true;
         this.dim = 0;
-        this.greenEyes = 0;
-        npcs.andrew.visible = false;
-        Object.assign(npcs.virus, { visible: true, x: 1580, y: 332, dir: 'left', grow: 0.3 });
-        this.virusGlow = 150;
+        this.greenEyes = 1;
+        Object.assign(npcs.virus, { visible: true, x: 1580, y: 332, dir: 'left', grow: 0.5, alpha: 0 });
+        npcs.andrew.alpha = 1;
+        this.morph = { t: 0 };
+        this.virusGlow = 120;
         for (let i = 0; i < 46; i++) {
             this.shards.push({
                 x: 1430 + hash(i, 21, 1) * 300, y: 250 + hash(i, 22, 2) * 150,
@@ -553,10 +652,13 @@ export class AdventureScene {
         Sfx.slide();
     }
 
-    // Pil virüse çarpar: elektrik çakar, virüs Fred'i bırakır ve acıyla kıvranır
+    // Pil virüse çarpar: elektrik çakar, virüs Fred'i bırakır ve eriyip Andrew'a
+    // döner; Andrew yerde acıyla kıvranır.
     hitVirus() {
         const v = this.npcs.virus;
         v.pain = 1;
+        v.moving = false;
+        this.revert = { t: 0 };
         this.bolts = 400;
         this.shake = 30;
         this.flash = 0.6;
@@ -640,6 +742,12 @@ export class AdventureScene {
         const free = !this.seq && !this.overlay && !this.dialogue.active && !this.fadingOut && this.intro === 0;
         if (free) this.movePlayer();
         else if (!this.seq?.playerWalk) this.player.moving = false;
+        this.updateAim(free);
+
+        if (free && this.phase === 'chase' && this.chase) this.stepChase();
+        if (free && (this.phase === 'getBattery' || this.phase === 'throwBattery') && this.fredClock > 0) {
+            if (--this.fredClock === 0) this.fredLost();
+        }
 
         if (this.fadingOut) {
             this.fade = Math.min(FADE_FRAMES, this.fade + 1);
@@ -690,9 +798,47 @@ export class AdventureScene {
             }
         }
 
-        const v = this.npcs.virus;
+        const v = this.npcs.virus, a = this.npcs.andrew;
+        const m = this.morph;
+        if (m) {
+            m.t++;
+            const u = Math.min(1, m.t / MORPH_FRAMES);
+            const ramp = (from, to) => Math.max(0, Math.min(1, (u - from) / (to - from)));
+            v.grow = 0.5 + 0.5 * u;
+            v.alpha = ramp(0.4, 0.95);
+            a.alpha = 1 - ramp(0.3, 0.8);
+            this.virusGlow = 120 + 140 * u;
+            if (m.t % 50 === 0) { Sfx.ooze(); this.shake = Math.max(this.shake, 8 + Math.round(u * 12)); }
+            if (m.t % 95 === 40) this.flash = Math.max(this.flash, 0.3);
+            if (m.t >= MORPH_FRAMES) {
+                this.morph = null;
+                a.visible = false;
+                this.greenEyes = 0;
+                v.alpha = 1;
+            }
+        }
+        const rv = this.revert;
+        if (rv) {
+            rv.t++;
+            const u = Math.min(1, rv.t / REVERT_FRAMES);
+            v.grow = 1 - 0.45 * u;
+            v.alpha = 1 - u;
+            a.visible = true;
+            a.lying = true;
+            a.x = v.x;
+            a.y = v.y;
+            a.alpha = u;
+            this.virusGlow = 330 * (1 - u);
+            if (u >= 1) {
+                this.revert = null;
+                v.visible = false;
+                v.pain = 0;
+                this.virusGlow = 0;
+                a.alpha = 1;
+            }
+        }
         if (v.visible) {
-            if (v.grow < 1) v.grow = Math.min(1, v.grow + 0.018);
+            if (!m && !rv && v.grow < 1) v.grow = Math.min(1, v.grow + 0.018);
             // Dev adımlar: yer sarsılıyor
             if (v.moving && this.frame % 24 === 0) {
                 this.shake = Math.max(this.shake, 5);
@@ -778,6 +924,7 @@ export class AdventureScene {
         }
         player.moving = dx !== 0 || dy !== 0;
         if (!player.moving) return;
+        this.moveAngle = Math.atan2(dy, dx);
 
         const len = Math.hypot(dx, dy) || 1;
         const vx = (dx / len) * speed;
@@ -788,6 +935,29 @@ export class AdventureScene {
 
         if (Math.abs(dy) >= Math.abs(dx)) player.dir = dy < 0 ? 'up' : 'down';
         else player.dir = dx < 0 ? 'left' : 'right';
+    }
+
+    // Fenerin yönü. Kovalamacada sağ çubuk (kol) feneri istediği yöne çevirir ve
+    // Harry de oraya bakar; çubuk boşsa fener yürünen yöne bakar (klavyede hep
+    // böyle). Diğer sahnelerde Harry'nin baktığı yöne.
+    updateAim(free) {
+        const p = this.player;
+        let target = DIR_ANGLE[p.dir];
+        if (this.phase === 'chase' && free) {
+            const rs = this.gamepad?.rightStick?.() || { x: 0, y: 0 };
+            if (Math.hypot(rs.x, rs.y) > 0) {
+                target = Math.atan2(rs.y, rs.x);
+                p.dir = Math.abs(rs.y) >= Math.abs(rs.x) ? (rs.y < 0 ? 'up' : 'down') : (rs.x < 0 ? 'left' : 'right');
+            } else if (p.moving) {
+                target = this.moveAngle;
+            } else {
+                target = this.aim;
+            }
+        }
+        let diff = target - this.aim;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.aim += diff * 0.3;
     }
 
     // --- Çizim ---
@@ -923,8 +1093,31 @@ export class AdventureScene {
             this.drawVirus(npc);
             return;
         }
+        if (npc.lying) {
+            this.drawLyingAndrew(npc);
+            return;
+        }
+        const { ctx } = this;
+        const morphing = npc.id === 'andrew' && this.morph;
+        const jx = morphing ? (hash(this.frame, 9, 3) - 0.5) * (4 + 10 * (this.morph.t / MORPH_FRAMES)) : 0;
+        ctx.save();
+        ctx.globalAlpha = npc.alpha ?? 1;
         this.drawShadow(npc.x, npc.y);
-        drawPerson(this.ctx, npc.x, npc.y + this.bob(npc.id), npc.who, npc.dir, npc.moving, this.frame, PLAYER_SCALE);
+        drawPerson(ctx, npc.x + jx, npc.y + this.bob(npc.id), npc.who, npc.dir, npc.moving, this.frame, PLAYER_SCALE,
+            morphing ? { sickBlend: Math.min(1, this.morph.t / (MORPH_FRAMES * 0.6)) } : {});
+        ctx.restore();
+    }
+
+    // Andrew yerde acı içinde kıvranıyor
+    drawLyingAndrew(a) {
+        const { ctx } = this;
+        const wr = Math.sin(this.frame * 0.5) * 0.12 + Math.sin(this.frame * 1.3) * 0.05;
+        const jx = Math.sin(this.frame * 0.9) * 2;
+        ctx.save();
+        ctx.globalAlpha = a.alpha ?? 1;
+        this.drawShadow(a.x + 18, a.y);
+        this.drawFredAt(a.x + jx, a.y - 14, Math.PI / 2 + wr, 'andrew');
+        ctx.restore();
     }
 
     drawHarry() {
@@ -967,6 +1160,13 @@ export class AdventureScene {
         // İçerideki organizmanın balonu yeşil: kimin konuştuğu ayırt edilsin
         const style = dialogue.speaker === 'ses' ? { fill: '#cfe8a8', border: '#16260a', text: '#16260a' } : {};
         drawSpeechBubble(ctx, ax, ay, lines, { scale: BUBBLE_SCALE, viewLeft: 0, viewW: VIEW.w, ...style });
+
+        // Portre: Harry solda, diğerleri sağda
+        const sp = dialogue.speaker;
+        if (this.overlay?.type === 'peep' && sp === 'andrew') return;
+        const left = sp === 'biz';
+        drawPortrait(ctx, sp, left ? 16 : VIEW.w - PORTRAIT.w - 16, VIEW.h - PORTRAIT.h - 16,
+            { talking: !dialogue.finishedTyping, tick: this.frame });
     }
 
     drawCaption() {
@@ -996,6 +1196,26 @@ export class AdventureScene {
             ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
             ctx.fillRect(x - 12, VIEW.h - 44, w + 24, 32);
             drawPixelText(ctx, CONTROL_HINT, x, VIEW.h - 36, { scale: 2, color: '#e2e8f0' });
+        }
+        if (this.frame < this.hintUntil && this.phase === 'chase' && !this.dialogue.active) {
+            const text = this.gamepad?.connected ? CHASE_HINT_PAD : CHASE_HINT_KEYS;
+            const w = measurePixelText(text, 2);
+            const x = Math.round((VIEW.w - w) / 2 / PX) * PX;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.fillRect(x - 12, VIEW.h - 44, w + 24, 32);
+            drawPixelText(ctx, text, x, VIEW.h - 36, { scale: 2, color: '#e2e8f0' });
+        }
+        if (this.fredClock > 0 && (this.phase === 'getBattery' || this.phase === 'throwBattery')) {
+            const total = FRED_SECONDS * FRAME_RATE;
+            const frac = this.fredClock / total;
+            const bw = 240, bx = Math.round((VIEW.w - bw) / 2), by = 14;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.fillRect(bx - 8, by - 6, bw + 16, 34);
+            ctx.fillStyle = '#3b1d1d';
+            ctx.fillRect(bx, by + 10, bw, 10);
+            ctx.fillStyle = frac < 0.3 && this.frame % 20 < 10 ? '#fecaca' : '#ef4444';
+            ctx.fillRect(bx, by + 10, Math.round(bw * frac), 10);
+            drawPixelText(ctx, 'FRED', bx, by - 2, { scale: 2, color: '#fef3c7', shadow: '#0f172a' });
         }
         if (!this.seq && !this.overlay && !this.dialogue.active) {
             const spot = this.currentSpot();
@@ -1035,14 +1255,14 @@ export class AdventureScene {
         const { ctx } = this;
         const sc = VIRUS_SCALE * v.grow;
         const b = PX * sc;
-        const sprite = virusSprite(-1);
+        const sprite = virusSprite(2);
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = '#10181c';
         ctx.fillRect(Math.round(v.x - 120 * v.grow), Math.round(v.y - 8), Math.round(240 * v.grow), 14);
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = v.alpha ?? 1;
 
         const bob = v.moving ? Math.abs(Math.sin(this.frame * 0.16)) * -8 : Math.sin(this.frame * 0.06) * 2;
         const jitter = v.pain ? (hash(this.frame, 7, 3) - 0.5) * 14 : 0;
@@ -1055,7 +1275,10 @@ export class AdventureScene {
         const hand = this.grab?.hand && !v.pain
             ? { x: this.grab.hand.x - v.x, y: this.grab.hand.y - v.y - bob }
             : { x: this.restHand(v).x - v.x, y: this.restHand(v).y - v.y };
-        this.drawVirusArm(shoulder, hand, b);
+        this.drawVirusArm(shoulder, hand, b, -1);
+        // Sağ kol: aynı çizim, yanda sallanıyor
+        const sway = Math.sin(this.frame * (v.moving ? 0.16 : 0.07)) * 3 * b;
+        this.drawVirusArm({ x: 14 * b, y: -31 * b }, { x: 20.5 * b, y: -11 * b + sway }, b, 1);
 
         // Elektrik çarpınca beyaz parlama
         if (v.pain && this.frame % 6 < 3) {
@@ -1066,9 +1289,9 @@ export class AdventureScene {
         ctx.restore();
     }
 
-    drawVirusArm(S, H, b) {
+    drawVirusArm(S, H, b, side) {
         const { ctx } = this;
-        const mid = { x: (S.x + H.x) / 2 - 30, y: (S.y + H.y) / 2 + 12 };
+        const mid = { x: (S.x + H.x) / 2 + side * 30, y: (S.y + H.y) / 2 + 12 };
         const strokes = [[S, mid, 6.5 * b], [mid, H, 5.5 * b]];
         const trace = (w, color, dx = 0) => {
             ctx.fillStyle = color;
@@ -1083,7 +1306,7 @@ export class AdventureScene {
         };
         trace(8, '#16260a');
         trace(0, '#4a7c1f');
-        trace(-18, '#6ea32c', -10);
+        trace(-18, '#6ea32c', side * 10);
         // Dirsek yumrusu ve pençe
         ctx.fillStyle = '#16260a';
         ctx.fillRect(Math.round(mid.x - 26), Math.round(mid.y - 26), 52, 52);
@@ -1099,12 +1322,12 @@ export class AdventureScene {
     }
 
     // Fred'i merkezi (cx, cy) ve açısıyla çizer; 0 = ayakta, PI = baş aşağı
-    drawFredAt(cx, cy, angle) {
+    drawFredAt(cx, cy, angle, who = 'fred') {
         const { ctx } = this;
         ctx.save();
         ctx.translate(Math.round(cx), Math.round(cy));
         ctx.rotate(angle);
-        drawPerson(ctx, 0, SPRITE_H / 2, 'fred', 'down', false, this.frame, PLAYER_SCALE);
+        drawPerson(ctx, 0, SPRITE_H / 2, who, 'down', false, this.frame, PLAYER_SCALE);
         ctx.restore();
     }
 
@@ -1213,7 +1436,7 @@ export class AdventureScene {
         if (this.flashlight) {
             const p = this.player;
             const px = p.x - camX, py = p.y - 36;
-            const ang = { right: 0, left: Math.PI, up: -Math.PI / 2, down: Math.PI / 2 }[p.dir];
+            const ang = this.aim;
             for (const [len, half] of [[360, 0.44], [300, 0.32], [220, 0.2]]) {
                 d.fillStyle = 'rgba(0, 0, 0, 0.42)';
                 d.beginPath();
@@ -1233,6 +1456,8 @@ export class AdventureScene {
             circle(vx, vy, this.virusGlow * 0.7, 0.4);
             circle(vx, vy, this.virusGlow * 0.4, 0.4);
         }
+        const lying = this.npcs.andrew;
+        if (lying.visible && lying.lying) circle(lying.x - camX, lying.y - 20, 150, 0.5);
         if (this.battery.floor) {
             circle(SPOTS.battery.x - camX, SPOTS.battery.y - 10, 70, 0.6);
         }

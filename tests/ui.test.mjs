@@ -324,20 +324,33 @@ async function main() {
         for (let i = 0; i < 40 && a.cellClosed < 1; i++) await wait(50);
         log.push(['cam-kapi', Math.round(a.cellClosed * 10) / 10, a.consoleState]);
         // Gece: hucrede konusma, patlama, kacis, virus Fred'i yakaliyor (uzun dizi)
-        let blast = false, dark = false;
-        for (let i = 0; i < 1800 && a.phase !== 'getBattery'; i++) {
+        let blast = false, dark = false, morphSeen = false, chaseInfo = null;
+        for (let i = 0; i < 3000 && a.phase !== 'getBattery'; i++) {
             if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); }
             if (a.cellBroken) blast = true;
             if (a.lightsOut) dark = true;
+            if (a.morph) morphSeen = true;
+            if (a.phase === 'chase' && !chaseInfo) {
+                // Kovalamaca: oynanabilir, virus yavasca yaklasiyor, fener yone bakiyor
+                const vx0 = a.npcs.virus.x;
+                a.input.keys.KeyA = true;
+                await wait(700);
+                chaseInfo = { moved: a.npcs.virus.x < vx0, aim: Math.abs(Math.abs(a.aim) - Math.PI) < 0.6, phase: a.phase };
+                a.input.keys.KeyA = false;
+                a.player.x = 540; a.player.y = 380;
+            }
             await wait(30);
         }
         log.push(['gece', a.phase, blast, dark, a.wallBroken, a.grab?.state, a.npcs.virus.visible, Math.round(a.npcs.virus.x)]);
+        log.push(['donusum', morphSeen, chaseInfo, a.fredClock > 0]);
         // Pil: once almak, sonra firlatmak
         at(262, 392); await wait(80); a.action();
         log.push(['pil-al', await drain(), a.phase, a.battery.floor]);
         a.action();
         for (let i = 0; i < 80 && !a.fredDown; i++) await wait(40);
         log.push(['pil-firlat', a.fredDown !== null, a.npcs.virus.pain, a.grab?.state]);
+        for (let i = 0; i < 60 && a.revert; i++) await wait(40);
+        log.push(['andrew-yerde', a.npcs.andrew.visible, a.npcs.andrew.lying, a.npcs.virus.visible]);
         for (let i = 0; i < 600 && a.running; i++) {
             if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); }
             await wait(40);
@@ -361,6 +374,10 @@ async function main() {
     check('Oynanis: gece sahnesi: cam kirilir, elektrik kesilir, virus duvari yikip Fred i yakalar',
         f.gece[0] === 'getBattery' && f.gece[1] && f.gece[2] && f.gece[3] === 1 && f.gece[4] === 'swing'
         && f.gece[5] === true && f.gece[6] > 500 && f.gece[6] < 620, JSON.stringify(f.gece));
+    check('Oynanis: donusum uzun suruyor, sonra kovalamaca oynaniyor, virus yavasca yaklasiyor',
+        f.donusum[0] === true && f.donusum[1]?.moved === true && f.donusum[1]?.phase === 'chase' && f.donusum[2] === true, JSON.stringify(f.donusum));
+    check('Oynanis: pil degince virus Andrew a donup yerde yatiyor',
+        f['andrew-yerde'][0] === true && f['andrew-yerde'][1] === true && f['andrew-yerde'][2] === false, JSON.stringify(f['andrew-yerde']));
     check('Oynanis: pil alininca firlatma gorevi geliyor', f['pil-al'][1] === 'throwBattery' && f['pil-al'][2] === false, JSON.stringify(f['pil-al']));
     check('Oynanis: pil virusa carpinca Fred yere dusuyor, virus aci cekiyor',
         f['pil-firlat'][0] === true && f['pil-firlat'][1] === 1 && f['pil-firlat'][2] === 'released', JSON.stringify(f['pil-firlat']));

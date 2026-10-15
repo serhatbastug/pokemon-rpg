@@ -826,6 +826,7 @@ const playText = [
     ...playLines.map(l => l.text),
     ...script.SCAN_TARGETS.flatMap(t => [t.label, t.line.text]),
     ...Object.values(script.OBJECTIVES), script.CONTROL_HINT, script.ENDING_CAPTION, script.NIGHT_CAPTION,
+    script.CHASE_HINT_KEYS, script.CHASE_HINT_PAD, script.CAUGHT_CAPTION, script.FRED_LOST_CAPTION, 'HARRY', 'FRED', 'ANDREW', 'SES', 'YARDIMCI',
     ...script.PLAY_ENTRIES.map(e => e.title),
     'ÖRNEK TARAMASI', 'KAPI DELİĞİ', 'KONUŞ', 'BAK', 'AÇ', 'İNCELE', 'KİLİTLE', 'PİLİ AL', 'FIRLAT',
     'OKLAR: NİŞAN ALIN     F: İŞARETLE', 'ANORMALLİK 3 / 3', 'GÖREV: KAPIYA GİT', 'PROTOTİP 8'

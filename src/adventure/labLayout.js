@@ -31,6 +31,9 @@ export const PLAYER_SPEED = 3.0;
 export const PLAYER_SCALE = 4;
 // Andrew'ın dönüştüğü virüs: 2 kişilik moddaki sprite'ın bu sahnedeki ölçeği
 export const VIRUS_SCALE = 1.45;
+// Kovalamaca: virüs oyuncudan yavaş; Fred'i kurtarma süresi (saniye)
+export const VIRUS_CHASE_SPEED = 1.7;
+export const FRED_SECONDS = 30;
 export const START = { x: 430, y: 372, dir: 'up' };
 
 // --- Ana laboratuvar ---

@@ -19,12 +19,19 @@ export const OBJECTIVES = {
     talkAndrew: 'ANDREW İLE KONUŞ',
     openAnnex: 'İZOLASYON KAPISINI AÇ',
     lock: 'CAM HÜCREYİ KİLİTLE',
+    chase: 'VİRÜSTEN KAÇ VE FREDİ UYAR',
     getBattery: 'PİLİ AL',
     throwBattery: 'PİLİ FIRLAT'
 };
 
 // Kontrol ipucu: oyun açılırken kısa süre görünür
 export const CONTROL_HINT = 'OKLAR / WASD YÜRÜ     F KONUŞ / ETKİLEŞİM';
+
+// Kovalamaca ipuçları (kolda: sol çubuk yürür, sağ çubuk feneri çevirir)
+export const CHASE_HINT_KEYS = 'OKLAR / WASD YÜRÜ     FENER YÜRÜDÜĞÜN YÖNE BAKAR';
+export const CHASE_HINT_PAD = 'SOL ÇUBUK YÜRÜ     SAĞ ÇUBUK FENERİ ÇEVİRİR';
+export const CAUGHT_CAPTION = 'YAKALANDIN. TEKRAR DENE.';
+export const FRED_LOST_CAPTION = 'FRED DAYANAMADI. TEKRAR DENE.';
 
 export const LINES = {
     fredTalk: [
@@ -145,6 +152,7 @@ export const LINES = {
         { speaker: 'biz', text: 'Bir pil... Yeter mi bilmiyorum ama deneyeceğim.' }
     ],
     afterThrow: [
+        { speaker: 'andrew', text: 'Aaah... Başım... Ne oldu bana?' },
         { speaker: 'arkadas', text: 'Aah... Harry...' },
         { speaker: 'biz', text: 'Fred! Dayan, yanındayım!' }
     ]

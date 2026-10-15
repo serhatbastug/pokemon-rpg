@@ -133,7 +133,7 @@ function virusHalf(row) {
 
 const virusCaches = new Map();
 
-// hideArm: 0 yok · -1 karakterin sağ kolu · 1 sol kolu. Savururken o kol
+// hideArm: 0 yok · -1 karakterin sağ kolu · 1 sol kolu · 2 ikisi de (kollar dışarıdan çiziliyor). Savururken o kol
 // sprite'ta durmamalı - üstüne çizilen kolla birlikte karakterin üç kolu
 // oluyordu (bkz. spriteFor).
 export function virusSprite(hideArm = 0) {
@@ -232,8 +232,8 @@ export function virusSprite(hideArm = 0) {
         drip(ctx, Math.round(c - half) + 1, bottom - 9, 3, P);
         drip(ctx, Math.round(c + half) - 2, bottom - 6, 2, P);
     };
-    if (hideArm !== -1) drawArm(-1, 11, 40, 91);
-    if (hideArm !== 1) drawArm(1, 14, 37, 97);
+    if (hideArm !== -1 && hideArm !== 2) drawArm(-1, 11, 40, 91);
+    if (hideArm !== 1 && hideArm !== 2) drawArm(1, 14, 37, 97);
 
     // --- 4) Bacaklar ve altındaki birikinti ---
     // Ayak yok: bacaklar aşağı indikçe yayılıp tek bir kütlede birleşiyor.

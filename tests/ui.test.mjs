@@ -252,20 +252,114 @@ async function main() {
     check('Bolum secme: 4. bolum 4. bolumun basindan basliyor',
         jumped.chapter === 4 && jumped.first === 'baslik-4', JSON.stringify(jumped));
 
-    // Son kareden sonra ana menüye dönülüyor (orman henüz yok)
+    // Son kareden sonra OYNANIŞ başlıyor (laboratuvarda Harry)
     await page.evaluate(() => {
         const p = window.__comic.player;
         p.enter(p.panels.length - 1);
         for (let i = 0; i < 20 && !p.finished; i++) { p.frame = 9999; p.advance(); }
     });
-    await wait(400);
+    await wait(500);
     const afterComic = await page.evaluate(() => ({
-        menu: window.__menu.running,
+        adventure: window.__adventure.running,
         comic: window.__comic.running,
+        screen: !document.getElementById('adventure-screen').classList.contains('hidden'),
+        phase: window.__adventure.phase
+    }));
+    check('Cizgi roman bitince oynanis basliyor',
+        afterComic.adventure && !afterComic.comic && afterComic.screen && afterComic.phase === 'talkFred',
+        JSON.stringify(afterComic));
+    await wait(1200);
+    await shot('00d4-oynanis-laboratuvar');
+
+    // Oyuncu klavyeyle yürüyor ve duvara/masaya çarpıyor
+    const walk = await page.evaluate(async () => {
+        const a = window.__adventure;
+        const y0 = a.player.y;
+        return { y0 };
+    });
+    await hold('KeyS', 400);
+    const walked = await page.evaluate(() => window.__adventure.player.y);
+    check('Oynanis: S tusu Harry asagi yuruyor', walked > walk.y0, `${walk.y0} -> ${walked}`);
+    await hold('KeyW', 3000);
+    const blockedY = await page.evaluate(() => window.__adventure.player.y);
+    check('Oynanis: Harry silah masasinin icinden gecemiyor', blockedY > 330, String(blockedY));
+
+    // Olay akisi: Fred -> vurus -> kapi deligi -> kapi -> Andrew -> tarama -> cam oda -> final
+    const flow = await page.evaluate(async () => {
+        const a = window.__adventure;
+        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+        const drain = async () => {
+            for (let i = 0; i < 500; i++) {
+                if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); }
+                if (!a.seq) return true;
+                await wait(40);
+            }
+            return false;
+        };
+        const log = [];
+        const at = (x, y) => { a.player.x = x; a.player.y = y; };
+        at(352, 214); await wait(80); a.action(); log.push(['fred', await drain(), a.phase]);
+        at(84, 168); await wait(80); a.action(); await wait(200);
+        log.push(['peep-overlay', a.overlay?.type]);
+        log.push(['peep', await drain(), a.phase]);
+        a.action(); log.push(['open', await drain(), a.phase, Math.round(a.doorOpen * 10) / 10 + '/' + a.npcs.andrew.visible]);
+        at(692, 214); await wait(80); a.action();
+        for (let i = 0; i < 100 && !a.scan; i++) { if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); } await wait(40); }
+        log.push(['scan-overlay', a.overlay?.type]);
+        // Yanlis yere F: hedef sayilmaz
+        a.scan.x = 100; a.scan.y = 150; a.action(); log.push(['yanlis', a.scan.found.length]);
+        for (const [tx, ty] of [[220, 200], [520, 330], [780, 220]]) {
+            a.scan.x = tx; a.scan.y = ty; a.action();
+            for (let i = 0; i < 40 && a.dialogue.active; i++) { a.dialogue.advance(); a.dialogue.advance(); await wait(30); }
+        }
+        log.push(['bulunan', a.scan.found.length]);
+        log.push(['scope', await drain(), a.phase]);
+        at(a.npcs.andrew.x + 40, a.npcs.andrew.y); await wait(80); a.action();
+        log.push(['andrew', await drain(), a.phase, Math.round(a.npcs.andrew.x)]);
+        at(744, 284); await wait(80); a.action();
+        for (let i = 0; i < 40 && a.cellClosed < 1; i++) await wait(50);
+        log.push(['cam-kapi', Math.round(a.cellClosed * 10) / 10, a.consoleState]);
+        return log;
+    });
+    const f = Object.fromEntries(flow.map(r => [r[0], r.slice(1)]));
+    check('Oynanis: Fred ile konusunca kapi vurusu basliyor ve kapiya gitme gorevi geliyor',
+        f.fred[0] === true && f.fred[1] === 'toDoor', JSON.stringify(f.fred));
+    check('Oynanis: kapi deligi ekrani aciliyor', f['peep-overlay'][0] === 'peep');
+    check('Oynanis: kapi deligi bitince kapiyi acma gorevi', f.peep[1] === 'openDoor', JSON.stringify(f.peep));
+    check('Oynanis: kapi acilinca Andrew iceri giriyor', f.open[1] === 'toScope' && f.open[2].endsWith('true'), JSON.stringify(f.open));
+    check('Oynanis: mikroskopta tarama ekrani aciliyor', f['scan-overlay'][0] === 'scan');
+    check('Oynanis: bos yere F anomali saymiyor', f.yanlis[0] === 0);
+    check('Oynanis: uc anomali bulununca tarama bitiyor', f.bulunan[0] === 3 && f.scope[1] === 'talkAndrew', JSON.stringify(f.scope));
+    check('Oynanis: Andrew cam odaya yuruyor', f.andrew[1] === 'lock' && f.andrew[2] > 800, JSON.stringify(f.andrew));
+    check('Oynanis: cam oda kilitleniyor', f['cam-kapi'][0] === 1 && f['cam-kapi'][1] === 'locked', JSON.stringify(f['cam-kapi']));
+    await shot('00d5-oynanis-cam-oda');
+
+    // Final: ekran kararir, ana menuye donulur
+    await page.waitForFunction(() => !window.__adventure.running, { timeout: 30000 });
+    await wait(400);
+    const afterPlay = await page.evaluate(() => ({
+        menu: window.__menu.running,
+        adventure: window.__adventure.running,
         screen: !document.getElementById('menu-screen').classList.contains('hidden')
     }));
-    check('Cizgi roman bitince ana menuye donuyor',
-        afterComic.menu && !afterComic.comic && afterComic.screen, JSON.stringify(afterComic));
+    check('Oynanis bitince ana menuye donuluyor',
+        afterPlay.menu && !afterPlay.adventure && afterPlay.screen, JSON.stringify(afterPlay));
+
+    // Bolum seciminde oynanis girisi var ve dogrudan oynanisi aciyor
+    await page.evaluate(() => { window.__menu.player.x = 500; window.__menu.player.y = 250; });
+    await page.keyboard.press('KeyF');
+    await page.waitForSelector('#start-prompt:not(.hidden)', { timeout: 5000 });
+    await page.click('#start-prompt-yes');
+    await page.waitForSelector('#chapter-select:not(.hidden)', { timeout: 5000 });
+    await page.click('#chapter-list [data-chapter="kapidaki-ses"]');
+    await page.waitForFunction(() => window.__adventure.running, { timeout: 8000 });
+    check('Bolum secme: oynanis girisi dogrudan oynanisi aciyor',
+        await page.evaluate(() => !document.getElementById('adventure-screen').classList.contains('hidden')));
+    // Esc ile ana menuye
+    await page.keyboard.press('Escape');
+    await wait(400);
+    check('Oynanis: Esc ana menuye donduruyor',
+        await page.evaluate(() => window.__menu.running && !window.__adventure.running));
 
     // Oyun kolu: kol yokken de sahne kolun durumunu sorunsuz tarıyor olmalı
     const padState = await page.evaluate(() => ({

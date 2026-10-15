@@ -757,6 +757,67 @@ check('en zor seviyede bile tepki insani sınırda', react[2] >= 5,
 // Her seviyenin ekranda yazan bir adı var (HUD'da rozette görünüyor)
 check('her seviyenin adı var', levels.every(k => !!ai.AI_LEVELS[k].label),
     levels.map(k => ai.AI_LEVELS[k].label).join(','));
+// ---- Oynanış 1. bölüm: KAPIDAKİ SES (3/4 laboratuvar) ----
+const lab = await import('../src/adventure/labLayout.js');
+const script = await import('../src/adventure/adventureScript.js');
+const { LOOKS } = await import('../src/adventure/charSprites.js');
+
+check('oynanış: başlangıç noktası boş', !lab.blocked(lab.START.x, lab.START.y));
+check('oynanış: silah masasının içine girilemiyor', lab.blocked(400, 300));
+check('oynanış: silah masasının güneyinde durulabiliyor', !lab.blocked(400, 360));
+check('oynanış: duvarın üstüne çıkılamıyor', lab.blocked(400, 100));
+check('oynanış: bilgisayar masasının içine girilemiyor', lab.blocked(220, 170));
+check('oynanış: kapının önünde durulabiliyor', !lab.blocked(lab.SPOTS.door.x, lab.SPOTS.door.y));
+check('oynanış: mikroskop masasının önünde durulabiliyor', !lab.blocked(lab.SPOTS.microscope.x, lab.SPOTS.microscope.y));
+check('oynanış: kilit panelinin önünde durulabiliyor', !lab.blocked(lab.SPOTS.console.x, lab.SPOTS.console.y));
+check('oynanış: cam odaya kapı AÇIKKEN girilebiliyor', !lab.blocked(800, 290));
+check('oynanış: cam oda kapısı KAPALIYKEN girilemiyor', lab.blocked(780, 290, { cellDoorClosed: true }));
+check('oynanış: cam odanın duvarından geçilemiyor', lab.blocked(780, 200) && lab.blocked(900, 346));
+// Başlangıçtan her etkileşim noktasına yürünebilmeli (ızgarada taşma araması)
+{
+    const step = 12;
+    const key = (x, y) => Math.round(x / step) + ',' + Math.round(y / step);
+    const seen = new Set([key(lab.START.x, lab.START.y)]);
+    const queue = [[lab.START.x, lab.START.y]];
+    while (queue.length) {
+        const [x, y] = queue.shift();
+        for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+            const nx = x + dx, ny = y + dy;
+            if (seen.has(key(nx, ny)) || lab.blocked(nx, ny)) continue;
+            seen.add(key(nx, ny));
+            queue.push([nx, ny]);
+        }
+    }
+    for (const id of ['door', 'microscope', 'console']) {
+        const s = lab.SPOTS[id];
+        check('oynanış: başlangıçtan ' + id + ' noktasına yürünebiliyor', seen.has(key(s.x, s.y)));
+    }
+}
+
+const playLines = Object.values(script.LINES).flat();
+check('oynanış: her replik konuşan ve metin içeriyor',
+    playLines.every(l => l.speaker && l.text && l.text.length > 0), String(playLines.length));
+const playSpeakers = [...new Set([...playLines, ...script.SCAN_TARGETS.map(t => t.line)].map(l => l.speaker))];
+check('oynanış: her konuşanın ses perdesi tanımlı',
+    playSpeakers.every(s => VOICE_PITCH[s]), playSpeakers.join(','));
+const playText = [
+    ...playLines.map(l => l.text),
+    ...script.SCAN_TARGETS.flatMap(t => [t.label, t.line.text]),
+    ...Object.values(script.OBJECTIVES), script.CONTROL_HINT, script.ENDING_CAPTION,
+    ...script.PLAY_ENTRIES.map(e => e.title),
+    'ÖRNEK TARAMASI', 'KAPI DELİĞİ', 'KONUŞ', 'BAK', 'AÇ', 'İNCELE', 'KİLİTLE',
+    'OKLAR: NİŞAN ALIN     F: İŞARETLE', 'ANORMALLİK 3 / 3', 'GÖREV: KAPIYA GİT', 'PROTOTİP 8'
+];
+const playMissing = playText.flatMap(t => missingGlyphs(t));
+check('oynanış: bütün yazılar piksel yazı tipinde çizilebiliyor', playMissing.length === 0, playMissing.join(''));
+check('oynanış: üç tarama hedefi ve hepsi ekranın içinde',
+    script.SCAN_TARGETS.length === 3
+    && script.SCAN_TARGETS.every(t => t.x - t.r > 40 && t.x + t.r < 960 && t.y - t.r > 90 && t.y + t.r < 490));
+check('oynanış: Andrew ilk repliği kapıdan geliyor', script.LINES.peep[0].speaker === 'andrew');
+check('oynanış: görünüşler tanımlı (Harry, Fred, yardımcılar, Andrew)',
+    ['harry', 'fred', 'saglikli0', 'saglikli1', 'saglikli2', 'andrew'].every(k => LOOKS[k]));
+check('oynanış: NPC görünüşleri tanımlı', Object.values(lab.NPCS).every(n => LOOKS[n.who]));
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

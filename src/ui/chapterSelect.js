@@ -2,6 +2,7 @@
 // hangi bölümden başlayacağını seçtirir. Yukarı/aşağı + Enter, rakam tuşları
 // (1-9), fare ve kol (yön tuşu + ÇARPI) çalışır; Esc / DAİRE vazgeçer.
 import { CHAPTERS } from '../comic/comicScript.js';
+import { PLAY_ENTRIES } from '../adventure/adventureScript.js';
 
 export class ChapterSelect {
     constructor({ onPick, onCancel }) {
@@ -12,11 +13,17 @@ export class ChapterSelect {
         this.open = false;
         this.index = 0;
 
-        this.buttons = CHAPTERS.map((chapter, i) => {
+        // Çizgi roman bölümleri + sonda oynanış girişleri (sıra numarası devam eder)
+        this.entries = [
+            ...CHAPTERS.map(chapter => ({ pick: chapter.n, key: String(chapter.n), text: `${chapter.n}. ${chapter.title}` })),
+            ...PLAY_ENTRIES.map((entry, i) => ({ pick: entry.id, key: entry.id, text: `${CHAPTERS.length + i + 1}. ${entry.title} (${entry.label})` }))
+        ];
+
+        this.buttons = this.entries.map((entry, i) => {
             const btn = document.createElement('button');
             btn.className = 'pixel-btn chapter-btn';
-            btn.dataset.chapter = String(chapter.n);
-            btn.textContent = `${chapter.n}. ${chapter.title}`;
+            btn.dataset.chapter = entry.key;
+            btn.textContent = entry.text;
             btn.addEventListener('click', () => this.pick(i));
             this.list.appendChild(btn);
             return btn;
@@ -70,7 +77,7 @@ export class ChapterSelect {
     pick(i) {
         if (!this.open) return;
         this.hide();
-        this.onPick(CHAPTERS[i].n);
+        this.onPick(this.entries[i].pick);
     }
 
     cancel() {

@@ -108,5 +108,7 @@ export const VOICE_PITCH = {
     'saglikli-3': 0.86,
     'saglikli-4': 1.3,
     doktor: 0.9,
-    hasta: 1.08
+    hasta: 1.08,
+    // Andrew Stolen: Harry'den biraz tizi, yorgun ve genç bir ses
+    andrew: 1.16
 };

@@ -1,7 +1,7 @@
 // Ekranlar arası geçişler. DOM sınıf değişiklikleri tek yerde toplanır.
 const el = (id) => document.getElementById(id);
 
-const SCREENS = ['menu-screen', 'comic-screen', 'selection-screen', 'battle-screen'];
+const SCREENS = ['menu-screen', 'comic-screen', 'adventure-screen', 'selection-screen', 'battle-screen'];
 
 function show(id, { header = false, lockScroll = true } = {}) {
     for (const screen of SCREENS) el(screen).classList.toggle('hidden', screen !== id);
@@ -18,6 +18,11 @@ export function showMenuScreen() {
 // öncesi kare kare anlatılıyor.
 export function showComicScreen() {
     show('comic-screen');
+}
+
+// Oynanış: prologdan sonra başlayan 3/4 görünümlü sahne
+export function showAdventureScreen() {
+    show('adventure-screen');
 }
 
 // Karakter seçimi: ana menüdeki geçitten gelinir, iki kişilik moda çıkar

@@ -8,12 +8,13 @@ import { GamepadManager } from './core/gamepad.js';
 import { CharacterSelect } from './ui/characterSelect.js';
 import { Hud } from './ui/hud.js';
 import { PadMenu } from './ui/padMenu.js';
-import { showBattleScreen, showGameOver, hideGameOver, showSelectionScreen, showMenuScreen, showComicScreen } from './ui/screens.js';
+import { showBattleScreen, showGameOver, hideGameOver, showSelectionScreen, showMenuScreen, showComicScreen, showAdventureScreen } from './ui/screens.js';
 import { Game } from './game/Game.js';
 import { MenuScene } from './menu/MenuScene.js';
 import { StartPrompt } from './ui/startPrompt.js';
 import { ChapterSelect } from './ui/chapterSelect.js';
 import { ComicScene } from './comic/ComicScene.js';
+import { AdventureScene } from './adventure/AdventureScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
@@ -60,10 +61,8 @@ function returnToMenu() {
     menu.start();
 }
 
-// PROLOG: çizgi roman. Oyunun oynanan kısmı ormana girişte başlıyor; ondan
-// öncesi (laboratuvar, yayılma yolu, kuşatma, ormanın ağzı) kare kare
-// anlatılıyor. Prolog bitince şimdilik ana menüye dönülüyor - ormanın
-// kendisi sıradaki iş.
+// PROLOG: çizgi roman (7 bölüm). Bitince OYNANIŞ başlıyor: laboratuvarda
+// Harry'yi yürüttüğümüz 3/4 görünümlü sahne (adventure/).
 const comic = new ComicScene({
     canvas: document.getElementById('comicCanvas'),
     input,
@@ -75,16 +74,41 @@ const comic = new ComicScene({
     },
     onFinish: () => {
         comic.stop();
-        showMenuScreen();
-        menu.start();
+        startAdventure();
     }
 });
+
+// OYNANIŞ: prolog bitince ya da bölüm seçme penceresinden doğrudan açılır.
+// Bitince (ya da Esc / DAİRE) ana menüye dönülür; devamı sıradaki iş.
+const adventure = new AdventureScene({
+    canvas: document.getElementById('adventureCanvas'),
+    input,
+    gamepad,
+    onExit: () => backToMenu(),
+    onFinish: () => backToMenu()
+});
+
+function startAdventure() {
+    showAdventureScreen();
+    adventure.start();
+}
+
+function backToMenu() {
+    adventure.stop();
+    showMenuScreen();
+    menu.start();
+}
 
 // Bölüm seçme: EVET'ten sonra açılır. Seçilen bölümde ekran yavaşça kararır,
 // sonra çizgi roman o bölümden başlar.
 const chapterSelect = new ChapterSelect({
     onPick: (chapter) => menu.beginExit(() => {
         menu.stop();
+        // Sayı = çizgi roman bölümü, metin = oynanış girişi
+        if (typeof chapter === 'string') {
+            startAdventure();
+            return;
+        }
         showComicScreen();
         comic.start(chapter);
     }),
@@ -140,6 +164,7 @@ document.getElementById('selection-back-btn').addEventListener('click', returnTo
 window.__game = game;
 window.__menu = menu;
 window.__comic = comic;
+window.__adventure = adventure;
 window.__chapterSelect = chapterSelect;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;

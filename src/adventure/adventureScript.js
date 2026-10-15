@@ -85,7 +85,7 @@ export const LINES = {
     ],
     annexOpen: [
         { speaker: 'biz', text: 'Yıllardır kimse girmedi buraya. Hücre hala çalışıyor.' },
-        { speaker: 'biz', text: 'İyi. Andrew'i oraya alalım.' }
+        { speaker: 'biz', text: "İyi. Andrew'ı oraya alalım." }
     ],
     locked: [
         { speaker: 'arkadas', text: 'Kilitlendi.' },

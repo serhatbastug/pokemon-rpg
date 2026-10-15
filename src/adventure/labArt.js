@@ -565,16 +565,34 @@ function bakeBarrels() {
 
 // Cam hücrenin ÖN yüzü ve yan sütunları: yarı saydam cam, çerçeve. Hücrenin
 // içindekiler cama göre ARKADA kaldığı için baseY hücrenin alt kenarında.
-function bakeCellFront() {
+// broken: patlamadan sonra - cam yok, çerçevede diş diş kalıntılar, yerde kırıntılar
+function bakeCellFront(broken = false) {
     const { x, y, w, h } = CELL;
-    return prop(x - 4, y, w + 8, h + 4, y + h, (ctx, ox, oy) => {
+    const front = prop(x - 4, y, w + 8, h + 4, y + h, (ctx, ox, oy) => {
         const X = (v) => v + ox, Y = (v) => v + oy;
-        ctx.globalAlpha = 0.3;
-        blk(ctx, X(x + 16), Y(y + h - 52), w - 32, 44, '#bfe4ee');
-        ctx.globalAlpha = 1;
-        for (let gx = x + 48; gx < x + w - 24; gx += 72) blk(ctx, X(gx), Y(y + h - 52), 2, 44, '#dff2f6');
-        blk(ctx, X(x + 60), Y(y + h - 44), 24, 4, '#ffffff');
-        blk(ctx, X(x + 180), Y(y + h - 28), 16, 4, '#ffffff');
+        if (!broken) {
+            ctx.globalAlpha = 0.3;
+            blk(ctx, X(x + 16), Y(y + h - 52), w - 32, 44, '#bfe4ee');
+            ctx.globalAlpha = 1;
+            for (let gx = x + 48; gx < x + w - 24; gx += 72) blk(ctx, X(gx), Y(y + h - 52), 2, 44, '#dff2f6');
+            blk(ctx, X(x + 60), Y(y + h - 44), 24, 4, '#ffffff');
+            blk(ctx, X(x + 180), Y(y + h - 28), 16, 4, '#ffffff');
+        } else {
+            // Çerçevede kalan sivri cam dişleri
+            ctx.globalAlpha = 0.34;
+            for (let gx = x + 16; gx < x + w - 16; gx += 12) {
+                const th = 4 + Math.round(hash(gx, 11, 5) * 5) * 4;
+                blk(ctx, X(gx), Y(y + h - 8 - th), 8, th, '#bfe4ee');
+            }
+            ctx.globalAlpha = 1;
+            // Yere dökülen kırıntılar
+            for (let i = 0; i < 46; i++) {
+                const sx = x + 24 + hash(i, 12, 7) * (w - 48);
+                const sy = y + h - 8 + hash(i, 13, 9) * 14;
+                const ss = 4 + Math.round(hash(i, 14, 3) * 2) * 2;
+                blk(ctx, X(Math.round(sx / 2) * 2), Y(Math.round(sy / 2) * 2), ss, ss - 2, i % 3 ? '#cfeef6' : '#8fc4d4');
+            }
+        }
         slab(ctx, X(x), Y(y + h - 56), w, 8, '#5f6a70', '#8b969c', '#3a444c');
         slab(ctx, X(x), Y(y + h - 12), w, 12, '#4a555b', '#6d797f', '#2f3a40');
         slab(ctx, X(x + w - 16), Y(y), 16, h, '#5f6a70', '#8b969c');
@@ -582,6 +600,8 @@ function bakeCellFront() {
         slab(ctx, X(x), Y(CELL_DOOR.y + CELL_DOOR.h), 16, y + h - (CELL_DOOR.y + CELL_DOOR.h), '#5f6a70', '#8b969c');
         slab(ctx, X(x), Y(y), w, 8, '#5f6a70', '#8b969c', '#3a444c');
     });
+    front.tag = broken ? 'cellBroken' : 'cellFront';
+    return front;
 }
 
 export function bakeLab() {
@@ -595,7 +615,7 @@ export function bakeLab() {
         bakeRacks(), bakeShower(), bakeBarrels(), bakeCellFront()
     ];
     props.sort((a, b) => a.baseY - b.baseY);
-    return { ground, props };
+    return { ground, props, cellBroken: bakeCellFront(true) };
 }
 
 // =================== DURUMU DEĞİŞENLER ===================
@@ -677,6 +697,40 @@ export function drawCellDoor(ctx, closed) {
         blk(ctx, x + 4, y + ph / 2 - 8, 4, 16, '#c8322e');
         blk(ctx, x + 4, y + 4, 2, ph - 8, '#ffffff');
     }
+}
+
+// Virüsün yıktığı ara duvar: açılan gedik, kırık kenarlar, yerdeki enkaz.
+// t: 0 sağlam (hiçbir şey çizilmez) .. 1 yıkık.
+export function drawBrokenWall(ctx, t) {
+    if (t <= 0) return;
+    const x = PARTITION.x, w = PARTITION.w;
+    blk(ctx, x + 4, 152, w - 8, 312, '#12171a');
+    for (let y = 140; y < 476; y += 12) {
+        const l = Math.round(hash(y, 1, 71) * 3) * PX;
+        const r = Math.round(hash(y, 2, 73) * 3) * PX;
+        blk(ctx, x + 4, y, l + PX, 12, '#cfd6d9');
+        blk(ctx, x + w - 8 - r, y, r + PX, 12, '#b4bec3');
+    }
+    for (let i = 0; i < 28; i++) {
+        const rx = x - 60 + hash(i, 3, 77) * 160;
+        const ry = 396 + hash(i, 4, 79) * 70;
+        const sz = 8 + Math.round(hash(i, 5, 81) * 3) * 4;
+        blk(ctx, Math.round(rx / PX) * PX, Math.round(ry / PX) * PX, sz, sz - 4, i % 3 ? '#9aa4a9' : '#6d797f');
+    }
+}
+
+// Yerde duran pil: sarı parıltılı, alınabilir olduğu belli
+export function drawBattery(ctx, x, y, frame) {
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.12);
+    ctx.globalAlpha = 0.14 + 0.12 * pulse;
+    blk(ctx, x - 32, y - 30, 64, 40, '#ffe06a');
+    ctx.globalAlpha = 1;
+    blk(ctx, x - 18, y - 16, 36, 16, '#1f2528');
+    blk(ctx, x - 16, y - 14, 32, 12, '#2f3a40');
+    blk(ctx, x - 16, y - 14, 12, 12, '#e8a030');
+    blk(ctx, x - 14, y - 12, 4, 8, '#ffd878');
+    blk(ctx, x - 2, y - 10, 14, 4, '#6bdc5a');
+    blk(ctx, x + 18, y - 11, 4, 8, '#b9c1c6');
 }
 
 // Mikroskop tezgâhında Andrew'dan alınan DNA örneği: yeşil sıvılı tüp, hafif parıltı

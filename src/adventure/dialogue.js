@@ -110,5 +110,7 @@ export const VOICE_PITCH = {
     doktor: 0.9,
     hasta: 1.08,
     // Andrew Stolen: Harry'den biraz tizi, yorgun ve genç bir ses
-    andrew: 1.16
+    andrew: 1.16,
+    // Andrew'in içindeki organizma: alçak, yavaş, insanlıktan uzak bir ses
+    ses: 0.5
 };

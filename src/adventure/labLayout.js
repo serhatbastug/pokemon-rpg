@@ -29,6 +29,8 @@ export const FEET_MIN_Y = 148;
 export const PLAYER_BOX = { w: 28, h: 16 };
 export const PLAYER_SPEED = 3.0;
 export const PLAYER_SCALE = 4;
+// Andrew'ın dönüştüğü virüs: 2 kişilik moddaki sprite'ın bu sahnedeki ölçeği
+export const VIRUS_SCALE = 1.45;
 export const START = { x: 430, y: 372, dir: 'up' };
 
 // --- Ana laboratuvar ---
@@ -92,6 +94,7 @@ export const SPOTS = {
     microscope: { x: 692,  y: 214, r: 68 },
     annexDoor:  { x: 950,  y: 348, r: 70 },
     console:    { x: 1338, y: 316, r: 60 },
+    battery:    { x: 262,  y: 392, r: 56 },
     fred:       { r: 72 },
     andrew:     { r: 72 }
 };

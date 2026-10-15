@@ -796,7 +796,7 @@ check('oynanış: kamera solda sıfırın altına inmiyor', lab.cameraX(0, true)
             queue.push([nx, ny]);
         }
     }
-    for (const id of ['door', 'microscope', 'annexDoor', 'console']) {
+    for (const id of ['door', 'microscope', 'annexDoor', 'console', 'battery']) {
         const s = lab.SPOTS[id];
         check('oynanış: başlangıçtan ' + id + ' noktasına yürünebiliyor', seen.has(key(s.x, s.y)));
     }
@@ -825,9 +825,9 @@ check('oynanış: her konuşanın ses perdesi tanımlı',
 const playText = [
     ...playLines.map(l => l.text),
     ...script.SCAN_TARGETS.flatMap(t => [t.label, t.line.text]),
-    ...Object.values(script.OBJECTIVES), script.CONTROL_HINT, script.ENDING_CAPTION,
+    ...Object.values(script.OBJECTIVES), script.CONTROL_HINT, script.ENDING_CAPTION, script.NIGHT_CAPTION,
     ...script.PLAY_ENTRIES.map(e => e.title),
-    'ÖRNEK TARAMASI', 'KAPI DELİĞİ', 'KONUŞ', 'BAK', 'AÇ', 'İNCELE', 'KİLİTLE',
+    'ÖRNEK TARAMASI', 'KAPI DELİĞİ', 'KONUŞ', 'BAK', 'AÇ', 'İNCELE', 'KİLİTLE', 'PİLİ AL', 'FIRLAT',
     'OKLAR: NİŞAN ALIN     F: İŞARETLE', 'ANORMALLİK 3 / 3', 'GÖREV: KAPIYA GİT', 'PROTOTİP 8'
 ];
 const playMissing = playText.flatMap(t => missingGlyphs(t));

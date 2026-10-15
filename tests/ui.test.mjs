@@ -323,6 +323,25 @@ async function main() {
         at(1338, 316); await wait(80); a.action();
         for (let i = 0; i < 40 && a.cellClosed < 1; i++) await wait(50);
         log.push(['cam-kapi', Math.round(a.cellClosed * 10) / 10, a.consoleState]);
+        // Gece: hucrede konusma, patlama, kacis, virus Fred'i yakaliyor (uzun dizi)
+        let blast = false, dark = false;
+        for (let i = 0; i < 1800 && a.phase !== 'getBattery'; i++) {
+            if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); }
+            if (a.cellBroken) blast = true;
+            if (a.lightsOut) dark = true;
+            await wait(30);
+        }
+        log.push(['gece', a.phase, blast, dark, a.wallBroken, a.grab?.state, a.npcs.virus.visible, Math.round(a.npcs.virus.x)]);
+        // Pil: once almak, sonra firlatmak
+        at(262, 392); await wait(80); a.action();
+        log.push(['pil-al', await drain(), a.phase, a.battery.floor]);
+        a.action();
+        for (let i = 0; i < 80 && !a.fredDown; i++) await wait(40);
+        log.push(['pil-firlat', a.fredDown !== null, a.npcs.virus.pain, a.grab?.state]);
+        for (let i = 0; i < 600 && a.running; i++) {
+            if (a.dialogue.active) { a.dialogue.advance(); a.dialogue.advance(); }
+            await wait(40);
+        }
         return log;
     });
     const f = Object.fromEntries(flow.map(r => [r[0], r.slice(1)]));
@@ -339,6 +358,12 @@ async function main() {
     check('Oynanis: kapi acilinca ikinci oda cikiyor, Andrew cam hucreye yuruyor',
         f.annex[1] === 'lock' && f.annex[2] > 1500 && f.annex[3] === 1 && f.annex[4] === true, JSON.stringify(f.annex));
     check('Oynanis: cam oda kilitleniyor', f['cam-kapi'][0] === 1 && f['cam-kapi'][1] === 'locked', JSON.stringify(f['cam-kapi']));
+    check('Oynanis: gece sahnesi: cam kirilir, elektrik kesilir, virus duvari yikip Fred i yakalar',
+        f.gece[0] === 'getBattery' && f.gece[1] && f.gece[2] && f.gece[3] === 1 && f.gece[4] === 'swing'
+        && f.gece[5] === true && f.gece[6] > 500 && f.gece[6] < 620, JSON.stringify(f.gece));
+    check('Oynanis: pil alininca firlatma gorevi geliyor', f['pil-al'][1] === 'throwBattery' && f['pil-al'][2] === false, JSON.stringify(f['pil-al']));
+    check('Oynanis: pil virusa carpinca Fred yere dusuyor, virus aci cekiyor',
+        f['pil-firlat'][0] === true && f['pil-firlat'][1] === 1 && f['pil-firlat'][2] === 'released', JSON.stringify(f['pil-firlat']));
     await shot('00d5-oynanis-cam-oda');
 
     // Final: ekran kararir, ana menuye donulur

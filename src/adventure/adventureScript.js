@@ -18,7 +18,9 @@ export const OBJECTIVES = {
     toScope: 'MİKROSKOBA GİT',
     talkAndrew: 'ANDREW İLE KONUŞ',
     openAnnex: 'İZOLASYON KAPISINI AÇ',
-    lock: 'CAM HÜCREYİ KİLİTLE'
+    lock: 'CAM HÜCREYİ KİLİTLE',
+    getBattery: 'PİLİ AL',
+    throwBattery: 'PİLİ FIRLAT'
 };
 
 // Kontrol ipucu: oyun açılırken kısa süre görünür
@@ -98,6 +100,53 @@ export const LINES = {
     locked: [
         { speaker: 'arkadas', text: 'Kilitlendi.' },
         { speaker: 'biz', text: 'Deneylerimize onunla devam edeceğiz.' }
+    ],
+    // Gece: cam hücrede Andrew ve içindeki ses
+    cellTalk: [
+        { speaker: 'ses', text: 'Seni bu duruma kim düşürdü?' },
+        { speaker: 'andrew', text: 'Ne? Sen de kimsin? Bu ses nereden geliyor?' },
+        { speaker: 'ses', text: 'Ben seni buradan kurtarabilecek tek güçüm.' },
+        { speaker: 'ses', text: 'Tabii beni kullanmayı becerebilirsen.' },
+        { speaker: 'andrew', text: 'İçimde gelişen organizma... Sen bir mutasyonsun. Profesörler senden bahsetmişti.' },
+        { speaker: 'andrew', text: 'Sen benim ailemi öldürdün! Yani beni bu duruma sen düşürdün!' },
+        { speaker: 'ses', text: 'Seni bu duruma ben düşürmedim. Ben sadece içindeki bir canlıyım, fazlası değil.' },
+        { speaker: 'ses', text: 'Bunu bu virüsü oluşturan kişi yaptı. Yani seni buraya tıkan kişi, yani Fred yaptı!' },
+        { speaker: 'andrew', text: 'Bunun doğru olduğu ne malum? Belki yalan söylüyorsun.' },
+        { speaker: 'andrew', text: 'Ayrıca ben sadece onlara yardım ediyorum. Eminim işleri bittiğinde beni buradan çıkaracaklar.' },
+        { speaker: 'ses', text: 'Bana güvenmek zorundasın. Fred virüsü yaparken son malzemeyi yanlış ekledi.' },
+        { speaker: 'ses', text: 'Bu da mutasyonu, yani beni oluşturdu. Fred hatasını ancak ertesi gün fark etti.' },
+        { speaker: 'ses', text: 'Onca insan arasından bizi bulmaları oldukça zor olacaktı. Tabii sen buraya kendi isteğinle gelmeseydin.' },
+        { speaker: 'andrew', text: 'Sadece yardım istemek için buraya gelmiştim.' },
+        { speaker: 'andrew', text: 'Ayrıca sen neden benim buradan çıkmamı istiyorsun? Anlattıkların bir pencereden bakınca mantıklı, ama aynı zamanda saçma.' },
+        { speaker: 'ses', text: 'Bu mutasyon yalnızca sende var. Bu fırsatı değerlendirmelisin Andrew.' },
+        { speaker: 'ses', text: 'Ailenin gerçek katilini bulmak istemiyor musun? Yoksa burada öylece mi bekleyeceksin?' },
+        { speaker: 'andrew', text: 'Ah, evet. İntikamı alacağım. Ne yapmamı istiyorsun?' },
+        { speaker: 'ses', text: 'Sadece kontrolü bana bırak. Gerisini ben hallederim.' }
+    ],
+    // Patlama sonrası: Harry fenerle geliyor
+    harryIn: [
+        { speaker: 'biz', text: 'Işıklar gitti... Andrew? İyi misin?' }
+    ],
+    harryShock: [
+        { speaker: 'biz', text: 'Bu... Bu da ne böyle?!' }
+    ],
+    harryWarn: [
+        { speaker: 'biz', text: 'Fred! Burayı hemen terk etmeliyiz!' },
+        { speaker: 'arkadas', text: 'Ne oldu? Neden bu kadar telaşlısın?' },
+        { speaker: 'biz', text: 'Andrew artık Andrew değil! Hemen çıkmalıyız!' }
+    ],
+    wallBreak: [
+        { speaker: 'arkadas', text: 'Bu ses de ne?!' }
+    ],
+    fredCaught: [
+        { speaker: 'arkadas', text: 'Harry! Yardım et! Bırak beni!' }
+    ],
+    batteryTake: [
+        { speaker: 'biz', text: 'Bir pil... Yeter mi bilmiyorum ama deneyeceğim.' }
+    ],
+    afterThrow: [
+        { speaker: 'arkadas', text: 'Aah... Harry...' },
+        { speaker: 'biz', text: 'Fred! Dayan, yanındayım!' }
     ]
 };
 
@@ -112,3 +161,4 @@ export const SCAN_TARGETS = [
 ];
 
 export const ENDING_CAPTION = 'ANDREW CAM ODADA.';
+export const NIGHT_CAPTION = 'O GECE.';

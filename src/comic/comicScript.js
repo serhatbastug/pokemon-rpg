@@ -358,7 +358,7 @@ export const PANELS = [
         // HAREKETLİ: Harry tek başına çalışma tezgâhında hap üzerinde çalışıyor
         id: 'hap-calisma', chapter: 7, art: 'labSolo',
         caption: 'HARRY, HAP ÜZERİNDE ÇALIŞIYOR.',
-        lines: at(LAB_SOLO, 330, 158),
+        lines: at(LAB_SOLO, 796, 158),
         motion: 160, hold: 40
     },
     {

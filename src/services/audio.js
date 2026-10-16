@@ -283,13 +283,17 @@ if (typeof window !== 'undefined') {
 // Telifsiz (CC0) gerçek müzik dosyaları: assets/audio/ (kaynaklar CREDITS.md'de).
 // Dosyası olan parçalar bunlarla çalar; yüklenemezse yukarıdaki sentez müzik
 // devreye girer.
+// volume: dosyanın kendi sesi çok yüksek (RMS ~0.2); efektlerle dengeli olsun
+// diye hedef seviye ~0.05'e göre ölçeklendi (0.05 / dosya RMS'i).
 const FILE_TRACKS = {
-    shadow: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.5 },
-    ruin: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.5 },
-    forest: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.5 },
-    boss: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
-    siege: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
-    sewer: { src: 'assets/audio/Chase.ogg', volume: 0.45 }
+    shadow: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.26 },
+    ruin: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
+    forest: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
+    // Ana menü ve araba sürüşü aynı ailenin parçaları (aynı ses dünyası)
+    town: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
+    siege: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
+    boss: { src: 'assets/audio/Chase.ogg', volume: 0.28 },
+    sewer: { src: 'assets/audio/Chase.ogg', volume: 0.28 }
 };
 
 let fileAudio = null;

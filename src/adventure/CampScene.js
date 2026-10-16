@@ -396,6 +396,7 @@ export class CampScene {
     enterCabin() {
         const first = this.phase === 'toCabin';
         const steps = [
+            { do: () => Sfx.doorOpen() },
             ...this.changeArea('cabin', CABIN_EXIT.x, CABIN_EXIT.y - 40, 'up', {
                 fred: this.tod === 2 ? null : { x: 590, y: 300, dir: 'left' },
                 after: () => { if (this.tod === 2) this.fred.visible = false; }
@@ -409,10 +410,10 @@ export class CampScene {
 
     leaveCabin() {
         const fredAtYard = this.tod === 2 ? null : this.fredYardPos();
-        this.run(this.changeArea('yard', YARD_DOOR.x, YARD_DOOR.y + 10, 'down', {
+        this.run([{ do: () => Sfx.doorClose() }, ...this.changeArea('yard', YARD_DOOR.x, YARD_DOOR.y + 10, 'down', {
             fred: fredAtYard,
             after: () => { if (!fredAtYard) this.fred.visible = false; }
-        }));
+        })]);
     }
 
     prepareBed(who) {
@@ -462,7 +463,7 @@ export class CampScene {
         p.dir = p.x < t.x ? 'right' : 'left';
         const fallDir = p.x < t.x ? 1 : -1;
         const first = this.tasks.wood.n === 0 && this.day === 2;
-        const hit = () => ({ do: () => { this.shake = 6; Sfx.hit(); } });
+        const hit = () => ({ do: () => { this.shake = 6; Sfx.chop(); } });
         this.chopping = { index };
         const steps = [
             { wait: 8 }, hit(), { wait: 18 }, hit(), { wait: 18 }, hit(), { wait: 14 },
@@ -622,6 +623,10 @@ export class CampScene {
         const free = !this.seq && !this.dialogue.active && !this.fadingOut && this.intro === 0 && this.curtain < 0.05;
         if (free) this.movePlayer();
         else if (!this.seq?.walking) this.player.moving = false;
+        // Adım sesi: dışarıda toprak/çim, içeride tahta
+        if (this.player.moving && this.frame % 20 === 0) {
+            if (this.area === 'cabin') Sfx.step(); else Sfx.grassStep();
+        }
 
         if (this.area === 'trail') this.stepTrail(free);
         if (this.area === 'yard') this.stepYard(free);
@@ -697,7 +702,7 @@ export class CampScene {
         for (const f of this.felled.values()) {
             if (f.t < FALL_FRAMES + 20) {
                 f.t++;
-                if (f.t === FALL_FRAMES - 6) { this.shake = Math.max(this.shake, 8); Sfx.metalSlam(); }
+                if (f.t === FALL_FRAMES - 6) { this.shake = Math.max(this.shake, 8); Sfx.thud(); }
             }
         }
         if (this.fredSwing && ++this.fredSwing.t > 12) this.fredSwing = null;
@@ -710,7 +715,7 @@ export class CampScene {
                 job.cd = FRED_SWING_GAP;
                 job.hits++;
                 this.fredSwing = { index: job.index, t: 0 };
-                Sfx.step();
+                Sfx.chop();
                 if (job.hits >= FRED_HITS) {
                     job.done = true;
                     this.fell(job.index, 1);

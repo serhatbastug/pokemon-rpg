@@ -14,6 +14,7 @@ import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import { PAD_GLYPHS } from '../pixel/controlHint.js';
 import { ABILITIES } from './abilities.js';
 import { muzzleOf, drawFighter } from './fighterArt.js';
+import { Sfx } from '../services/audio.js';
 
 // 'KeyF' -> 'F', 'Comma' -> ','   (tuş kapağında yazan)
 const KEY_LABELS = { Comma: ',', Period: '.', Slash: '/', Space: 'SPACE' };
@@ -67,6 +68,7 @@ export class Combat {
     }
 
     onDash(player) {
+        Sfx.whoosh();
         this.game.effects.createPulse(player.x, player.footY - 20, player.fighter.themeColor);
     }
 

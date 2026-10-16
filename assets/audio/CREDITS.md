@@ -8,3 +8,10 @@ Dosyalar OpenGameArt'tan indirildi, değiştirilmedi.
 - **Unsolved Investigation** - isaiah658 - https://opengameart.org/content/unsolved-investigation (CC0)
 - **A Path Which Leads to Somewhere** / **Un-understandable** - Centurion_of_war - https://opengameart.org/node/128999 , https://opengameart.org/node/143895 (CC0)
 - **Suspicious Loop** - Hazmat Harry - https://opengameart.org/content/suspicious-loop (CC0)
+
+## Ses efektleri (assets/audio/sfx/)
+
+- Kenney (www.kenney.nl) ses paketleri, CC0: Impact Sounds, Interface Sounds, RPG Audio, Sci-Fi Sounds
+  https://kenney.nl/assets/impact-sounds , /interface-sounds , /rpg-audio , /sci-fi-sounds
+- Lisans metni: assets/audio/sfx/KENNEY-LICENSE.txt
+- Konuşma "bıt"ları ve yedek sesler koddan üretilir (sentez).

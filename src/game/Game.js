@@ -1,5 +1,6 @@
 import { Player } from './Player.js';
 import { isPaused } from '../core/pause.js';
+import { Sfx } from '../services/audio.js';
 import { EffectsManager } from './effects.js';
 import { Combat } from './combat.js';
 import { randomArena, ledgesOf } from './arenas.js';
@@ -176,6 +177,7 @@ export class Game {
         if (this.phase !== 'fight') return;
         this.phase = 'roundOver';
         this.phaseTimer = COMBAT.intermissionFrames;
+        Sfx.bell();
 
         if (winnerNum) {
             this.wins[winnerNum]++;
@@ -204,6 +206,7 @@ export class Game {
         this.rafId = null;
 
         const winner = winnerNum === 1 ? this.p1 : this.p2;
+        Sfx.badge();
         this.onGameOver(winnerNum, winner);
     }
 

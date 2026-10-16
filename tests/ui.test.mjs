@@ -418,6 +418,19 @@ async function main() {
     check('Araba sahnesinde Esc ana menuye donduruyor',
         afterPlay.menu && !afterPlay.adventure && afterPlay.screen, JSON.stringify(afterPlay));
 
+    // Gercek ses efekti dosyalari (Kenney, CC0) yukleniyor mu
+    const sampleCount = await page.evaluate(async () => {
+        const audio = await import('/src/services/audio.js');
+        audio.unlockAudio();
+        for (let i = 0; i < 60; i++) {
+            const [loaded, total] = audio.loadedSamples();
+            if (loaded === total) break;
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return audio.loadedSamples();
+    });
+    check('Ses efektleri: butun gercek ses dosyalari yukleniyor', sampleCount[0] === sampleCount[1] && sampleCount[1] >= 20, JSON.stringify(sampleCount));
+
     // Ayarlar ekrani: L ile acilir, oyunu dondurur, ses ayarlari degisir, L ile kapanir
     await page.keyboard.press('KeyL');
     await wait(200);

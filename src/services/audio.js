@@ -39,6 +39,7 @@ function ensureContext() {
     sfxGain = ctx.createGain();
     sfxGain.gain.value = volumeScale(settings.sfxVol);
     sfxGain.connect(master);
+    loadSamples(ctx);
 
     // Müzik: daha kısık ve yumuşak (tiz kısmı kesilir); yorucu olmasın
     musicGain = ctx.createGain();
@@ -123,9 +124,109 @@ function noise({ duration = 0.2, volume = 0.4, filterFrom = 2000, filterTo = 200
     source.start(start);
 }
 
+// --- Gerçek ses dosyaları (Kenney, CC0): assets/audio/sfx/ ---
+// Her olayın birkaç çeşidi var; çalarken biri seçilir ve hızı biraz oynatılır, aynı
+// ses art arda kulağı yormasın. Dosyalar ilk etkileşimde arka planda yüklenir;
+// henüz yüklenmediyse (ya da yüklenemediyse) eski sentez ses çalar.
+const SAMPLE_FILES = {
+    punch: ['punch-1', 'punch-2', 'punch-3'],
+    punchHeavy: ['punch-heavy-1', 'punch-heavy-2'],
+    block: ['block-1', 'block-2'],
+    metal: ['metal-1', 'metal-2'],
+    glass: ['glass-1', 'glass-2'],
+    thud: ['thud-1', 'thud-2'],
+    bell: ['bell'],
+    step: ['step-1', 'step-2', 'step-3'],
+    grass: ['grass-1', 'grass-2', 'grass-3'],
+    chop: ['chop'],
+    whoosh: ['whoosh-1', 'whoosh-2', 'whoosh-3'],
+    jump: ['jump'],
+    doorOpen: ['door-open'],
+    doorClose: ['door-close'],
+    click: ['click-1', 'click-2'],
+    confirm: ['confirm'],
+    win: ['win'],
+    deny: ['deny'],
+    drip: ['drip'],
+    boom: ['boom-1', 'boom-2'],
+    boomLow: ['boom-low'],
+    slime: ['slime-1', 'slime-2'],
+    field: ['field-1', 'field-2'],
+    laserSmall: ['laser-small'],
+    laserRetro: ['laser-retro'],
+    laserLarge: ['laser-large']
+};
+const samples = {};          // ad -> [AudioBuffer]
+let samplesLoading = false;
+
+async function loadSamples(context) {
+    if (samplesLoading) return;
+    samplesLoading = true;
+    await Promise.all(Object.entries(SAMPLE_FILES).map(async ([name, files]) => {
+        const buffers = [];
+        for (const file of files) {
+            try {
+                const res = await fetch(`assets/audio/sfx/${file}.ogg`);
+                if (!res.ok) continue;
+                buffers.push(await context.decodeAudioData(await res.arrayBuffer()));
+            } catch (e) { /* dosya yok / çözülemedi: sentez ses kalır */ }
+        }
+        if (buffers.length) samples[name] = buffers;
+    }));
+}
+
+// Yüklenen örnek sayısı (test için): [yüklenen ad sayısı, toplam ad sayısı]
+export function loadedSamples() {
+    return [Object.keys(samples).length, Object.keys(SAMPLE_FILES).length];
+}
+
+// Örneği çalar; başarırsa true (sentez ses gerekmez)
+function sample(name, { volume = 0.6, rate = 1, jitter = 0.06, delay = 0 } = {}) {
+    const context = ensureContext();
+    const list = samples[name];
+    if (!context || !enabled || !list) return false;
+    const source = context.createBufferSource();
+    source.buffer = list[Math.floor(Math.random() * list.length)];
+    source.playbackRate.value = rate * (1 + (Math.random() * 2 - 1) * jitter);
+    const gain = context.createGain();
+    gain.gain.value = volume;
+    source.connect(gain);
+    gain.connect(sfxGain);
+    source.start(context.currentTime + delay);
+    return true;
+}
+
+// Örnek varsa onu, yoksa sentez sesi çalar
+const withSample = (name, opts, fallback) => () => { if (!sample(name, opts)) fallback(); };
+
 // Oyun olaylarına karşılık gelen sesler
 export const Sfx = {
-    hit: () => blip({ type: 'square', from: 320, to: 120, duration: 0.08, volume: 0.35 }),
+    // --- Arena (2 kişilik): vuruş, blok, sıçrama, dash, yetenekler ---
+    punch: () => sample('punch', { volume: 0.7 }),
+    punchHeavy: () => sample('punchHeavy', { volume: 0.8 }),
+    block: () => sample('block', { volume: 0.55 }),
+    bell: () => sample('bell', { volume: 0.5, jitter: 0.02 }),
+    whoosh: () => sample('whoosh', { volume: 0.5 }),
+    arenaJump: () => sample('jump', { volume: 0.4, jitter: 0.1 }),
+    arenaLand: () => sample('thud', { volume: 0.25, rate: 1.4 }),
+    // Yetenek türüne göre ses (combat.perform çağırır)
+    ability: (kind) => {
+        const map = {
+            shot: ['laserSmall', 0.4], burst: ['laserRetro', 0.45], beam: ['laserLarge', 0.5],
+            orb: ['field', 0.5], split: ['laserRetro', 0.4], trail: ['slime', 0.5],
+            grab: ['slime', 0.6], blink: ['field', 0.45], clone: ['field', 0.5], path: ['glass', 0.5],
+            melee: ['whoosh', 0.6]
+        };
+        const [name, volume] = map[kind] || ['whoosh', 0.5];
+        sample(name, { volume });
+    },
+    // --- Oynanış / menü ---
+    chop: () => sample('chop', { volume: 0.8, jitter: 0.08 }),
+    thud: () => sample('thud', { volume: 0.7 }),
+    grassStep: () => sample('grass', { volume: 0.35, jitter: 0.12 }),
+    doorOpen: () => sample('doorOpen', { volume: 0.5 }),
+    doorClose: () => sample('doorClose', { volume: 0.5 }),
+    hit: withSample('punch', { volume: 0.75 }, () => blip({ type: 'square', from: 320, to: 120, duration: 0.08, volume: 0.35 })),
     superEffective: () => {
         blip({ type: 'square', from: 520, to: 900, duration: 0.09, volume: 0.4 });
         blip({ type: 'square', from: 700, to: 1200, duration: 0.1, volume: 0.35, delay: 0.06 });
@@ -142,7 +243,7 @@ export const Sfx = {
     dash: () => noise({ duration: 0.16, volume: 0.22, filterFrom: 3000, filterTo: 600 }),
     jump: () => blip({ type: 'square', from: 420, to: 780, duration: 0.12, volume: 0.25 }),
     land: () => blip({ type: 'triangle', from: 200, to: 120, duration: 0.08, volume: 0.2 }),
-    token: () => blip({ type: 'square', from: 900, to: 1400, duration: 0.07, volume: 0.22 }),
+    token: withSample('click', { volume: 0.5, jitter: 0.04 }, () => blip({ type: 'square', from: 900, to: 1400, duration: 0.07, volume: 0.22 })),
     ballThrow: () => blip({ type: 'triangle', from: 300, to: 600, duration: 0.12, volume: 0.25 }),
     ballWobble: () => blip({ type: 'square', from: 380, to: 340, duration: 0.1, volume: 0.2 }),
     catchSuccess: () => {
@@ -169,11 +270,11 @@ export const Sfx = {
         [523, 523, 523, 659, 784, 1047].forEach((f, i) =>
             blip({ type: 'square', from: f, duration: i === 5 ? 0.5 : 0.16, volume: 0.32, delay: i * 0.13 }));
     },
-    badge: () => {
+    badge: withSample('win', { volume: 0.55 }, () => {
         [784, 988, 1319].forEach((f, i) =>
             blip({ type: 'triangle', from: f, duration: 0.3, volume: 0.3, delay: i * 0.12 }));
-    },
-    buy: () => blip({ type: 'square', from: 700, to: 1000, duration: 0.09, volume: 0.25 }),
+    }),
+    buy: withSample('confirm', { volume: 0.5 }, () => blip({ type: 'square', from: 700, to: 1000, duration: 0.09, volume: 0.25 })),
     heal: () => {
         [660, 880].forEach((f, i) => blip({ type: 'triangle', from: f, duration: 0.2, volume: 0.25, delay: i * 0.1 }));
     },
@@ -181,8 +282,8 @@ export const Sfx = {
         noise({ duration: 0.3, volume: 0.35, filterFrom: 2500, filterTo: 200 });
         blip({ type: 'square', from: 200, to: 90, duration: 0.25, volume: 0.25 });
     },
-    status: () => blip({ type: 'sawtooth', from: 300, to: 220, duration: 0.25, volume: 0.25 }),
-    deny: () => blip({ type: 'square', from: 200, to: 140, duration: 0.14, volume: 0.25 }),
+    status: withSample('field', { volume: 0.55 }, () => blip({ type: 'sawtooth', from: 300, to: 220, duration: 0.25, volume: 0.25 })),
+    deny: withSample('deny', { volume: 0.45 }, () => blip({ type: 'square', from: 200, to: 140, duration: 0.14, volume: 0.25 })),
 
     // Konusma: dublaj yok, harf harf yazilirken cikan kisa "bit" sesi.
     // Perde konusana gore degisiyor, yoksa herkes ayni karakter gibi duyuluyor.
@@ -196,11 +297,13 @@ export const Sfx = {
         blip({ type: 'sawtooth', from: 420, to: 700, duration: 0.5, volume: 0.16 });
         blip({ type: 'sawtooth', from: 700, to: 420, duration: 0.5, volume: 0.16, delay: 0.5 });
     },
-    metalSlam: () => {
+    metalSlam: withSample('metal', { volume: 0.8 }, () => {
         noise({ duration: 0.45, volume: 0.4, filterFrom: 900, filterTo: 80 });
         blip({ type: 'square', from: 140, to: 50, duration: 0.35, volume: 0.3 });
-    },
+    }),
     explosion: () => {
+        // Kütle ve çatırtı üst üste: gerçek patlama örneği + alçak gümleme
+        if (sample('boom', { volume: 0.8 })) { sample('boomLow', { volume: 0.6, delay: 0.02 }); return; }
         noise({ duration: 1.2, volume: 0.5, filterFrom: 1800, filterTo: 60 });
         blip({ type: 'sawtooth', from: 90, to: 26, duration: 1.0, volume: 0.4 });
     },
@@ -211,28 +314,28 @@ export const Sfx = {
 
     // --- Kanalizasyon ---
     // Kayma: betonda sürtünen bir hışırtı, sonuna doğru sönen
-    slide: () => noise({ duration: 0.34, volume: 0.26, filterFrom: 1600, filterTo: 240 }),
+    slide: withSample('whoosh', { volume: 0.5 }, () => noise({ duration: 0.34, volume: 0.26, filterFrom: 1600, filterTo: 240 })),
     // Engele çarpma: tökezleme. Ölüm yok, ceza ses ve sarsıntı.
     stumble: () => {
         noise({ duration: 0.3, volume: 0.34, filterFrom: 700, filterTo: 90 });
         blip({ type: 'sawtooth', from: 180, to: 70, duration: 0.26, volume: 0.3 });
     },
     // Tavandan düşen damla: koridorun tek canlı sesi
-    drip: () => blip({ type: 'sine', from: 1250, to: 620, duration: 0.09, volume: 0.09 }),
+    drip: withSample('drip', { volume: 0.4, jitter: 0.1 }, () => blip({ type: 'sine', from: 1250, to: 620, duration: 0.09, volume: 0.09 })),
     // Ayak sesi: dar tünelde yankılanan tok vuruş
-    step: () => blip({ type: 'triangle', from: 150, to: 96, duration: 0.06, volume: 0.09 }),
+    step: withSample('step', { volume: 0.4, jitter: 0.1 }, () => blip({ type: 'triangle', from: 150, to: 96, duration: 0.06, volume: 0.09 })),
 
     // --- Prolog 1: laboratuvar ---
     // Camın çatlaması: kısa, tiz, kuru bir çıtırtı
-    glassCrack: () => {
+    glassCrack: withSample('glass', { volume: 0.7 }, () => {
         noise({ duration: 0.09, volume: 0.22, filterFrom: 5200, filterTo: 1800 });
         blip({ type: 'square', from: 1500, to: 900, duration: 0.05, volume: 0.12 });
-    },
+    }),
     // Kütlenin kımıldaması: ağır, ıslak, alçak bir kayma
-    ooze: () => {
+    ooze: withSample('slime', { volume: 0.7 }, () => {
         blip({ type: 'sine', from: 130, to: 62, duration: 0.55, volume: 0.20 });
         noise({ duration: 0.5, volume: 0.14, filterFrom: 500, filterTo: 90 });
-    }
+    })
 };
 
 // --- Basit döngüsel müzik ---

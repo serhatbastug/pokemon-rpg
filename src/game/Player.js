@@ -5,6 +5,7 @@ import {
 import { drawFighter, FIGHTER_SPRITES } from './fighterArt.js';
 import { hash } from '../pixel/pixelDraw.js';
 import { abilitiesOf, abilityOf, DASHES, FREEZE } from './abilities.js';
+import { Sfx } from '../services/audio.js';
 
 // Bir karenin girdi anlık görüntüsü. Basılı tutmayı da, "yeni basıldı"yı da
 // buradan okuyoruz: kol tuşları için tarayıcıda olay yok, klavye ile aynı
@@ -423,11 +424,13 @@ export class Player {
         // Menzillilerde tek karelik bir hazırlık yetiyor.
         this.startAnim(ability);
         if (ability.kind === 'melee') {
+            Sfx.ability('melee');
             this.action = { ability, frame: 0 };
             this.cooldowns[ability.id] = ability.cooldown;
             return;
         }
         this.cooldowns[ability.id] = ability.cooldown;
+        Sfx.ability(ability.kind);
         this.game.combat.perform(this, ability);
     }
 
@@ -485,6 +488,7 @@ export class Player {
         if (!this.held.combo && this.held.jump && this.grounded) {
             this.vy = PHYSICS.jumpVelocity;
             this.grounded = false;
+            Sfx.arenaJump();
         }
 
         // Basamağın üstündeyken AŞAĞI: sekiden aşağı süzülme. Kısa bir süre
@@ -499,10 +503,12 @@ export class Player {
         if (this.dropFrames > 0) this.dropFrames--;
 
         const land = this.landingFoot(prevFoot);
+        const fallSpeed = this.vy;
         this.grounded = land !== null;
         if (this.grounded) {
             this.y = land - this.height / 2;
             this.vy = 0;
+            if (fallSpeed > 9) Sfx.arenaLand();
         }
     }
 
@@ -519,6 +525,7 @@ export class Player {
             this.vx = push * COMBAT.blockKnockback;
             effects.spawnText(this.x, this.y - 60, 'BLOK', '#9ad4ff');
             effects.triggerShake(4);
+            Sfx.block();
             if (leak <= 0) return 0;
             amount *= leak;
         }
@@ -527,6 +534,7 @@ export class Player {
         this.invulnFrames = COMBAT.hitInvuln;
         this.invulnerable = true;
         effects.triggerShake(8);
+        if (amount > 20) Sfx.punchHeavy(); else Sfx.punch();
 
         const dmg = Math.ceil(amount);
         const isCrit = amount > 20;

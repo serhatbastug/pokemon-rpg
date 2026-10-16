@@ -1,10 +1,11 @@
 // Avcı kulübesi bölümü: orman patikasında üç yol ayrımı, kulübe, birkaç günlük
-// hayatta kalma görevi (odun kes, ateş yak, uyu) ve gece Fred'in kaybolması.
+// hayatta kalma işi (odun, su, meyve, ateş, yemek, uyku) ve gece Fred'in kaybolması.
 //
-//   trail -> yard (kulübenin önü) -> cabin (iç mekân)
-//   toCabin -> beds -> sleep -> [wood -> fire -> toBed] x2 gün -> search -> fredRoom -> son
+//   trail -> yard (kulübenin çevresi, geniş) -> cabin (iç mekân)
+//   toCabin -> beds -> sleep -> [tasks -> fire -> (cook) -> toBed] x2 gün -> search -> fredRoom -> son
 //
 // Oyuncu Harry'yi yürütür (3/4 görünüm). F ya da kolda ÇARPI/ÜÇGEN etkileşir.
+// Fred de çalışır: 2. gün bir ağaç devirir, 3. gün gölde balık tutar.
 // Olaylar laboratuvardaki gibi "dizi" (run) olarak yazılır: bekle / konuş /
 // yürüt / koşula kadar bekle. Dizi sürerken oyuncu yürüyemez.
 
@@ -19,16 +20,20 @@ import { drawPerson } from './charSprites.js';
 import { drawPortrait, PORTRAIT } from './portraits.js';
 import { isPaused } from '../core/pause.js';
 import {
-    VIEW, PLAYER_SPEED, TRAIL, JUNCTIONS, TRAIL_TREES, YARD_TREES, CHOP_TREES, CABIN, YARD_DOOR,
-    FIRE_PIT, WOODPILE, SEARCH_SPOTS, FRED_BED, HARRY_BED, STOVE, TABLE, CHEST, SHELF_CRATE,
-    CABIN_EXIT, SPOTS_IN, trailCenter, blocked, near
+    VIEW, PLAYER_SPEED, TRAIL, JUNCTIONS, TRAIL_TREES, YARD_TREES, CHOP_TREES, CABIN, YARD,
+    YARD_DOOR, FIRE_PIT, WOODPILE, BARREL, BARREL_SPOT, POND, POND_SPOT, FRED_FISH, BUSHES,
+    SEARCH_SPOTS, FRED_BED, HARRY_BED, STOVE, TABLE, CHEST, SHELF_CRATE, CABIN_EXIT, SPOTS_IN,
+    FRED_WAKE, FRED_TREE, treeStand, trailCenter, blocked, near
 } from './campLayout.js';
 import {
     bakeTrailGround, bakeYardGround, bakeCabinExterior, bakeCabinInterior, CABIN_PAD,
     drawCabinGlow, drawBed, BED_TONES, drawStove, drawTable, drawChest, drawCrateProp,
-    drawFirePit, drawFireGlow, drawWoodpile, drawChoppedLog
+    drawFirePit, drawFireGlow, drawWoodpile, drawPondLife, drawBush, drawBarrel, drawBucket,
+    drawPot, drawStump, drawLyingTrunk
 } from './campArt.js';
-import { OBJECTIVES, LABELS, CAPTIONS, LINES, WOOD_GOAL, LAST_DAY } from './campScript.js';
+import {
+    OBJECTIVES, LABELS, CAPTIONS, LINES, DAY_TASKS, TASK_NAMES, LAST_DAY
+} from './campScript.js';
 
 const INTRO_FRAMES = 40;
 const FADE_FRAMES = 70;
@@ -38,6 +43,10 @@ const SPRITE_H = 64;
 const HINT_FRAMES = 420;
 const ACTION_BUTTONS = ['triangle', 'cross'];
 const FOLLOW_LAG = 46;            // Fred patikada Harry'nin bu kare gerisinden gelir
+const FALL_FRAMES = 60;           // ağacın devrilme süresi
+const FRED_HITS = 12;             // Fred'in ağacı devirmek için vuruş sayısı
+const FRED_SWING_GAP = 80;        // iki vuruş arası kare
+const FISH_FRAMES = 1500;         // balığın tutulması için gereken gündüz süresi
 
 export class CampScene {
     constructor({ canvas, input, gamepad, onExit, onFinish }) {
@@ -65,7 +74,7 @@ export class CampScene {
         });
     }
 
-    // Zeminler ve ağaç sprite'ları bir kez hazırlanır
+    // Zeminler bir kez hazırlanır
     bake() {
         if (this.art) return;
         this.art = {
@@ -76,7 +85,6 @@ export class CampScene {
         };
     }
 
-    // entry: 'kulube' (patikadan başlar). Test için 'kulube-gece' gibi atlamalar jump() ile.
     start() {
         this.bake();
         this.reset();
@@ -120,7 +128,6 @@ export class CampScene {
         this.curtain = 0;
         this.curtainTarget = 0;
         this.caption = null;
-        this.captionColor = null;
         this.seq = null;
         this.dialogue.cut();
 
@@ -129,9 +136,18 @@ export class CampScene {
         this.day = 1;
         this.tod = 0;                 // 0 gündüz, 1 akşam, 2 gece
         this.todVis = 0;              // ekranda görünen (yumuşak geçiş)
-        this.wood = 0;
-        this.chopped = new Set();
-        this.chopping = null;         // { index, t }
+        this.felled = new Map();      // devrilen ağaçlar: sıra -> { t, dir }
+        this.chopping = null;         // Harry'nin vurduğu ağaç: { index }
+        this.fredSwing = null;        // Fred'in vuruşu: { index, t }
+        this.tasks = null;            // günlük işler: { ad: { n, goal } }
+        this.picked = new Set();      // toplanan meyve çalıları
+        this.carry = null;            // 'water' ise elde kova var
+        this.barrelFilled = false;
+        this.fish = false;
+        this.dayFrames = 0;
+        this.fredJob = null;
+        this.potOn = false;
+        this.pendingLines = null;
         this.fireLit = false;
         this.beds = { fred: false, harry: false };
         this.searched = new Set();
@@ -234,6 +250,46 @@ export class CampScene {
         else playMusic(this.tod >= 1 ? 'night' : 'shadow');
     }
 
+    // --- Günlük işler ---
+
+    setupDay(day) {
+        this.day = day;
+        this.tasks = {};
+        for (const [key, goal] of Object.entries(DAY_TASKS[day] || {})) this.tasks[key] = { n: 0, goal };
+        this.picked = new Set();
+        this.carry = null;
+        this.fish = false;
+        this.dayFrames = 0;
+        this.potOn = false;
+        this.fireLit = false;
+        // Fred'in günlük işi: 2. gün ağaç devirir, 3. gün gölde balık tutar
+        this.fredJob = day === 2
+            ? { type: 'chop', index: FRED_TREE, hits: 0, cd: FRED_SWING_GAP, done: false }
+            : { type: 'fish', caught: false };
+    }
+
+    tasksDone() {
+        return !!this.tasks && Object.values(this.tasks).every(t => t.n >= t.goal);
+    }
+
+    // Fred'in gündüz durduğu yer: işine göre
+    fredYardPos() {
+        if (this.tod === 1 && this.fireLit) return { x: FIRE_PIT.x - 58, y: FIRE_PIT.y + 40, dir: 'right' };
+        const job = this.fredJob;
+        if (this.tod === 0 && job?.type === 'chop' && !job.done) {
+            const t = CHOP_TREES[job.index];
+            return { x: t.x - 40, y: t.y + 26, dir: 'right' };
+        }
+        if (this.tod === 0 && job?.type === 'fish') return { x: FRED_FISH.x, y: FRED_FISH.y, dir: 'up' };
+        return { x: WOODPILE.x + 130, y: WOODPILE.y + 70, dir: 'left' };
+    }
+
+    // Ağaç devrilir: yere uzanır, odun sayılır
+    fell(index, dir) {
+        this.felled.set(index, { t: 0, dir });
+        if (this.tasks?.wood) this.tasks.wood.n++;
+    }
+
     // --- Girdi ---
 
     action() {
@@ -255,12 +311,28 @@ export class CampScene {
                 const s = SEARCH_SPOTS.find(sp => !this.searched.has(sp.id) && near(x, y, sp));
                 if (s) return { id: 'search', label: LABELS.search, spot: s };
             }
-            if (this.phase === 'wood') {
-                const i = CHOP_TREES.findIndex((t, k) => !this.chopped.has(k) && Math.hypot(x - t.x, y - (t.y + 14)) < 62);
-                if (i >= 0) return { id: 'chop', label: LABELS.chop, index: i };
+            if (this.phase === 'tasks') {
+                const t = this.tasks;
+                if (t.wood && t.wood.n < t.wood.goal) {
+                    const i = CHOP_TREES.findIndex((tree, k) => !this.felled.has(k)
+                        && !(this.fredJob?.type === 'chop' && !this.fredJob.done && k === this.fredJob.index)
+                        && near(x, y, { ...treeStand(tree), r: 66 }));
+                    if (i >= 0) return { id: 'chop', label: LABELS.chop, index: i };
+                }
+                if (t.berries && t.berries.n < t.berries.goal) {
+                    const i = BUSHES.findIndex((b, k) => !this.picked.has(k) && near(x, y, { x: b.x, y: b.y + 26, r: 58 }));
+                    if (i >= 0) return { id: 'berry', label: LABELS.berry, index: i };
+                }
+                if (t.water && t.water.n < t.water.goal && this.carry !== 'water' && near(x, y, POND_SPOT)) {
+                    return { id: 'water', label: LABELS.water };
+                }
             }
+            if (this.carry === 'water' && near(x, y, BARREL_SPOT)) return { id: 'pour', label: LABELS.pour };
             if (this.phase === 'fire' && near(x, y, { x: FIRE_PIT.x, y: FIRE_PIT.y + 30, r: 78 })) {
                 return { id: 'fire', label: LABELS.fire };
+            }
+            if (this.phase === 'cook' && near(x, y, { x: FIRE_PIT.x, y: FIRE_PIT.y + 30, r: 78 })) {
+                return { id: 'cook', label: LABELS.cook };
             }
             if (near(x, y, YARD_DOOR)) return { id: 'enter', label: LABELS.enter };
             if (this.tod === 0 && this.fred.visible && near(x, y, { r: 66 }, this.fred.x, this.fred.y + 10)) {
@@ -281,16 +353,15 @@ export class CampScene {
     }
 
     get objective() {
-        const base = OBJECTIVES[this.phase];
-        if (!base) return null;
-        if (this.phase === 'wood') return `${base} ${this.wood}/${WOOD_GOAL[this.day]}`;
-        return base;
+        if (this.phase === 'tasks' && this.tasks) {
+            return Object.entries(this.tasks).map(([k, t]) => `${TASK_NAMES[k]} ${Math.min(t.n, t.goal)}/${t.goal}`).join('   ');
+        }
+        return OBJECTIVES[this.phase] || null;
     }
 
     // --- Olaylar ---
 
     interact(spot) {
-        const p = this.player;
         switch (spot.id) {
             case 'enter': this.enterCabin(); break;
             case 'exit': this.leaveCabin(); break;
@@ -298,17 +369,27 @@ export class CampScene {
             case 'bedHarry': this.prepareBed('harry'); break;
             case 'sleep': this.sleep(); break;
             case 'chop': this.chop(spot.index); break;
+            case 'berry': this.pickBerries(spot.index); break;
+            case 'water': this.takeWater(); break;
+            case 'pour': this.pourWater(); break;
             case 'fire': this.lightFire(); break;
+            case 'cook': this.cook(); break;
             case 'search': this.searchAt(spot.spot); break;
             case 'fredRoom': this.lookFredRoom(); break;
-            case 'fredTalk': {
-                const lines = LINES.fredIdle[this.fredTalks++ % LINES.fredIdle.length];
-                this.fred.dir = p.x < this.fred.x ? 'left' : 'right';
-                this.run([{ say: lines }]);
-                break;
-            }
+            case 'fredTalk': this.talkToFred(); break;
             default: break;
         }
+    }
+
+    talkToFred() {
+        const job = this.fredJob;
+        let lines;
+        if (job?.type === 'chop' && !job.done) lines = LINES.fredJobChop;
+        else if (job?.type === 'chop') lines = LINES.fredJobChopDone;
+        else if (job?.type === 'fish') lines = LINES.fredJobFish;
+        else lines = LINES.fredIdle[this.fredTalks++ % LINES.fredIdle.length];
+        this.fred.dir = this.player.x < this.fred.x ? 'left' : 'right';
+        this.run([{ say: lines }]);
     }
 
     // Kulübeye girerken Fred de içeride ana odada durur
@@ -327,9 +408,7 @@ export class CampScene {
     }
 
     leaveCabin() {
-        const fredAtYard = this.tod === 2 ? null : (this.tod === 1 && this.fireLit
-            ? { x: FIRE_PIT.x - 58, y: FIRE_PIT.y + 40, dir: 'right' }
-            : { x: WOODPILE.x + 130, y: WOODPILE.y + 70, dir: 'left' });
+        const fredAtYard = this.tod === 2 ? null : this.fredYardPos();
         this.run(this.changeArea('yard', YARD_DOOR.x, YARD_DOOR.y + 10, 'down', {
             fred: fredAtYard,
             after: () => { if (!fredAtYard) this.fred.visible = false; }
@@ -360,13 +439,13 @@ export class CampScene {
             { do: () => { this.curtainTarget = 1; Sfx.slide(); } },
             { until: () => this.curtain >= 1 },
             { do: () => {
-                this.day++;
+                this.setupDay(this.day + 1);
                 this.tod = 0; this.todVis = 0;
-                this.wood = 0; this.chopped = new Set(); this.fireLit = false;
-                this.phase = 'wood';
+                this.phase = 'tasks';
                 this.caption = this.day === 2 ? CAPTIONS.day2 : CAPTIONS.day3;
                 this.player.x = HARRY_BED.x + 64; this.player.y = HARRY_BED.y + HARRY_BED.h + 36; this.player.dir = 'down';
-                Object.assign(this.fred, { x: 590, y: 300, dir: 'left', visible: true });
+                // Fred sabah kendi yatağının yanında uyanır
+                Object.assign(this.fred, { x: FRED_WAKE.x, y: FRED_WAKE.y, dir: 'right', visible: true, moving: false });
                 this.updateMusic();
             } },
             { wait: 110 },
@@ -376,33 +455,56 @@ export class CampScene {
         ]);
     }
 
+    // Harry ağaca üç kez vurur; ağaç yere devrilir
     chop(index) {
         const t = CHOP_TREES[index];
         const p = this.player;
         p.dir = p.x < t.x ? 'right' : 'left';
-        const first = this.wood === 0 && this.day === 2;
-        const hit = () => ({ do: () => { this.shake = 6; Sfx.hit(); this.chopping.t++; } });
-        this.chopping = { index, t: 0 };
+        const fallDir = p.x < t.x ? 1 : -1;
+        const first = this.tasks.wood.n === 0 && this.day === 2;
+        const hit = () => ({ do: () => { this.shake = 6; Sfx.hit(); } });
+        this.chopping = { index };
         const steps = [
             { wait: 8 }, hit(), { wait: 18 }, hit(), { wait: 18 }, hit(), { wait: 14 },
-            { do: () => {
-                this.chopping = null;
-                this.chopped.add(index);
-                this.wood++;
-                Sfx.token();
-            } }
+            { do: () => { this.chopping = null; this.fell(index, fallDir); } }
         ];
         if (first) steps.push({ say: LINES.chopFirst });
-        // Yeterli odun toplandıysa: akşam olur, ateş görevi gelir
-        if (this.wood + 1 >= WOOD_GOAL[this.day]) {
-            steps.push(
-                { say: LINES.woodDone },
-                { do: () => { this.caption = CAPTIONS.evening; this.tod = 1; this.phase = 'fire'; this.updateMusic(); } },
-                { wait: 90 },
-                { do: () => { this.caption = null; } }
-            );
-        }
         this.run(steps);
+    }
+
+    pickBerries(index) {
+        const first = this.tasks.berries.n === 0;
+        this.picked.add(index);
+        this.tasks.berries.n++;
+        Sfx.token();
+        this.player.dir = 'down';
+        this.run(first ? [{ wait: 20 }, { say: LINES.berryFirst }] : [{ wait: 20 }]);
+    }
+
+    takeWater() {
+        this.player.dir = 'up';
+        this.carry = 'water';
+        Sfx.drip();
+        this.run([{ wait: 18 }, { say: LINES.waterTake }]);
+    }
+
+    pourWater() {
+        this.player.dir = 'up';
+        this.carry = null;
+        this.barrelFilled = true;
+        if (this.tasks?.water) this.tasks.water.n++;
+        Sfx.drip();
+        this.run([{ wait: 18 }, { say: LINES.waterPour }]);
+    }
+
+    // Tüm günlük işler bitince akşam olur, ateş görevi gelir (adım döngüsünden çağrılır)
+    startEvening() {
+        this.run([
+            { say: LINES.woodDone },
+            { do: () => { this.caption = CAPTIONS.evening; this.tod = 1; this.phase = 'fire'; this.updateMusic(); } },
+            { wait: 90 },
+            { do: () => { this.caption = null; } }
+        ]);
     }
 
     lightFire() {
@@ -410,14 +512,29 @@ export class CampScene {
         p.dir = 'up';
         this.run([
             { wait: 14 },
-            { do: () => { Sfx.slide(); this.fireLit = true; this.wood = 0; this.fred.visible = true; Object.assign(this.fred, { x: FIRE_PIT.x - 58, y: FIRE_PIT.y + 40, dir: 'right' }); } },
+            { do: () => {
+                Sfx.slide();
+                this.fireLit = true;
+                this.fish = true;
+                Object.assign(this.fred, { x: FIRE_PIT.x - 58, y: FIRE_PIT.y + 40, dir: 'right', visible: true });
+            } },
             { wait: 50 },
             { say: this.day === 2 ? LINES.fireLit : LINES.fireLit3 },
+            { do: () => { this.phase = this.day >= 3 ? 'cook' : 'toBed'; } }
+        ]);
+    }
+
+    cook() {
+        this.player.dir = 'up';
+        this.run([
+            { say: LINES.cook },
+            { do: () => { this.potOn = true; Sfx.ooze(); } },
+            { wait: 90 },
             { do: () => { this.phase = 'toBed'; } }
         ]);
     }
 
-    // Gece uyanış: cam hücrede değil, kulübede kendi yatağında; Fred yok
+    // Gece uyanış: kulübede kendi yatağında; Fred yok
     nightWakeSteps() {
         return [
             { do: () => { this.curtainTarget = 1; Sfx.slide(); } },
@@ -425,7 +542,7 @@ export class CampScene {
             { do: () => {
                 this.area = 'cabin';
                 this.tod = 2; this.todVis = 2;
-                this.fireLit = false;
+                this.fireLit = false; this.potOn = false;
                 this.phase = 'search';
                 this.caption = CAPTIONS.night;
                 this.player.x = HARRY_BED.x + 64; this.player.y = HARRY_BED.y + HARRY_BED.h + 36; this.player.dir = 'down';
@@ -469,18 +586,20 @@ export class CampScene {
         this.dialogue.cut();
         this.curtain = this.curtainTarget = 0;
         this.caption = null;
-        const toYard = (phase, day, tod, { fireLit = false } = {}) => {
-            this.area = 'yard'; this.phase = phase; this.day = day; this.tod = this.todVis = tod;
-            this.fireLit = fireLit; this.wood = 0; this.chopped = new Set();
+        const toYard = (phase, day, tod) => {
+            this.area = 'yard'; this.phase = phase; this.tod = this.todVis = tod;
             this.beds = { fred: true, harry: true };
-            Object.assign(this.player, { x: 480, y: 340, dir: 'down' });
-            Object.assign(this.fred, { x: 300, y: 400, dir: 'right', visible: tod < 2 });
+            if (day >= 2) this.setupDay(day);
+            this.day = day;
+            this.fireLit = false;
+            Object.assign(this.player, { x: YARD_DOOR.x, y: 340, dir: 'down' });
+            Object.assign(this.fred, { ...this.fredYardPos(), visible: tod < 2 });
             this.snapCamera();
             this.updateMusic();
         };
         if (stage === 'yard') toYard('toCabin', 1, 1);
-        else if (stage === 'day2') toYard('wood', 2, 0);
-        else if (stage === 'day3') toYard('wood', 3, 0);
+        else if (stage === 'day2') toYard('tasks', 2, 0);
+        else if (stage === 'day3') toYard('tasks', 3, 0);
         else if (stage === 'night') toYard('search', 3, 2);
     }
 
@@ -505,6 +624,7 @@ export class CampScene {
         else if (!this.seq?.walking) this.player.moving = false;
 
         if (this.area === 'trail') this.stepTrail(free);
+        if (this.area === 'yard') this.stepYard(free);
         this.updateCamera();
 
         if (this.fadingOut) {
@@ -533,8 +653,8 @@ export class CampScene {
         if (!player.moving) return;
         const len = Math.hypot(dx, dy) || 1;
         const vx = (dx / len) * speed, vy = (dy / len) * speed;
-        if (!blocked(this.area, player.x + vx, player.y)) player.x += vx;
-        if (!blocked(this.area, player.x, player.y + vy)) player.y += vy;
+        if (!blocked(this.area, player.x + vx, player.y, this.felled)) player.x += vx;
+        if (!blocked(this.area, player.x, player.y + vy, this.felled)) player.y += vy;
         if (Math.abs(dy) >= Math.abs(dx)) player.dir = dy < 0 ? 'up' : 'down';
         else player.dir = dx < 0 ? 'left' : 'right';
     }
@@ -572,18 +692,63 @@ export class CampScene {
         }
     }
 
+    // Açıklık: ağaçlar devrilir, Fred işini yapar, işler bitince akşam olur
+    stepYard(free) {
+        for (const f of this.felled.values()) {
+            if (f.t < FALL_FRAMES + 20) {
+                f.t++;
+                if (f.t === FALL_FRAMES - 6) { this.shake = Math.max(this.shake, 8); Sfx.metalSlam(); }
+            }
+        }
+        if (this.fredSwing && ++this.fredSwing.t > 12) this.fredSwing = null;
+
+        // Fred'in işi (yalnızca gündüz ve oyuncu açıklıktayken ilerler)
+        const job = this.fredJob;
+        if (job && this.tod === 0 && this.phase === 'tasks') {
+            this.dayFrames++;
+            if (job.type === 'chop' && !job.done && --job.cd <= 0) {
+                job.cd = FRED_SWING_GAP;
+                job.hits++;
+                this.fredSwing = { index: job.index, t: 0 };
+                Sfx.step();
+                if (job.hits >= FRED_HITS) {
+                    job.done = true;
+                    this.fell(job.index, 1);
+                    Object.assign(this.fred, this.fredYardPos());
+                    this.pendingLines = LINES.fredFelled;
+                }
+            }
+            if (job.type === 'fish' && !job.caught && this.dayFrames >= FISH_FRAMES) {
+                job.caught = true;
+                this.fish = true;
+            }
+        }
+
+        if (!free) return;
+        if (this.pendingLines) {
+            const lines = this.pendingLines;
+            this.pendingLines = null;
+            this.run([{ say: lines }]);
+            return;
+        }
+        if (this.phase === 'tasks' && this.tasksDone()) this.startEvening();
+    }
+
     updateCamera() {
-        const target = this.area === 'trail'
-            ? Math.max(0, Math.min(TRAIL.w - VIEW.w, this.player.x - VIEW.w * 0.45))
-            : 0;
+        const target = this.camTarget();
         this.camX += (target - this.camX) * 0.1;
         if (Math.abs(target - this.camX) < 0.4) this.camX = target;
     }
 
     snapCamera() {
-        this.camX = this.area === 'trail'
-            ? Math.max(0, Math.min(TRAIL.w - VIEW.w, this.player.x - VIEW.w * 0.45))
-            : 0;
+        this.camX = this.camTarget();
+    }
+
+    camTarget() {
+        const p = this.player;
+        if (this.area === 'trail') return Math.max(0, Math.min(TRAIL.w - VIEW.w, p.x - VIEW.w * 0.45));
+        if (this.area === 'yard') return Math.max(0, Math.min(YARD.w - VIEW.w, p.x - VIEW.w * 0.5));
+        return 0;
     }
 
     // --- Çizim ---
@@ -610,7 +775,7 @@ export class CampScene {
         }
         ctx.translate(-camX, 0);
         if (this.area === 'trail') this.drawTrail(camX);
-        else if (this.area === 'yard') this.drawYard();
+        else if (this.area === 'yard') this.drawYard(camX);
         else this.drawCabin();
         ctx.restore();
 
@@ -645,6 +810,7 @@ export class CampScene {
         const p = this.player;
         this.shadow(p.x, p.y);
         drawPerson(this.ctx, p.x, p.y + this.bob('player'), 'harry', p.dir, p.moving, this.frame, 4);
+        if (this.carry === 'water') drawBucket(this.ctx, p.x + (p.dir === 'left' ? -16 : 16), p.y - 22);
     }
 
     drawFred() {
@@ -652,11 +818,45 @@ export class CampScene {
         if (!f.visible) return;
         this.shadow(f.x, f.y);
         drawPerson(this.ctx, f.x, f.y + this.bob('fred'), 'fred', f.dir, f.moving, this.frame, 4);
+        // Balık tutarken olta: Fred'den gölete uzanan ince çizgi
+        if (this.area === 'yard' && this.fredJob?.type === 'fish' && this.tod === 0) {
+            const sx = f.x + 10, sy = f.y - 44;
+            const ex = FRED_FISH.x + 66, ey = POND.y + POND.h - 26;
+            for (let i = 0; i <= 14; i++) {
+                const u = i / 14;
+                this.ctx.fillStyle = '#e8e4d0';
+                this.ctx.fillRect(Math.round((sx + (ex - sx) * u) / PX) * PX, Math.round((sy + (ey - sy) * u + Math.sin(u * 3) * 4) / PX) * PX, PX, PX);
+            }
+        }
     }
 
     drawTree(tree, dx = 0) {
         const sprite = treeSpriteFor(tree);
         this.ctx.drawImage(sprite.canvas, Math.round(tree.x - sprite.ox + dx), Math.round(tree.y - sprite.oy));
+    }
+
+    // Kırılan ağaç: yatıyorsa kütük ve gövde; devriliyorsa dibinden dönerek düşer
+    drawChopTree(tree, index) {
+        const { ctx } = this;
+        const f = this.felled.get(index);
+        if (!f) {
+            const swing = this.chopping?.index === index || this.fredSwing?.index === index;
+            this.drawTree(tree, swing ? Math.round(Math.sin(this.frame * 1.6) * 3) : 0);
+            return;
+        }
+        if (f.t < FALL_FRAMES) {
+            const u = f.t / FALL_FRAMES;
+            const sprite = treeSpriteFor(tree);
+            ctx.save();
+            ctx.translate(tree.x, tree.y);
+            ctx.rotate(f.dir * u * u * (Math.PI / 2) * 0.96);
+            ctx.drawImage(sprite.canvas, -sprite.ox, -sprite.oy);
+            ctx.restore();
+            drawStump(ctx, tree.x, tree.y);
+        } else {
+            drawLyingTrunk(ctx, tree.x, tree.y, f.dir);
+            drawStump(ctx, tree.x, tree.y);
+        }
     }
 
     drawTrail(camX) {
@@ -673,17 +873,19 @@ export class CampScene {
         for (const l of layers) l.draw();
     }
 
-    drawYard() {
+    drawYard(camX) {
         const { ctx } = this;
-        ctx.drawImage(this.art.yard, 0, 0);
+        ctx.drawImage(this.art.yard, camX, 0, VIEW.w, 560, camX, 0, VIEW.w, 560);
+        const fishing = this.fredJob?.type === 'fish' && this.tod === 0;
+        drawPondLife(ctx, this.frame, fishing ? { x: FRED_FISH.x + 62, y: POND.y + POND.h - 30 } : null);
+        const visible = (x, pad = 200) => x > camX - pad && x < camX + VIEW.w + pad;
         const layers = [];
-        for (const t of YARD_TREES) layers.push({ y: t.y, draw: () => this.drawTree(t) });
+        for (const t of YARD_TREES) if (visible(t.x, 140)) layers.push({ y: t.y, draw: () => this.drawTree(t) });
         CHOP_TREES.forEach((t, i) => {
-            const shake = this.chopping?.index === i ? Math.round(Math.sin(this.frame * 1.6) * 3) : 0;
-            layers.push({ y: t.y, draw: () => {
-                this.drawTree(t, shake);
-                if (this.chopped.has(i)) drawChoppedLog(ctx, t.x + 26, t.y + 8);
-            } });
+            if (visible(t.x, 260)) layers.push({ y: t.y, draw: () => this.drawChopTree(t, i) });
+        });
+        BUSHES.forEach((b, i) => {
+            if (visible(b.x)) layers.push({ y: b.y + 16, draw: () => drawBush(ctx, b.x, b.y, !this.picked.has(i)) });
         });
         layers.push({ y: CABIN.y + CABIN.h, draw: () => {
             ctx.drawImage(this.art.cabinOut, CABIN.x, CABIN.y - CABIN_PAD);
@@ -691,7 +893,11 @@ export class CampScene {
             drawCabinGlow(ctx, this.frame, glowing ? Math.min(1, this.todVis) : 0);
         } });
         layers.push({ y: WOODPILE.y + WOODPILE.h, draw: () => drawWoodpile(ctx, this.woodForPile()) });
-        layers.push({ y: FIRE_PIT.y + 10, draw: () => drawFirePit(ctx, this.fireLit, this.frame) });
+        layers.push({ y: BARREL.y + BARREL.h, draw: () => drawBarrel(ctx, this.barrelFilled) });
+        layers.push({ y: FIRE_PIT.y + 10, draw: () => {
+            drawFirePit(ctx, this.fireLit, this.frame);
+            if (this.potOn) drawPot(ctx, FIRE_PIT.x, FIRE_PIT.y - 4, this.frame);
+        } });
         layers.push({ y: this.fred.y, draw: () => this.drawFred() });
         layers.push({ y: this.player.y, draw: () => this.drawHarry() });
         layers.sort((a, b) => a.y - b.y);
@@ -700,8 +906,8 @@ export class CampScene {
 
     // Odun yığını: önceki günlerin artığı + bugün toplanan
     woodForPile() {
-        if (this.phase === 'search' || this.tod === 2) return 2;
-        return 2 + this.wood;
+        if (this.phase === 'search' || this.tod === 2 || !this.tasks?.wood) return 2;
+        return Math.min(9, 2 + this.tasks.wood.n);
     }
 
     drawCabin() {
@@ -750,9 +956,12 @@ export class CampScene {
             ctx.restore();
         }
 
-        // Ateşin hâlesi: yalnızca açıklıkta
+        // Ateşin hâlesi: yalnızca açıklıkta (dünya koordinatı: kamera kaydırması)
         if (this.area === 'yard' && this.fireLit) {
+            ctx.save();
+            ctx.translate(-camX, 0);
             drawFireGlow(ctx, this.frame, 0.6 + 0.8 * Math.min(1, tod));
+            ctx.restore();
         }
     }
 
@@ -777,7 +986,7 @@ export class CampScene {
             d.fillRect(x - r, y - r, r * 2, r * 2);
         };
         hole(this.player.x - camX, this.player.y - 30, 190, 0.9);
-        if (this.fireLit && this.area === 'yard') hole(FIRE_PIT.x, FIRE_PIT.y - 10, 230, 0.8);
+        if (this.fireLit && this.area === 'yard') hole(FIRE_PIT.x - camX, FIRE_PIT.y - 10, 230, 0.8);
         if (this.area === 'cabin') {
             // İçeride iki pencereden ay ışığı sızar
             for (const wx of [176, 788]) hole(wx, 120, 130, 0.35);

@@ -5,8 +5,8 @@
 
 import { PX, newCanvas, blk, dot, hash } from '../pixel/pixelDraw.js';
 import {
-    TRAIL, JUNCTIONS, trailCenter, CABIN, YARD_DOOR, FIRE_PIT, WOODPILE, CABIN_IN,
-    STOVE, TABLE, CHEST, SHELF_CRATE, PARTITIONS
+    TRAIL, JUNCTIONS, trailCenter, junctionArm, STUB_HALF, CABIN, YARD, YARD_DOOR, FIRE_PIT,
+    WOODPILE, BARREL, POND, CABIN_IN, STOVE, TABLE, CHEST, SHELF_CRATE, PARTITIONS
 } from './campLayout.js';
 
 const GRASS = ['#14532d', '#166534', '#15803d', '#177a39', '#1a8a42'];
@@ -40,17 +40,17 @@ function dirtCell(ctx, x, y, edge) {
     ctx.fillRect(Math.round(x / PX) * PX, Math.round(y / PX) * PX, PX, PX);
 }
 
-// Devrilmiş kütük (yan patikanın ucunda)
-function fallenLog(ctx, x, y, w) {
-    blk(ctx, x, y + PX * 5, w, PX, '#2a1a0c');
-    blk(ctx, x, y, w, PX * 5, WOOD.base);
-    blk(ctx, x, y, w, PX, WOOD.hi);
-    blk(ctx, x, y + PX * 4, w, PX, WOOD.lo);
-    for (let i = PX * 2; i < w - PX * 2; i += PX * 4) {
-        if (hash(i, y, 5) > 0.5) blk(ctx, x + i, y + PX * 2, PX * 2, PX, WOOD.lo);
+// Yan patikanın ucundaki dikey devrilmiş kütük
+function fallenLogV(ctx, x, y, h) {
+    blk(ctx, x + PX * 5, y, PX, h, '#2a1a0c');
+    blk(ctx, x, y, PX * 5, h, WOOD.base);
+    blk(ctx, x, y, PX, h, WOOD.hi);
+    blk(ctx, x + PX * 4, y, PX, h, WOOD.lo);
+    for (let i = PX * 2; i < h - PX * 2; i += PX * 4) {
+        if (hash(i, x, 5) > 0.5) blk(ctx, x + PX * 2, y + i, PX, PX * 2, WOOD.lo);
     }
-    blk(ctx, x - PX, y + PX, PX, PX * 3, '#b88a58');
-    blk(ctx, x + w, y + PX, PX, PX * 3, '#b88a58');
+    blk(ctx, x + PX, y - PX, PX * 3, PX, '#b88a58');
+    blk(ctx, x + PX, y + h, PX * 3, PX, '#b88a58');
 }
 
 function signpost(ctx, x, y) {
@@ -78,17 +78,26 @@ export function bakeTrailGround() {
             dirtCell(ctx, x, y, edge);
         }
     }
-    // Yan patikalar ve ucundaki kütük
+    // Yan patikalar: dikey bağlantı, yatay kol ve ucunda devrilmiş kütük
     for (const j of JUNCTIONS) {
-        const top = trailCenter(j.x) - TRAIL.halfH - j.len;
-        for (let y = top; y < trailCenter(j.x) - TRAIL.halfH + 12; y += PX) {
-            for (let x = j.x - 30; x < j.x + 30; x += PX) {
-                const edge = Math.min(x - (j.x - 30), (j.x + 30) - x) < 8;
+        const arm = junctionArm(j);
+        const half = STUB_HALF - 4;
+        for (let y = arm.cy - half; y < trailCenter(j.x) - TRAIL.halfH + 12; y += PX) {
+            for (let x = j.x - half; x < j.x + half; x += PX) {
+                const edge = Math.min(x - (j.x - half), (j.x + half) - x) < 8;
                 if (edge && hash(x, y, 63) < 0.4) continue;
                 dirtCell(ctx, x, y, edge);
             }
         }
-        fallenLog(ctx, j.x - 44, top - PX * 2, 88);
+        for (let x = arm.x0 + 4; x < arm.x1 - 4; x += PX) {
+            for (let y = arm.cy - half; y < arm.cy + half; y += PX) {
+                const edge = Math.min(y - (arm.cy - half), (arm.cy + half) - y) < 8;
+                if (edge && hash(x, y, 65) < 0.4) continue;
+                dirtCell(ctx, x, y, edge);
+            }
+        }
+        const endX = j.dir > 0 ? arm.x1 : arm.x0;
+        fallenLogV(ctx, endX - (j.dir > 0 ? PX * 3 : -PX * 0), arm.cy - 44, 88);
         signpost(ctx, j.x + 52, trailCenter(j.x) - TRAIL.halfH + 6);
     }
     // Düşmüş yapraklar, taşlar ve ayak izleri
@@ -105,11 +114,11 @@ export function bakeTrailGround() {
     return canvas;
 }
 
-// --- Açıklık zemini (kulübenin önü) ---
+// --- Açıklık zemini (kulübenin çevresi, 2400 geniş) ---
 export function bakeYardGround() {
-    const { canvas, ctx } = newCanvas(1000, 560);
-    grassField(ctx, 1000, 560, 5);
-    // Kulübenin önünde çiğnenmiş toprak, kapıdan ateş çukuruna ve odun yığınına iz
+    const { canvas, ctx } = newCanvas(YARD.w, 560);
+    grassField(ctx, YARD.w, 560, 5);
+    // Çiğnenmiş toprak lekeleri: kulübenin önü, ateş çukuru, odun yığını, patika başı
     const dirtAt = (x, y, rx, ry) => {
         for (let py = y - ry; py < y + ry; py += PX) {
             for (let px = x - rx; px < x + rx; px += PX) {
@@ -122,17 +131,156 @@ export function bakeYardGround() {
     dirtAt(YARD_DOOR.x, 330, 190, 66);
     dirtAt(FIRE_PIT.x, FIRE_PIT.y + 8, 80, 44);
     dirtAt(WOODPILE.x + 50, WOODPILE.y + 30, 80, 38);
-    // Patikaya çıkan iz (sol kenar)
     dirtAt(70, 440, 60, 40);
-    for (let i = 0; i < 160; i++) {
-        const x = hash(i, 1, 171) * 1000, y = 280 + hash(i, 2, 173) * 280;
+    dirtAt(BARREL.x + 24, BARREL.y + 70, 56, 30);
+    // Kulübeden iki yana giden toprak yol
+    for (let x = 150; x < YARD.w - 150; x += PX) {
+        const y = 392 + Math.sin(x / 150) * 10;
+        for (let py = y - 18; py < y + 18; py += PX) {
+            const edge = Math.min(py - (y - 18), (y + 18) - py) < 6;
+            if (hash(x, py, 93) < 0.35 || (edge && hash(x, py, 95) < 0.5)) continue;
+            dirtCell(ctx, x, py, edge);
+        }
+    }
+    drawPondBase(ctx);
+    for (let i = 0; i < 380; i++) {
+        const x = hash(i, 1, 171) * YARD.w, y = 280 + hash(i, 2, 173) * 280;
+        if (x > POND.x - 10 && x < POND.x + POND.w + 10 && y > POND.y - 10 && y < POND.y + POND.h + 10) continue;
         dot(ctx, x, y, LEAF[Math.floor(hash(i, 3, 175) * LEAF.length)]);
     }
-    // Odun kütüğü ve çipler
     for (let i = 0; i < 30; i++) {
         dot(ctx, WOODPILE.x + 20 + hash(i, 4, 177) * 120, WOODPILE.y + 40 + hash(i, 5, 179) * 22, '#c9a06a');
     }
     return canvas;
+}
+
+// Gölet: kıyıda çamur ve taş, suyun içi mavi bantlı
+function drawPondBase(ctx) {
+    const { x, y, w, h } = POND;
+    const cx = x + w / 2, cy = y + h / 2;
+    for (let py = y - 16; py < y + h + 16; py += PX) {
+        for (let px = x - 20; px < x + w + 20; px += PX) {
+            const d = Math.hypot((px - cx) / (w / 2), (py - cy) / (h / 2));
+            if (d > 1.18 - hash(px, py, 97) * 0.12) continue;
+            if (d > 1.0) {
+                ctx.fillStyle = hash(px, py, 99) < 0.5 ? '#5a3f26' : '#6e4e30';
+                ctx.fillRect(px, py, PX, PX);
+            } else {
+                const band = Math.floor((py - y) / 12) % 2;
+                ctx.fillStyle = d > 0.85 ? '#2c6e86' : (band ? '#2f84a2' : '#3a93b2');
+                ctx.fillRect(px, py, PX, PX);
+            }
+        }
+    }
+    // Kıyı taşları
+    for (let i = 0; i < 16; i++) {
+        const a = hash(i, 1, 101) * Math.PI * 2;
+        const rx = cx + Math.cos(a) * (w / 2 + 6), ry = cy + Math.sin(a) * (h / 2 + 4);
+        blk(ctx, rx - PX, ry - PX, PX * 3, PX * 2, hash(i, 2, 103) < 0.5 ? '#7a7c84' : '#9a9ca4');
+    }
+}
+
+// Suyun üstünde dalgacıklar ve olta şamandırası (her karede)
+export function drawPondLife(ctx, frame, bobber = null) {
+    const { x, y, w, h } = POND;
+    const cx = x + w / 2, cy = y + h / 2;
+    ctx.fillStyle = '#bfe4f0';
+    for (let i = 0; i < 9; i++) {
+        const t = (frame * 0.4 + i * 37) % 120;
+        const px = cx + Math.cos(i * 2.1) * (w * 0.34), py = cy + Math.sin(i * 1.7) * (h * 0.3);
+        const r = (t / 120) * 10;
+        ctx.globalAlpha = 1 - t / 120;
+        ctx.fillRect(Math.round((px - r) / PX) * PX, Math.round(py / PX) * PX, Math.max(PX, Math.round(r * 2 / PX) * PX), PX);
+    }
+    ctx.globalAlpha = 1;
+    if (bobber) {
+        const bob = Math.round(Math.sin(frame * 0.12) * 2 / PX) * PX;
+        blk(ctx, bobber.x, bobber.y + bob, PX * 2, PX * 2, '#d8431c');
+        blk(ctx, bobber.x, bobber.y + bob, PX * 2, PX, '#f4f1e4');
+    }
+}
+
+// Yeşil çalı; meyveleri toplanınca bir daha görünmez
+export function drawBush(ctx, x, y, berries) {
+    ctx.globalAlpha = 0.3;
+    blk(ctx, x - 24, y + 14, 52, PX * 2, '#000');
+    ctx.globalAlpha = 1;
+    const tones = ['#0a3d1d', '#14532d', '#1c7a3c', '#2a9e52'];
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 6; c++) {
+            const bx = x - 24 + c * PX * 2 + (r % 2) * PX, by = y - 12 + r * PX * 2;
+            blk(ctx, bx, by, PX * 3, PX * 3, tones[(r + c) % 3 + (r === 0 ? 1 : 0)]);
+        }
+    }
+    blk(ctx, x - 22, y - 14, 44, PX, '#3fbf6a');
+    if (berries) {
+        for (let i = 0; i < 7; i++) {
+            blk(ctx, x - 20 + hash(i, 1, 3) * 36, y - 10 + hash(i, 2, 5) * 18, PX, PX, i % 2 ? '#7a1d6e' : '#a8328f');
+        }
+    }
+}
+
+export function drawBarrel(ctx, filled) {
+    const { x, y, w, h } = BARREL;
+    ctx.globalAlpha = 0.3;
+    blk(ctx, x + PX, y + h - PX, w, PX * 2, '#000');
+    ctx.globalAlpha = 1;
+    blk(ctx, x + PX, y, w - PX * 2, h, WOOD.base);
+    blk(ctx, x, y + PX * 3, w, h - PX * 6, WOOD.base);
+    blk(ctx, x, y + PX * 3, PX, h - PX * 6, WOOD.hi);
+    blk(ctx, x + w - PX, y + PX * 3, PX, h - PX * 6, WOOD.lo);
+    for (const by of [y + PX * 3, y + h - PX * 5]) blk(ctx, x, by, w, PX * 2, '#3a3c44');
+    blk(ctx, x + PX, y, w - PX * 2, PX * 2, filled ? '#3a93b2' : '#2a1a0c');
+    blk(ctx, x + PX, y, w - PX * 2, PX, filled ? '#8fd0e6' : '#523520');
+}
+
+// Harry'nin elindeki kova (su taşırken)
+export function drawBucket(ctx, x, y) {
+    blk(ctx, x - PX * 2, y, PX * 5, PX * 4, '#8a6a42');
+    blk(ctx, x - PX * 2, y, PX * 5, PX, '#3a93b2');
+    blk(ctx, x - PX * 2, y + PX * 3, PX * 5, PX, '#3a2414');
+    blk(ctx, x - PX, y - PX * 2, PX * 3, PX, '#3a3c44');
+}
+
+// Ateşin üstündeki kazan: yemek pişerken buhar çıkar
+export function drawPot(ctx, x, y, frame) {
+    blk(ctx, x - 20, y - 22, 40, 22, '#2a2c32');
+    blk(ctx, x - 20, y - 22, 40, PX, '#555862');
+    blk(ctx, x - 16, y - 20, 32, PX * 2, '#c97a3a');
+    blk(ctx, x - 24, y - 20, PX, PX * 3, '#2a2c32');
+    blk(ctx, x + 20, y - 20, PX, PX * 3, '#2a2c32');
+    for (let i = 0; i < 4; i++) {
+        const t = ((frame * 0.7 + i * 30) % 80) / 80;
+        ctx.globalAlpha = 0.5 * (1 - t);
+        blk(ctx, x - 12 + i * 8 + Math.sin(frame * 0.1 + i) * 3, y - 28 - t * 40, PX * 2, PX * 2, '#e4e4e8');
+    }
+    ctx.globalAlpha = 1;
+}
+
+// Devrilmiş ağacın kütüğü (dipte kalan çıkıntı)
+export function drawStump(ctx, x, y) {
+    blk(ctx, x - PX * 4, y - PX * 3, PX * 8, PX * 4, WOOD.lo);
+    blk(ctx, x - PX * 4, y - PX * 4, PX * 8, PX * 2, '#c9a06a');
+    blk(ctx, x - PX * 2, y - PX * 4, PX * 4, PX, '#8a5a30');
+    blk(ctx, x - PX * 5, y - PX * 2, PX, PX * 3, WOOD.dark);
+    blk(ctx, x + PX * 4, y - PX * 2, PX, PX * 3, WOOD.dark);
+}
+
+// Yere uzanmış gövde (dir: 1 sağa, -1 sola); taç birkaç dal olarak kalır
+export function drawLyingTrunk(ctx, x, y, dir) {
+    const len = 150;
+    const x0 = dir > 0 ? x + PX * 4 : x - PX * 4 - len;
+    blk(ctx, x0, y - PX * 4, len, PX * 5, WOOD.base);
+    blk(ctx, x0, y - PX * 4, len, PX, WOOD.hi);
+    blk(ctx, x0, y, len, PX, WOOD.dark);
+    for (let i = PX * 3; i < len - PX * 3; i += PX * 5) {
+        if (hash(i, x, 7) > 0.45) blk(ctx, x0 + i, y - PX * 2, PX * 2, PX, WOOD.lo);
+    }
+    // Dallar ve yapraklar uçta
+    const ex = dir > 0 ? x0 + len : x0 - PX * 14;
+    for (let i = 0; i < 24; i++) {
+        blk(ctx, ex + hash(i, 1, 5) * PX * 14, y - PX * 8 + hash(i, 2, 7) * PX * 8, PX * 2, PX * 2, hash(i, 3, 9) < 0.5 ? '#1c7a3c' : '#14532d');
+    }
 }
 
 // --- Kulübenin dış yüzü ---

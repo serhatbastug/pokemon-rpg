@@ -1294,7 +1294,8 @@ async function main() {
     check('CARPI savas sonunda yeniden baslatiyor',
         restarted.kapandi && restarted.calisiyor && restarted.can > 0, JSON.stringify(restarted));
 
-    // Avci kulubesi bolumu: patikadan acikliga, kulube, yataklar, gunler, gece, Fred yok
+    // Avci kulubesi bolumu: patikadan acikliga, kulube, yataklar, gorevler, gece, Fred yok
+    const camp = await import('../src/adventure/campLayout.js');
     await page.evaluate(() => {
         window.__menu.stop();
         for (const id of ['menu-screen', 'comic-screen', 'selection-screen', 'battle-screen']) document.getElementById(id).classList.add('hidden');
@@ -1313,7 +1314,11 @@ async function main() {
         }
     };
     const campAt = (x, y) => page.evaluate((a) => { const c = window.__camp; c.player.x = a[0]; c.player.y = a[1]; c.action(); }, [x, y]);
-    const campState = () => page.evaluate(() => ({ area: window.__camp.area, phase: window.__camp.phase, day: window.__camp.day, wood: window.__camp.wood }));
+    const campState = () => page.evaluate(() => {
+        const c = window.__camp;
+        return { area: c.area, phase: c.phase, day: c.day, felled: c.felled.size, tasks: c.tasks && Object.fromEntries(Object.entries(c.tasks).map(([k, t]) => [k, t.n])) };
+    });
+    const standAt = (t) => camp.treeStand(t);
     await wait(1200);
     await page.evaluate(() => { window.__camp.player.x = 760; window.__camp.player.y = 360; });
     const campTalked = await page.waitForFunction(() => window.__camp.dialogue.active, { timeout: 5000 }).then(() => true, () => false);
@@ -1323,7 +1328,7 @@ async function main() {
     await wait(300); await campFlush(); await wait(300);
     const atYard = await campState();
     check('Kulube: patikanin sonunda acikliga geciliyor', atYard.area === 'yard' && atYard.phase === 'toCabin', JSON.stringify(atYard));
-    await campAt(500, 300); await wait(300); await campFlush(); await wait(300);
+    await campAt(camp.YARD_DOOR.x, camp.YARD_DOOR.y + 4); await wait(300); await campFlush(); await wait(300);
     check('Kulube: kapidan iceri girilince yataklari hazirla gorevi', (await campState()).phase === 'beds');
     await shot('00f-kulube-ic');
     await campAt(130, 310); await campFlush();
@@ -1331,20 +1336,50 @@ async function main() {
     check('Kulube: iki yatak hazirlaninca uyku gorevi', (await campState()).phase === 'sleep');
     await campAt(870, 310); await campFlush(); await wait(300);
     const day2 = await campState();
-    check('Kulube: uyuyunca 2. gun, odun gorevi', day2.day === 2 && day2.phase === 'wood', JSON.stringify(day2));
+    const fredWake = await page.evaluate(() => ({ x: window.__camp.fred.x, y: window.__camp.fred.y, v: window.__camp.fred.visible }));
+    check('Kulube: 2. gun gorevler ve Fred yataginin yaninda uyaniyor',
+        day2.day === 2 && day2.phase === 'tasks' && day2.area === 'cabin' && fredWake.v
+            && Math.abs(fredWake.x - camp.FRED_WAKE.x) < 4 && Math.abs(fredWake.y - camp.FRED_WAKE.y) < 4,
+        JSON.stringify({ day2, fredWake }));
     await campAt(500, 500); await campFlush(); await wait(300);
-    for (const [x, y] of [[118, 500], [330, 530], [636, 520]]) { await campAt(x, y); await wait(900); await campFlush(); }
-    await wait(1200);
+    // Su: golet -> fici
+    await campAt(camp.POND_SPOT.x, camp.POND_SPOT.y); await campFlush();
+    check('Kulube: golden su alinca kova elde', await page.evaluate(() => window.__camp.carry === 'water'));
+    await campAt(camp.BARREL_SPOT.x, camp.BARREL_SPOT.y); await campFlush();
+    // Odun: uc agac Harry, biri Fred
+    for (const i of [0, 1, 2]) { const p = standAt(camp.CHOP_TREES[i]); await campAt(p.x, p.y); await wait(1000); await campFlush(); }
+    await shot('00f2-agac-devrildi');
+    await page.evaluate(() => { const j = window.__camp.fredJob; j.hits = 11; j.cd = 1; });
+    await page.waitForFunction(() => window.__camp.fredJob.done, { timeout: 6000 }).catch(() => {});
+    await wait(1500); await campFlush(); await wait(1500);
     const evening = await campState();
-    check('Kulube: 3 odun kesilince aksam, ates gorevi', evening.phase === 'fire' && evening.wood === 3, JSON.stringify(evening));
-    await campAt(790, 460); await campFlush(); await wait(300);
+    check('Kulube: odun (Fred dahil 4) + su bitince aksam, ates gorevi',
+        evening.phase === 'fire' && evening.felled === 4 && evening.tasks.wood === 4 && evening.tasks.water === 1, JSON.stringify(evening));
+    await campAt(camp.FIRE_PIT.x, camp.FIRE_PIT.y + 40); await campFlush(); await wait(300);
     check('Kulube: ates yakilinca eve girip uyuma gorevi', (await campState()).phase === 'toBed');
     await shot('00g-kulube-ates');
+    await campAt(camp.YARD_DOOR.x, camp.YARD_DOOR.y + 4); await campFlush(); await wait(300);
+    await campAt(870, 310); await campFlush(); await wait(300);
+    const day3 = await campState();
+    check('Kulube: 3. gun odun ve meyve gorevleri', day3.day === 3 && day3.phase === 'tasks' && day3.tasks.wood === 0 && day3.tasks.berries === 0, JSON.stringify(day3));
+    await campAt(500, 500); await campFlush(); await wait(300);
+    for (const i of camp.BUSHES.keys()) {
+        if (i >= 3) break;
+        const b = camp.BUSHES[i]; await campAt(b.x, b.y + 26); await campFlush();
+    }
+    for (const i of [3, 5, 6, 7, 8]) { const p = standAt(camp.CHOP_TREES[i]); await campAt(p.x, p.y); await wait(1000); await campFlush(); }
+    await wait(1500); await campFlush(); await wait(1500);
+    check('Kulube: 3. gun 5 odun + 3 meyve bitince aksam', (await campState()).phase === 'fire');
+    await campAt(camp.FIRE_PIT.x, camp.FIRE_PIT.y + 40); await campFlush(); await wait(300);
+    check('Kulube: 3. gun ates sonrasi yemek pisirme gorevi', (await campState()).phase === 'cook');
+    await campAt(camp.FIRE_PIT.x, camp.FIRE_PIT.y + 40); await campFlush(); await wait(300);
+    await shot('00h-kulube-yemek');
+    check('Kulube: yemek pisince uyuma gorevi', (await campState()).phase === 'toBed');
     await page.evaluate(() => window.__camp.jump('night'));
     await wait(400);
-    for (const [x, y] of [[210, 396], [790, 460], [96, 440]]) { await campAt(x, y); await campFlush(); }
+    for (const sp of camp.SEARCH_SPOTS) { await campAt(sp.x, sp.y); await campFlush(); }
     check('Kulube: gece uc yer aranir, Fred yok, odasina git gorevi', (await campState()).phase === 'fredRoom');
-    await campAt(500, 300); await wait(300); await campFlush(); await wait(300);
+    await campAt(camp.YARD_DOOR.x, camp.YARD_DOOR.y + 4); await wait(300); await campFlush(); await wait(300);
     await campAt(130, 310); await wait(400);
     await page.evaluate(() => { const c = window.__camp; while (c.dialogue.active) c.dialogue.advance(); });
     for (let i = 0; i < 6; i++) { await page.evaluate(() => { const c = window.__camp; if (c.dialogue.active) c.dialogue.advance(); }); await wait(200); }

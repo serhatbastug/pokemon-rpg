@@ -872,9 +872,13 @@ check('kulübe: patika baştan sona yürünebilir', (() => {
     }
     return true;
 })());
-check('kulübe: yan patikalar yürünebilir ve ucu kütükle kapalı', camp.JUNCTIONS.every(j => {
-    const top = camp.trailCenter(j.x) - camp.TRAIL.halfH - j.len;
-    return camp.trailWalkable(j.x, top + 24) && !camp.trailWalkable(j.x, top - 12);
+check('kulübe: yan patikalar uzun (bağlantı + kol), yürünebilir ve ucu kütükle kapalı', camp.JUNCTIONS.every(j => {
+    const arm = camp.junctionArm(j);
+    const endX = j.dir > 0 ? arm.x1 : arm.x0;
+    return arm.x1 - arm.x0 >= 300
+        && camp.trailWalkable(j.x, arm.cy + 8)
+        && camp.trailWalkable(endX - j.dir * 24, arm.cy)
+        && !camp.trailWalkable(endX + j.dir * 14, arm.cy);
 }));
 
 // Bir alanda başlangıçtan hedeflere yürünebiliyor mu (ızgara taraması)
@@ -889,7 +893,7 @@ function campReach(area, start, targets, r = 60) {
         targets.forEach((t, i) => { if (Math.hypot(x - t.x, y - t.y) <= (t.r || r)) found[i] = true; });
         for (const [dx, dy] of [[STEP, 0], [-STEP, 0], [0, STEP], [0, -STEP]]) {
             const nx = x + dx, ny = y + dy;
-            if (nx < 0 || ny < 0 || nx > 1000 || ny > 560 || seen.has(key(nx, ny)) || camp.blocked(area, nx, ny)) continue;
+            if (nx < 0 || ny < 0 || nx > 2400 || ny > 560 || seen.has(key(nx, ny)) || camp.blocked(area, nx, ny)) continue;
             seen.add(key(nx, ny));
             queue.push([nx, ny]);
         }
@@ -902,16 +906,22 @@ const yardTargets = [
     { ...camp.YARD_DOOR },
     { x: camp.FIRE_PIT.x, y: camp.FIRE_PIT.y + 30, r: 78 },
     ...camp.SEARCH_SPOTS,
-    ...camp.CHOP_TREES.map(t => ({ x: t.x, y: t.y + 14, r: 62 }))
+    ...camp.CHOP_TREES.map(t => ({ ...camp.treeStand(t), r: 66 })),
+    ...camp.BUSHES.map(b => ({ x: b.x, y: b.y + 26, r: 58 })),
+    camp.POND_SPOT, camp.BARREL_SPOT, camp.FRED_FISH
 ];
 const yardFound = campReach('yard', yardStart, yardTargets);
-check('kulübe: açıklıkta kapı, ateş, arama noktaları ve bütün odun ağaçlarına varılıyor',
+check('kulübe: açıklıkta kapı, ateş, arama, odun ağaçları, çalılar, gölet, fıçı ve oltaya varılıyor',
     yardFound.every(Boolean), JSON.stringify(yardFound));
 const cabinFound = campReach('cabin', { x: camp.CABIN_EXIT.x, y: camp.CABIN_EXIT.y - 40 }, [
     camp.SPOTS_IN.fredBed, camp.SPOTS_IN.harryBed, camp.CABIN_EXIT
 ]);
 check('kulübe: içeride iki yatağa ve çıkışa varılıyor', cabinFound.every(Boolean), JSON.stringify(cabinFound));
-check('kulübe: odun hedefi günlere yetiyor', camp.CHOP_TREES.length >= Math.max(...Object.values(campScript.WOOD_GOAL)));
+const woodNeed = Object.values(campScript.DAY_TASKS).reduce((a, t) => a + (t.wood || 0), 0);
+check('kulübe: ağaç sayısı iki günün odununa yetiyor (Fred dahil)', camp.CHOP_TREES.length >= woodNeed, camp.CHOP_TREES.length + ' >= ' + woodNeed);
+check('kulübe: kırılan ağaçlar süs ağaçlarıyla aynı boyda (tall/huge)', camp.CHOP_TREES.every(t => t.size === 'tall' || t.size === 'huge'));
+check('kulübe: açıklık 2 ekran genişliğinden büyük', camp.YARD.w >= 2000);
+check('kulübe: meyve hedefi için yeterli çalı', camp.BUSHES.length >= (campScript.DAY_TASKS[3].berries || 0));
 
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);

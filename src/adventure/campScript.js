@@ -7,8 +7,13 @@
 // (2. ve 3. günde) odun topla, akşam ateş yak, uyu -> gece uyanış: Fred'i ara ->
 // açıklıkta hiçbir yerde yok -> Fred'in odası boş.
 
-// Odun hedefi: gün -> kesilecek ağaç sayısı
-export const WOOD_GOAL = { 2: 3, 3: 4 };
+// Günlük görevler: gün -> { görev: hedef }. Odun hedefine Fred'in devirdiği ağaç da
+// sayılır (2. gün 4 = Harry 3 + Fred 1; 3. gün 5 = Harry 4 + Fred 1).
+export const DAY_TASKS = {
+    2: { wood: 4, water: 1 },
+    3: { wood: 5, berries: 3 }
+};
+export const TASK_NAMES = { wood: 'ODUN', water: 'SU', berries: 'MEYVE' };
 export const LAST_DAY = 3;
 
 export const OBJECTIVES = {
@@ -16,8 +21,9 @@ export const OBJECTIVES = {
     toCabin: 'KULÜBEYE GİR',
     beds: 'YATAKLARI HAZIRLA',
     sleep: 'YATAĞINA GİR VE UYU',
-    wood: 'ODUN TOPLA',
+    tasks: 'GÜNLÜK İŞLER',
     fire: 'ATEŞ YAK',
+    cook: 'YEMEK PİŞİR',
     toBed: 'EVE GİR VE UYU',
     search: "FRED'İ ARA",
     fredRoom: "FRED'İN ODASINA GİT"
@@ -25,7 +31,8 @@ export const OBJECTIVES = {
 
 export const LABELS = {
     enter: 'GİR', exit: 'ÇIK', bed: 'YATAK HAZIRLA', sleep: 'UYU', chop: 'ODUN KES',
-    fire: 'ATEŞ YAK', search: 'ARA', look: 'BAK', talk: 'KONUŞ'
+    fire: 'ATEŞ YAK', search: 'ARA', look: 'BAK', talk: 'KONUŞ',
+    water: 'SU AL', pour: 'SUYU DÖK', berry: 'MEYVE TOPLA', cook: 'YEMEK PİŞİR'
 };
 
 export const CAPTIONS = {
@@ -70,8 +77,9 @@ export const LINES = {
     ],
     // 2. gün
     day2: [
-        { speaker: 'biz', text: 'Günaydın. Önce odun toplamamız lazım.' },
-        { speaker: 'arkadas', text: 'Ben etrafa göz atarım. Balta odun yığınının yanında.' }
+        { speaker: 'biz', text: 'Günaydın Fred.' },
+        { speaker: 'arkadas', text: 'Günaydın. Bugün hem odun hem su lazım. Ben uzaktaki bir ağacı devireyim.' },
+        { speaker: 'biz', text: 'Ben de suyu getiririm. Sonra odunu bölüşürüz.' }
     ],
     chopFirst: [{ speaker: 'biz', text: 'Balta eski ama iş görür.' }],
     woodDone: [
@@ -85,11 +93,25 @@ export const LINES = {
     // 3. gün
     day3: [
         { speaker: 'arkadas', text: 'Dün gece iyi uyudum. Sanki hiçbir şey olmamış gibi.' },
-        { speaker: 'biz', text: 'Bir iki gün daha buradayız. Yine odun lazım.' }
+        { speaker: 'arkadas', text: 'Bugün gölde balık tutacağım. Sen odun kes, biraz da yemiş topla.' },
+        { speaker: 'biz', text: 'Olur. Akşam hep birlikte yemek yeriz.' }
     ],
     fireLit3: [
         { speaker: 'arkadas', text: 'Harry... Sence diğerleri iyi mi?' },
         { speaker: 'biz', text: 'Umarım. Şimdilik biz hayattayız.' }
+    ],
+    // Yeni görevler
+    waterTake: [{ speaker: 'biz', text: 'Su soğuk ve temiz. Fıçıya götüreyim.' }],
+    waterPour: [{ speaker: 'biz', text: 'Fıçı doldu. Birkaç gün yeter.' }],
+    berryFirst: [{ speaker: 'biz', text: 'Bunlar yenir gibi. Birkaç tane toplayayım.' }],
+    fredFelled: [{ speaker: 'arkadas', text: 'Devrildi! Sen de kendi payını kes Harry.' }],
+    fredJobChop: [{ speaker: 'arkadas', text: 'Şu ağaç benim. Tam sağlam bir gövde.' }],
+    fredJobChopDone: [{ speaker: 'arkadas', text: 'Dev ağacı indirdim. Sıra sende.' }],
+    fredJobFish: [{ speaker: 'arkadas', text: 'Göl balık dolu. Akşama yemek çıkar, görürsün.' }],
+    cook: [
+        { speaker: 'arkadas', text: 'Bir balık yakaladım. Yemişlerle güzel bir çorba olur.' },
+        { speaker: 'biz', text: 'Uzun zamandır sıcak yemek yemedik. Kokusu bile iyi.' },
+        { speaker: 'arkadas', text: 'Afiyet olsun Harry.' }
     ],
     // Fred ile konuşma (gündüz, isteğe bağlı)
     fredIdle: [

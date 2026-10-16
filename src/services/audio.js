@@ -266,6 +266,7 @@ export function setMusicEnabled(value) {
     musicEnabled = value;
     try { localStorage.setItem('musicOff', value ? '0' : '1'); } catch (e) { /* önemli değil */ }
     if (musicGain) musicGain.gain.value = value ? 0.10 : 0;
+    if (fileBus) fileBus.gain.value = value ? (FILE_TRACKS[currentTrack]?.volume ?? 0.5) : 0;
 }
 
 export function isMusicEnabled() {
@@ -279,11 +280,77 @@ if (typeof window !== 'undefined') {
     });
 }
 
+// Telifsiz (CC0) gerçek müzik dosyaları: assets/audio/ (kaynaklar CREDITS.md'de).
+// Dosyası olan parçalar bunlarla çalar; yüklenemezse yukarıdaki sentez müzik
+// devreye girer.
+const FILE_TRACKS = {
+    shadow: { src: 'assets/audio/cold_silence.ogg', volume: 0.55 },
+    ruin: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
+    forest: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
+    boss: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
+    siege: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
+    sewer: { src: 'assets/audio/Chase.ogg', volume: 0.45 }
+};
+
+let fileAudio = null;
+let fileNode = null;
+let fileBus = null;
+
+function stopFileMusic() {
+    if (!fileAudio) return;
+    const old = fileAudio;
+    fileAudio = null;
+    old.pause();
+}
+
+function playFileMusic(name, def) {
+    const context = ensureContext();
+    if (!context || typeof Audio === 'undefined') return false;
+    if (!fileBus) {
+        fileBus = context.createGain();
+        fileBus.connect(master);
+    }
+    fileBus.gain.value = musicEnabled ? def.volume : 0;
+    const audio = new Audio(def.src);
+    audio.loop = true;
+    audio.crossOrigin = 'anonymous';
+    fileAudio = audio;
+    audio.addEventListener('error', () => {
+        // Dosya yoksa/bozuksa sentez müziğe dön
+        if (fileAudio === audio && currentTrack === name) {
+            fileAudio = null;
+            currentTrack = null;
+            playSynthMusic(name);
+        }
+    });
+    try {
+        const node = context.createMediaElementSource(audio);
+        node.connect(fileBus);
+        fileNode = node;
+    } catch (e) {
+        return false;
+    }
+    audio.play().catch(() => {});
+    return true;
+}
+
 export function playMusic(name) {
     if (currentTrack === name) return;
     stopMusic();
+    if (!ensureContext() || !enabled) return;
+    const def = FILE_TRACKS[name];
+    if (def) {
+        currentTrack = name;
+        if (playFileMusic(name, def)) return;
+        currentTrack = null;
+    }
+    playSynthMusic(name);
+}
+
+function playSynthMusic(name) {
+    if (currentTrack === name) return;
     const track = TRACKS[name];
-    if (!track || !ensureContext() || !enabled) return;
+    if (!track) return;
 
     currentTrack = name;
     const phrase = buildPhrase(track, name);
@@ -329,6 +396,7 @@ function blipMusic(freq, type, duration, volume) {
 }
 
 export function stopMusic() {
+    stopFileMusic();
     if (musicTimer) clearInterval(musicTimer);
     musicTimer = null;
     currentTrack = null;

@@ -288,7 +288,13 @@ if (typeof window !== 'undefined') {
 const FILE_TRACKS = {
     shadow: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.26 },
     ruin: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
-    forest: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
+    forest: { src: 'assets/audio/a-path-somewhere.ogg', volume: 1.1 },
+    // Gece sahnesi (oynanış 2. bölüm)
+    night: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
+    // Çizgi roman 5-7: her bölüm başka parça, art arda aynısı çalmasın
+    week: { src: 'assets/audio/a-path-somewhere.ogg', volume: 1.1 },
+    experiment: { src: 'assets/audio/suspicious-loop.ogg', volume: 0.85 },
+    pill: { src: 'assets/audio/un-understandable.ogg', volume: 1.7 },
     // Ana menü ve araba sürüşü aynı ailenin parçaları (aynı ses dünyası)
     town: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
     siege: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },

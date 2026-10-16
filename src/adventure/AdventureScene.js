@@ -159,7 +159,7 @@ export class AdventureScene {
         if (entry === 'o-gece') this.beginNight();
         this.running = true;
         this.ctx.imageSmoothingEnabled = false;
-        playMusic('shadow');
+        playMusic(entry === 'o-gece' ? 'night' : 'shadow');
 
         if (this.rafId) cancelAnimationFrame(this.rafId);
         const stepMs = 1000 / FRAME_RATE;

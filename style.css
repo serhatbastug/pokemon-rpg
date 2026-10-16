@@ -844,6 +844,13 @@ canvas {
     transition: all 0.3s ease;
 }
 
+/* İkinci düğme: yeniden oynamaktan daha az öne çıkar */
+.gameover-menu-btn {
+    margin-top: 0.8rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
 .restart-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);

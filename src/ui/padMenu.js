@@ -20,13 +20,14 @@ const REPEAT_NEXT = 9;
 const SCROLL_SPEED = 16;
 
 export class PadMenu {
-    constructor({ gamepad, characterSelect, onStart, onStartAi, onBack, onRestart }) {
+    constructor({ gamepad, characterSelect, onStart, onStartAi, onBack, onRestart, onMenu }) {
         this.gamepad = gamepad;
         this.select = characterSelect;
         this.onStart = onStart;
         this.onStartAi = onStartAi;
         this.onBack = onBack;
         this.onRestart = onRestart;
+        this.onMenu = onMenu;
 
         this.mode = null;     // null | 'selection' | 'gameover'
         this.rafId = null;
@@ -80,6 +81,7 @@ export class PadMenu {
 
         if (this.mode === 'gameover') {
             if (button === 'cross') this.onRestart?.();
+            else if (button === 'circle') this.onMenu?.();
             return;
         }
 

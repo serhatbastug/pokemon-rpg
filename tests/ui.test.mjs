@@ -1468,6 +1468,27 @@ async function main() {
     check('Kulube: Fred odasinda yok, bolum sona eriyor', (await campState()).phase === 'ending');
     await page.evaluate(() => { window.__camp.stop(); });
 
+    // SAVAS BITTI penceresinde ANA MENUYE DON dugmesi: menuyu acar, pencereyi kapatir
+    await page.evaluate(() => {
+        const { FIGHTERS } = window.__fighters;
+        window.__menu.stop();
+        document.getElementById('battle-screen').classList.remove('hidden');
+        window.__game.start(FIGHTERS[0], FIGHTERS[1]);
+        window.__game.endGame(1);
+    });
+    await wait(300);
+    const gameoverShown = await page.evaluate(() => !document.getElementById('gameover-screen').classList.contains('hidden'));
+    await shot('03d-savas-bitti');
+    await page.click('#gameover-menu-btn');
+    await wait(400);
+    const backToMain = await page.evaluate(() => ({
+        gameover: !document.getElementById('gameover-screen').classList.contains('hidden'),
+        menu: window.__menu.running,
+        menuScreen: !document.getElementById('menu-screen').classList.contains('hidden')
+    }));
+    check('Savas bitince ANA MENUYE DON dugmesi ana menuyu aciyor',
+        gameoverShown && !backToMain.gameover && backToMain.menu && backToMain.menuScreen, JSON.stringify({ gameoverShown, backToMain }));
+
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));
 

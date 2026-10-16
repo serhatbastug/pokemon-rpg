@@ -43,7 +43,8 @@ const padMenu = new PadMenu({
     onStart: () => document.getElementById('start-battle-btn').click(),
     onStartAi: () => document.getElementById('start-ai-btn').click(),
     onBack: () => returnToMenu(),
-    onRestart: () => document.getElementById('restart-btn').click()
+    onRestart: () => document.getElementById('restart-btn').click(),
+    onMenu: () => document.getElementById('gameover-menu-btn').click()
 });
 
 const game = new Game({
@@ -275,6 +276,17 @@ function startMatch(ai) {
 
 document.getElementById('start-battle-btn').addEventListener('click', () => startMatch(null));
 document.getElementById('start-ai-btn').addEventListener('click', () => startMatch(aiLevelKey));
+
+// SAVAŞ BİTTİ penceresinden ana menüye dön (Esc de aynı işi yapar)
+document.getElementById('gameover-menu-btn').addEventListener('click', () => {
+    hideGameOver();
+    returnToMenu();
+});
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && !document.getElementById('gameover-screen').classList.contains('hidden')) {
+        document.getElementById('gameover-menu-btn').click();
+    }
+});
 
 document.getElementById('restart-btn').addEventListener('click', () => {
     hideGameOver();

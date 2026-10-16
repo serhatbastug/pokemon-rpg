@@ -284,8 +284,9 @@ if (typeof window !== 'undefined') {
 // Dosyası olan parçalar bunlarla çalar; yüklenemezse yukarıdaki sentez müzik
 // devreye girer.
 const FILE_TRACKS = {
-    ruin: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
-    forest: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
+    shadow: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.5 },
+    ruin: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.5 },
+    forest: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.5 },
     boss: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
     siege: { src: 'assets/audio/Chase.ogg', volume: 0.45 },
     sewer: { src: 'assets/audio/Chase.ogg', volume: 0.45 }

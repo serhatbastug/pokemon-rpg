@@ -763,3 +763,20 @@ export function drawConsole(ctx, state, frame) {
         ctx.globalAlpha = 1;
     }
 }
+
+// Kapının yanındaki İMHA butonu: duvarda kırmızı kapaklı bir pano. pressed
+// 0..1: basılınca kapak açılır ve ışık yanıp söner.
+export const DESTRUCT_BUTTON = { x: 128, y: 52, w: 28, h: 44 };
+
+export function drawDestructButton(ctx, pressed, frame) {
+    const { x, y, w, h } = DESTRUCT_BUTTON;
+    blk(ctx, x - PX, y - PX, w + PX * 2, h + PX * 2, '#2a2a2a');
+    blk(ctx, x, y, w, h, '#d8b030');
+    blk(ctx, x, y, w, PX, '#f0d060');
+    blk(ctx, x + PX, y + PX * 2, w - PX * 2, h - PX * 3, '#3a3f44');
+    const blink = pressed > 0 && Math.floor(frame / 8) % 2 === 0;
+    const pushed = pressed > 0 ? PX / 2 : 0;
+    blk(ctx, x + PX * 2, y + PX * 3 + pushed, w - PX * 4, w - PX * 4, blink ? '#ff8a80' : '#c8322e');
+    blk(ctx, x + PX * 2, y + PX * 3 + pushed, w - PX * 4, PX / 2, '#ff9a90');
+    drawPixelText(ctx, 'İMHA', x + 2, y + h - PX * 4, { scale: 1, color: '#2a2a2a' });
+}

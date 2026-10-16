@@ -30,7 +30,7 @@ import { drawPortrait, PORTRAIT } from './portraits.js';
 import { virusSprite } from '../game/fighterArt.js';
 import {
     bakeLab, drawDoor, drawAnnexDoor, drawAnnexCover, drawCellDoor, drawConsole, drawSample,
-    drawBrokenWall, drawBattery
+    drawBrokenWall, drawBattery, drawDestructButton
 } from './labArt.js';
 import {
     PX, VIEW, START, NPCS, SPOTS, PLAYER_SPEED, PLAYER_SCALE, VIRUS_SCALE, CELL_INSIDE,
@@ -140,6 +140,8 @@ export class AdventureScene {
         this.aim = 0;                // fenerin yönü (radyan)
         this.moveAngle = 0;
 
+        this.buttonPressed = 0;      // imha butonu
+        this.collapse = null;        // laboratuvarın çöküşü
         this.phase = 'talkFred';
         this.overlay = null;
         this.seq = null;
@@ -147,9 +149,12 @@ export class AdventureScene {
         this.scan = null;
     }
 
-    start() {
+    // entry: 'kapidaki-ses' (baştan) ya da 'o-gece' (kilitten sonraki gece bölümü)
+    start(entry = 'kapidaki-ses') {
         if (!this.baked) this.baked = bakeLab();
         this.reset();
+        this.entry = entry;
+        if (entry === 'o-gece') this.beginNight();
         this.running = true;
         this.ctx.imageSmoothingEnabled = false;
         playMusic('shadow');
@@ -171,6 +176,22 @@ export class AdventureScene {
             this.draw();
         };
         this.rafId = requestAnimationFrame(loop);
+    }
+
+    // Bölüm 2: laboratuvar kilitlenmiş, Andrew cam hücrede; sahne karanlıkta açılır
+    beginNight() {
+        const { npcs } = this;
+        this.annexOpen = this.annexTarget = 1;
+        this.cellClosed = this.cellTarget = 1;
+        this.consoleState = 'locked';
+        Object.assign(npcs.andrew, { x: 1580, y: 332, dir: 'left', visible: true });
+        this.curtain = this.curtainTarget = 1;
+        this.phase = 'night';
+        this.run([
+            ...this.nightSteps(),
+            { say: LINES.cellTalk },
+            ...this.blastSteps()
+        ]);
     }
 
     stop() {
@@ -216,6 +237,17 @@ export class AdventureScene {
                 this.phase = s.phase;
             } else if (s.until) {
                 if (!s.until()) return;
+            } else if (s.walkAll) {
+                // Birkaç kişi aynı anda yürür; hepsi varınca devam
+                let done = true;
+                for (const w of s.walkAll) {
+                    const a = this.actor(w.id);
+                    if (this.walkToward(a, w.to, w.speed || 2.6)) a.moving = false;
+                    else done = false;
+                }
+                seq.playerWalk = true;
+                if (!done) return;
+                seq.playerWalk = false;
             } else if (s.walk) {
                 const npc = this.actor(s.walk);
                 const escort = s.escort ? this.actor(s.escort) : null;
@@ -407,10 +439,8 @@ export class AdventureScene {
                 { until: () => this.cellClosed >= 1 },
                 { do: () => { this.consoleState = 'locked'; Sfx.glassCrack(); } },
                 { say: LINES.locked },
-                { phase: 'night' },
-                ...this.nightSteps(),
-                { say: LINES.cellTalk },
-                ...this.blastSteps()
+                { wait: 60 },
+                { do: () => { this.fadingOut = true; } }
             ]);
         } else if (id === 'battery') {
             this.run([
@@ -425,10 +455,67 @@ export class AdventureScene {
                 { do: () => this.hitVirus() },
                 { wait: 110 },
                 { say: LINES.afterThrow },
-                { wait: 160 },
-                { do: () => { this.fadingOut = true; } }
+                { wait: 60 },
+                ...this.exitSteps()
             ]);
         }
+    }
+
+    // Fred ayağa kalkmış halinden normal NPC'ye döner
+    standFred() {
+        const f = this.fredDown, fred = this.npcs.fred;
+        if (f) Object.assign(fred, { x: f.x1 + 18, y: f.y1, dir: 'left', visible: true, moving: false });
+        this.fredDown = null;
+        this.grab = null;
+    }
+
+    // Çıkış: ışıklar gelir, yardımcılar kapıdan girer, hepsi kapıya yürür. Fred
+    // kapının yanındaki imha butonuna basar, laboratuvar çökmeye başlar; hepsi
+    // dışarı kaçar. Ardından araba sahnesi (DriveScene) gelir.
+    exitSteps() {
+        const { npcs } = this;
+        const helpers = ['yardimci0', 'yardimci1', 'yardimci2'];
+        const out = [84, 116];
+        const hide = (...ids) => ({ do: () => ids.forEach(id => { this.actor(id).visible = false; }) });
+        return [
+            { say: LINES.leave },
+            { do: () => {
+                this.standFred();
+                this.lightsOut = false; this.flashlight = false; this.virusGlow = 0; this.dim = 0;
+                this.doorTarget = 1; Sfx.slide();
+                playMusic('ruin');
+                helpers.forEach((id, i) => {
+                    Object.assign(npcs[id], { x: 84 + (i - 1) * 24, y: 124 - i * 10, dir: 'down', visible: true, moving: false });
+                });
+            } },
+            { wait: 40 },
+            { walkAll: [
+                { id: 'yardimci0', to: [70, 250], speed: 3.2 },
+                { id: 'yardimci1', to: [124, 272], speed: 3.2 },
+                { id: 'yardimci2', to: [90, 300], speed: 3.2 },
+                { id: 'player', to: [150, 360], speed: 2.8 },
+                { id: 'fred', to: [200, 380], speed: 2.8 }
+            ] },
+            { walkAll: helpers.map((id, i) => ({ id, to: [out[0] + (i - 1) * 6, 112], speed: 3.0 })) },
+            hide(...helpers),
+            { walkAll: [
+                { id: 'player', to: [84, 150], speed: 2.8 },
+                { id: 'fred', to: [140, 152], speed: 2.8 }
+            ] },
+            { face: 'fred', dir: 'up' },
+            { face: 'player', dir: 'down' },
+            { wait: 20 },
+            { say: LINES.destruct },
+            { do: () => { this.buttonPressed = 1; this.collapse = { t: 0 }; Sfx.metalSlam(); Sfx.siren(); } },
+            { wait: 60 },
+            { say: LINES.collapseRun },
+            { walkAll: [{ id: 'player', to: [84, 112], speed: 3.4 }] },
+            hide('player'),
+            { walkAll: [{ id: 'fred', to: [84, 112], speed: 3.4 }] },
+            hide('fred'),
+            { wait: 150 },
+            { do: () => { this.fadingOut = true; } }
+        ];
     }
 
     facing(dir) {
@@ -755,7 +842,7 @@ export class AdventureScene {
             if (this.fade >= FADE_FRAMES && !this.finished) {
                 this.finished = true;
                 this.running = false;
-                this.onFinish();
+                this.onFinish(this.entry);
             }
         }
     }
@@ -783,6 +870,22 @@ export class AdventureScene {
         if (this.flash > 0) this.flash = Math.max(0, this.flash - 0.025);
         this.curtain += Math.sign(this.curtainTarget - this.curtain) * Math.min(0.03, Math.abs(this.curtainTarget - this.curtain));
         if (this.bolts > 0) this.bolts--;
+        const col = this.collapse;
+        if (col) {
+            col.t++;
+            this.shake = Math.max(this.shake, 6 + Math.min(10, col.t / 20));
+            if (col.t % 40 === 1) { Sfx.explosion(); }
+            if (col.t % 3 === 0) {
+                const i = col.t;
+                this.debris.push({
+                    x: this.camX + hash(i, 41, 1) * VIEW.w, y: -12,
+                    vx: (hash(i, 42, 2) - 0.5) * 3, vy: 3 + hash(i, 43, 3) * 4,
+                    floor: 150 + hash(i, 44, 4) * 380, s: 8 + Math.round(hash(i, 45, 5) * 3) * 4,
+                    c: hash(i, 46, 6) > 0.5 ? '#9aa4a9' : '#6d797f'
+                });
+                if (this.debris.length > 260) this.debris.splice(0, 20);
+            }
+        }
 
         for (const list of [this.shards, this.debris]) {
             for (const p of list) {
@@ -1026,6 +1129,7 @@ export class AdventureScene {
         drawDoor(ctx, this.doorOpen);
         drawAnnexDoor(ctx, this.annexOpen, this.frame);
         drawBrokenWall(ctx, this.wallBroken);
+        drawDestructButton(ctx, this.buttonPressed, this.frame);
 
         // Arkadan öne: eşyalar ve karakterler ayak/dip hizasına göre sıralanır
         const list = [];
@@ -1066,6 +1170,12 @@ export class AdventureScene {
             ctx.fillStyle = '#9cc4d0';
             ctx.fillRect(CELL_INSIDE.x - 12 - camX, CELL_INSIDE.y - 20, CELL_INSIDE.w + 24, CELL_INSIDE.h + 20);
             ctx.restore();
+        }
+
+        if (this.collapse) {
+            const pulse = 0.5 + 0.5 * Math.sin(this.collapse.t * 0.18);
+            ctx.fillStyle = `rgba(200, 30, 30, ${0.1 + 0.16 * pulse})`;
+            ctx.fillRect(0, 0, VIEW.w, VIEW.h);
         }
 
         if (this.flash > 0) {

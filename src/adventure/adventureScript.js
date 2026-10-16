@@ -7,7 +7,8 @@
 // yardıma gelen üç sağlıklı, andrew = Andrew Stolen.
 
 export const PLAY_ENTRIES = [
-    { id: 'kapidaki-ses', title: 'KAPIDAKİ SES', label: 'OYNANIŞ' }
+    { id: 'kapidaki-ses', title: 'KAPIDAKİ SES', label: 'OYNANIŞ' },
+    { id: 'o-gece', title: 'O GECE', label: 'OYNANIŞ' }
 ];
 
 // Ekranın sol üstünde duran görev satırı
@@ -155,6 +156,16 @@ export const LINES = {
         { speaker: 'andrew', text: 'Aaah... Başım... Ne oldu bana?' },
         { speaker: 'arkadas', text: 'Ah... Andrew...' },
         { speaker: 'biz', text: 'Fred! Dayan, yanındayım!' }
+    ],
+    // Çıkış: Andrew baygın, laboratuvar imha ediliyor
+    leave: [
+        { speaker: 'biz', text: 'Bu onu bir süre oyalar. Haydi gidelim.' }
+    ],
+    destruct: [
+        { speaker: 'arkadas', text: 'Geriye hiçbir şey kalmasın.' }
+    ],
+    collapseRun: [
+        { speaker: 'biz', text: 'Fred, çabuk! Her yer çöküyor!' }
     ]
 };
 

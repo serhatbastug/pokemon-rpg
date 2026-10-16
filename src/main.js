@@ -15,6 +15,7 @@ import { StartPrompt } from './ui/startPrompt.js';
 import { ChapterSelect } from './ui/chapterSelect.js';
 import { ComicScene } from './comic/ComicScene.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
+import { DriveScene } from './adventure/DriveScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
@@ -85,16 +86,36 @@ const adventure = new AdventureScene({
     input,
     gamepad,
     onExit: () => backToMenu(),
+    // Bölüm 1 bitince "O GECE" bölümü, o bitince araba sahnesi gelir
+    onFinish: (entry) => {
+        adventure.stop();
+        if (entry === 'kapidaki-ses') startAdventure('o-gece');
+        else startDrive();
+    }
+});
+
+// ARABA: laboratuvardan kaçış, ormanın girişine kadar sürüş
+const drive = new DriveScene({
+    canvas: document.getElementById('adventureCanvas'),
+    input,
+    gamepad,
+    onExit: () => backToMenu(),
     onFinish: () => backToMenu()
 });
 
-function startAdventure() {
+function startAdventure(entry = 'kapidaki-ses') {
     showAdventureScreen();
-    adventure.start();
+    adventure.start(entry);
+}
+
+function startDrive() {
+    showAdventureScreen();
+    drive.start();
 }
 
 function backToMenu() {
     adventure.stop();
+    drive.stop();
     showMenuScreen();
     menu.start();
 }
@@ -106,7 +127,7 @@ const chapterSelect = new ChapterSelect({
         menu.stop();
         // Sayı = çizgi roman bölümü, metin = oynanış girişi
         if (typeof chapter === 'string') {
-            startAdventure();
+            startAdventure(chapter);
             return;
         }
         showComicScreen();
@@ -165,6 +186,7 @@ window.__game = game;
 window.__menu = menu;
 window.__comic = comic;
 window.__adventure = adventure;
+window.__drive = drive;
 window.__chapterSelect = chapterSelect;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;

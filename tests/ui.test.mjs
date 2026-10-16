@@ -383,15 +383,20 @@ async function main() {
         f['pil-firlat'][0] === true && f['pil-firlat'][1] === 1 && f['pil-firlat'][2] === 'released', JSON.stringify(f['pil-firlat']));
     await shot('00d5-oynanis-cam-oda');
 
-    // Final: ekran kararir, ana menuye donulur
-    await page.waitForFunction(() => !window.__adventure.running, { timeout: 30000 });
+    // Final: ekran kararir, araba sahnesi baslar; Esc ana menuye doner
+    await page.waitForFunction(() => window.__drive.running, { timeout: 60000 });
+    await wait(1500);
+    check('Oynanis bitince araba sahnesi basliyor',
+        await page.evaluate(() => window.__drive.running && !window.__adventure.running && window.__drive.phase === 'drive'));
+    await shot('00d6-araba');
+    await page.keyboard.press('Escape');
     await wait(400);
     const afterPlay = await page.evaluate(() => ({
         menu: window.__menu.running,
-        adventure: window.__adventure.running,
+        adventure: window.__adventure.running || window.__drive.running,
         screen: !document.getElementById('menu-screen').classList.contains('hidden')
     }));
-    check('Oynanis bitince ana menuye donuluyor',
+    check('Araba sahnesinde Esc ana menuye donduruyor',
         afterPlay.menu && !afterPlay.adventure && afterPlay.screen, JSON.stringify(afterPlay));
 
     // Bolum seciminde oynanis girisi var ve dogrudan oynanisi aciyor

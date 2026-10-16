@@ -156,9 +156,13 @@ export class ForestMouthScene {
     // --- Adım ---
 
     step() {
-        if (isPaused()) return;
+        if (isPaused()) {
+            this.gamepad?.poll();
+            return;
+        }
         this.frame++;
         if (this.intro > 0) this.intro--;
+        this.gamepad?.poll();
         this.dialogue.step();
         this.timer++;
         this.stepPhase();

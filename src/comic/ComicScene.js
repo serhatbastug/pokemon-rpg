@@ -124,7 +124,10 @@ export class ComicScene {
     }
 
     step() {
-        if (isPaused()) return;
+        if (isPaused()) {
+            this.gamepad?.poll();
+            return;
+        }
         this.frame++;
         this.gamepad?.poll();
         this.player.step();

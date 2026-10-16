@@ -427,6 +427,33 @@ async function main() {
     check('Ayarlar: L ile kapaniyor',
         await page.evaluate(() => document.getElementById('settings').classList.contains('hidden')));
     await page.evaluate(() => localStorage.removeItem('audioSettings'));
+    // Ayarlar ekrani kolla: OPTIONS acar, yon tuslari gezer/ayarlar, DAIRE kapatir
+    const padPress = async (index) => {
+        await page.evaluate((i) => { window.__fakePad.buttons[i].pressed = true; }, index);
+        await wait(120);
+        await page.evaluate((i) => { window.__fakePad.buttons[i].pressed = false; }, index);
+        await wait(120);
+    };
+    await page.evaluate(() => {
+        window.__fakePad = {
+            index: 0, connected: true, id: 'sahte kol', mapping: 'standard', axes: [0, 0, 0, 0],
+            buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }))
+        };
+        navigator.getGamepads = () => [window.__fakePad];
+        window.dispatchEvent(new Event('gamepadconnected'));
+    });
+    await wait(300);
+    await padPress(9);     // OPTIONS
+    const setPadOpen = await page.evaluate(() => !document.getElementById('settings').classList.contains('hidden'));
+    await padPress(13);    // asagi
+    await padPress(14);    // sol
+    const setPadVol = await page.evaluate(() => document.getElementById('settings-music-vol').value);
+    await padPress(1);     // DAIRE
+    const setPadClosed = await page.evaluate(() => document.getElementById('settings').classList.contains('hidden'));
+    check('Ayarlar (kol): OPTIONS acar, yon tuslari ayarlar, DAIRE kapatir',
+        setPadOpen && setPadVol === '50' && setPadClosed, JSON.stringify({ setPadOpen, setPadVol, setPadClosed }));
+    await page.evaluate(() => { navigator.getGamepads = () => []; window.__fakePad = null; });
+
 
     // Bolum seciminde oynanis girisi var ve dogrudan oynanisi aciyor
     await page.evaluate(() => { window.__menu.player.x = 500; window.__menu.player.y = 250; });

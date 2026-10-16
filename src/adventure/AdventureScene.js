@@ -49,6 +49,7 @@ const BUBBLE_MAX_W = 460;
 const SPRITE_H = 64;
 const HINT_FRAMES = 420;
 const MORPH_FRAMES = 380;       // Andrew'ın virüse dönüşümü
+const RELIGHT_FRAMES = 190;     // elektriğin geri gelmesi
 const REVERT_FRAMES = 110;      // pilin değmesiyle Andrew'a dönüş
 const DIR_ANGLE = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
@@ -142,6 +143,7 @@ export class AdventureScene {
 
         this.buttonPressed = 0;      // imha butonu
         this.collapse = null;        // laboratuvarın çöküşü
+        this.relight = null;         // elektriğin geri gelişi
         this.phase = 'talkFred';
         this.overlay = null;
         this.seq = null;
@@ -481,14 +483,15 @@ export class AdventureScene {
             { say: LINES.leave },
             { do: () => {
                 this.standFred();
-                this.lightsOut = false; this.flashlight = false; this.virusGlow = 0; this.dim = 0;
+                this.dim = 0;
                 this.doorTarget = 1; Sfx.slide();
-                playMusic('ruin');
                 helpers.forEach((id, i) => {
                     Object.assign(npcs[id], { x: 84 + (i - 1) * 24, y: 124 - i * 10, dir: 'down', visible: true, moving: false });
                 });
             } },
-            { wait: 40 },
+            { wait: 60 },
+            // Elektrik yavaşça, titreyerek geri gelir (bir anda değil)
+            { do: () => { this.relight = { t: 0 }; Sfx.token(); } },
             { walkAll: [
                 { id: 'yardimci0', to: [70, 250], speed: 3.2 },
                 { id: 'yardimci1', to: [124, 272], speed: 3.2 },
@@ -870,6 +873,16 @@ export class AdventureScene {
         if (this.flash > 0) this.flash = Math.max(0, this.flash - 0.025);
         this.curtain += Math.sign(this.curtainTarget - this.curtain) * Math.min(0.03, Math.abs(this.curtainTarget - this.curtain));
         if (this.bolts > 0) this.bolts--;
+        const rl = this.relight;
+        if (rl) {
+            rl.t++;
+            if (rl.t === 100) playMusic('ruin');
+            if (rl.t >= RELIGHT_FRAMES) {
+                this.relight = null;
+                this.lightsOut = false;
+                this.flashlight = false;
+            }
+        }
         const col = this.collapse;
         if (col) {
             col.t++;
@@ -1158,7 +1171,17 @@ export class AdventureScene {
         drawAnnexCover(ctx, this.annexOpen);
         ctx.restore();
 
-        if (this.lightsOut) this.drawDarkness(camX);
+        if (this.lightsOut) {
+            // Elektrik geri gelirken karanlık azalır ve titrer
+            const rl = this.relight;
+            if (rl) {
+                const u = rl.t / RELIGHT_FRAMES;
+                const flicker = rl.t > 14 && rl.t % 26 < 7 ? 0.35 : 0;
+                ctx.globalAlpha = Math.max(0, Math.min(1, (1 - u) * (1 - u) + flicker * (1 - u)));
+            }
+            this.drawDarkness(camX);
+            ctx.globalAlpha = 1;
+        }
 
         if (this.dim > 0) {
             ctx.fillStyle = `rgba(4, 10, 20, ${this.dim})`;

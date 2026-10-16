@@ -9,7 +9,7 @@ export const DRIVE = {
     carHalf: 0.2,         // arabanın yarı genişliği (şerit birimi)
     hitFront: 22,         // çarpışma penceresi (z)
     hitBack: 16,
-    sceneSpacing: 120,    // yol kenarı nesnelerin aralığı
+    sceneSpacing: 150,    // yol kenarı nesnelerin aralığı
     forestZone: 2400      // yolun son bölümü orman
 };
 
@@ -34,11 +34,10 @@ export const DRIVE_LINES = {
 // en az bir şerit hep boş kalır.
 const LANES = [-0.66, 0, 0.66];
 const KINDS = [
-    { kind: 'car', half: 0.24 },
+    { kind: 'car', half: 0.26 },
     { kind: 'rubble', half: 0.22 },
     { kind: 'infected', half: 0.1 }
 ];
-const CAR_COLORS = ['#7a2e2e', '#3f5f48', '#6a5a2e', '#4a4a6a', '#8a8a8e'];
 
 function rnd(i, salt) {
     const v = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
@@ -61,7 +60,7 @@ export function buildCourse() {
             const offset = kindDef.kind === 'infected' ? (rnd(row, 5) - 0.5) * 0.3 : (rnd(row, 6) - 0.5) * 0.12;
             obstacles.push({
                 d, lat: LANES[lane] + offset, ...kindDef,
-                color: CAR_COLORS[Math.floor(rnd(row + k, 7) * CAR_COLORS.length)]
+                variant: Math.floor(rnd(row + k, 7) * 10)
             });
         });
         d += 330 - Math.min(110, row * 3);

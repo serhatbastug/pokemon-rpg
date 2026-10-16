@@ -284,7 +284,6 @@ if (typeof window !== 'undefined') {
 // Dosyası olan parçalar bunlarla çalar; yüklenemezse yukarıdaki sentez müzik
 // devreye girer.
 const FILE_TRACKS = {
-    shadow: { src: 'assets/audio/cold_silence.ogg', volume: 0.55 },
     ruin: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
     forest: { src: 'assets/audio/dark_cavern_ambient_002.ogg', volume: 0.7 },
     boss: { src: 'assets/audio/Chase.ogg', volume: 0.45 },

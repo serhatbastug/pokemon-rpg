@@ -17,7 +17,9 @@ export const DRIVE_TEXT = {
     objective: 'ENGELLERDEN KAÇ VE ORMANA ULAŞ',
     hintKeys: 'A D / OKLAR ARABAYI YÖNLENDİRİR',
     hintPad: 'SOL ÇUBUK ARABAYI YÖNLENDİRİR',
-    crashed: 'ARABA PARÇALANDI. TEKRAR DENE.'
+    crashed: 'ARABA PARÇALANDI. TEKRAR DENE.',
+    skipKeys: 'K: ARABAYI ATLA',
+    skipPad: 'KARE: ARABAYI ATLA'
 };
 
 export const DRIVE_LINES = {

@@ -16,6 +16,7 @@ import { ChapterSelect } from './ui/chapterSelect.js';
 import { ComicScene } from './comic/ComicScene.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
 import { DriveScene } from './adventure/DriveScene.js';
+import { ForestMouthScene } from './adventure/ForestMouthScene.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
@@ -100,8 +101,25 @@ const drive = new DriveScene({
     input,
     gamepad,
     onExit: () => backToMenu(),
+    onFinish: () => {
+        drive.stop();
+        startForestMouth();
+    }
+});
+
+// ORMAN AĞZI: araba burada durur, herkes iner, yollar ayrılır
+const forestMouth = new ForestMouthScene({
+    canvas: document.getElementById('adventureCanvas'),
+    input,
+    gamepad,
+    onExit: () => backToMenu(),
     onFinish: () => backToMenu()
 });
+
+function startForestMouth() {
+    showAdventureScreen();
+    forestMouth.start();
+}
 
 function startAdventure(entry = 'kapidaki-ses') {
     showAdventureScreen();
@@ -116,6 +134,7 @@ function startDrive() {
 function backToMenu() {
     adventure.stop();
     drive.stop();
+    forestMouth.stop();
     showMenuScreen();
     menu.start();
 }
@@ -187,6 +206,7 @@ window.__menu = menu;
 window.__comic = comic;
 window.__adventure = adventure;
 window.__drive = drive;
+window.__forestMouth = forestMouth;
 window.__chapterSelect = chapterSelect;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;

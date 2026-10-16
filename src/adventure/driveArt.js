@@ -299,11 +299,52 @@ function bakeBuildings() {
     });
 }
 
+// Oyuncunun arabası yandan (sağa bakıyor): orman ağzı sahnesinde geliş. 48x20 piksel.
+function bakeSideCar() {
+    const { canvas, ctx } = newCanvas(48 * PX, 22 * PX);
+    ctx.globalAlpha = 0.4;
+    g(ctx, 2, 19, 44, 3, '#000');
+    ctx.globalAlpha = 1;
+    // Tekerlekler
+    for (const gx of [7, 34]) {
+        g(ctx, gx, 13, 8, 8, '#0c0c0e');
+        g(ctx, gx + 1, 12, 6, 1, '#0c0c0e');
+        g(ctx, gx + 2, 15, 4, 4, '#6a6a72');
+        g(ctx, gx + 3, 16, 2, 2, '#9a9aa4');
+    }
+    // Gövde
+    g(ctx, 1, 8, 46, 8, '#3f6a96');
+    g(ctx, 1, 8, 46, 1, '#6d9bc9');
+    g(ctx, 1, 15, 46, 1, '#2b4a6c');
+    g(ctx, 36, 7, 10, 2, '#4f7eab');                // kaput
+    // Kabin
+    g(ctx, 12, 1, 22, 8, '#3f6a96');
+    g(ctx, 13, 0, 20, 1, '#6d9bc9');
+    g(ctx, 14, 2, 8, 6, '#0f1822');
+    g(ctx, 23, 2, 10, 6, '#0f1822');
+    g(ctx, 15, 3, 3, 1, '#ffffff33');
+    g(ctx, 22, 1, 1, 7, '#2b4a6c');                  // direk
+    g(ctx, 33, 3, 2, 5, '#0f1822');                  // ön cam eğimi
+    g(ctx, 10, 3, 2, 5, '#0f1822');                  // arka cam eğimi
+    g(ctx, 27, 9, 1, 6, '#2b4a6c');                  // kapı çizgisi
+    g(ctx, 25, 10, 2, 1, '#aab4b8');                 // kapı kolu
+    // Tamponlar ve lambalar
+    g(ctx, 0, 14, 2, 3, '#2b3340');
+    g(ctx, 46, 14, 2, 3, '#2b3340');
+    g(ctx, 0, 9, 2, 3, '#d83a3a');
+    g(ctx, 46, 9, 2, 3, '#ffe9a0');
+    g(ctx, 3, 12, 6, 1, '#2b4a6c');
+    // Anten
+    g(ctx, 11, 0, 1, 1, '#2a2a30');
+    return canvas;
+}
+
 let cache = null;
 export function driveArt() {
     if (!cache) {
         cache = {
             playerCar: bakePlayerCars(),
+            sideCar: bakeSideCar(),
             wrecks: bakeWrecks(),
             rubble: bakeRubble(),
             buildings: bakeBuildings()

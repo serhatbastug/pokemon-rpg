@@ -32,7 +32,6 @@ const FADE_FRAMES = 70;
 const BUBBLE_SCALE = 2;
 const BUBBLE_MAX_W = 460;
 const INTRO_FRAMES = 40;
-const ACTION_BUTTONS = ['triangle', 'cross'];
 
 const tOf = (z) => 1 / (1 + z / FOCAL);
 const yOf = (t) => HORIZON + (CAR_Y - HORIZON) * t;
@@ -56,13 +55,13 @@ export class DriveScene {
             unlockAudio();
             if (SCROLL_KEYS.includes(e.code)) e.preventDefault();
             if (e.code === 'Escape') this.onExit();
-            if (e.code === 'KeyF' || e.code === 'Space' || e.code === 'Enter') this.dialogue.advance();
+            if (e.code === 'KeyK') this.skip();
         });
         this.gamepad?.onButtonDown(button => {
             if (!this.running) return;
             unlockAudio();
             if (button === 'circle') this.onExit();
-            if (ACTION_BUTTONS.includes(button)) this.dialogue.advance();
+            if (button === 'square') this.skip();
         });
     }
 
@@ -199,7 +198,7 @@ export class DriveScene {
         }
 
         if (this.progress >= this.course.length) {
-            this.phase = 'stop';
+            this.phase = 'enter';
             this.timer = 0;
         }
     }
@@ -232,71 +231,23 @@ export class DriveScene {
         return W / 2 + this.lat * halfOf(t) * LANE_SCALE;
     }
 
-    // Yol bitti: araba yavaşça durur, herkes iner, vedalaşma, yürüyüş
+    // Yol bitti: araba ormanın ağzına doğru yavaşlayarak girer, ekran kararır;
+    // devamı ForestMouthScene'de (araba orada durur, herkes iner)
     stepAfter() {
         this.timer++;
-        const car = this.carX();
-        if (this.phase === 'stop') {
-            this.speed = Math.max(0, this.speed - 0.1);
-            this.progress += this.speed;
-            if (this.speed === 0 && this.timer > 30) {
-                Sfx.slide();
-                this.phase = 'exitCar';
-                this.timer = 0;
-                const mk = (who, speaker, x, tx, dir) => ({
-                    who, speaker, x, y: CAR_Y + 18, tx, ty: 506, dir, moving: false
-                });
-                this.people = [
-                    mk('saglikli0', 'saglikli-0', car - 70, car - 190, 'left'),
-                    mk('saglikli1', 'saglikli-1', car - 70, car - 250, 'left'),
-                    mk('saglikli2', 'saglikli-2', car - 70, car - 310, 'left'),
-                    mk('harry', 'biz', car + 70, car + 190, 'right'),
-                    mk('fred', 'arkadas', car + 70, car + 255, 'right')
-                ];
-            }
-        } else if (this.phase === 'exitCar') {
-            let moving = false;
-            for (const p of this.people) moving = this.walkPerson(p, p.tx, p.ty, 2.2) || moving;
-            if (!moving) {
-                for (const p of this.people) p.dir = p.who === 'harry' || p.who === 'fred' ? 'left' : 'right';
-                this.phase = 'talk';
-                this.dialogue.start(DRIVE_LINES.shelter);
-            }
-        } else if (this.phase === 'talk') {
-            if (!this.dialogue.active) {
-                this.phase = 'leave';
-                this.timer = 0;
-            }
-        } else if (this.phase === 'leave') {
-            let busy = false;
-            for (const p of this.people) {
-                if (p.who === 'harry' || p.who === 'fred') {
-                    // Yolun ucundaki ormana doğru yürürler
-                    const off = p.who === 'harry' ? -24 : 24;
-                    busy = this.walkPerson(p, W / 2 + off * (1 - tOf(0) * 0) * Math.max(0.25, (p.y - HORIZON) / (CAR_Y - HORIZON)), HORIZON + 14, 1.7) || busy;
-                    p.dir = 'up';
-                } else {
-                    busy = this.walkPerson(p, -80, p.ty + 14, 2.6) || busy;
-                }
-            }
-            if (!busy || this.timer > 600) this.fadingOut = true;
-        }
+        this.speed = Math.max(3, this.speed - 0.03);
+        this.progress += this.speed;
+        this.lat += (0 - this.lat) * 0.03;
+        if (this.timer === 110) this.fadingOut = true;
     }
 
-    // Hedefe adım atar; yürüyorsa true
-    walkPerson(p, tx, ty, speed) {
-        const dx = tx - p.x, dy = ty - p.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist <= speed) {
-            p.x = tx; p.y = ty; p.moving = false;
-            return false;
-        }
-        p.x += (dx / dist) * speed;
-        p.y += (dy / dist) * speed;
-        p.moving = true;
-        if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
-        else p.dir = dy < 0 ? 'up' : 'down';
-        return true;
+    // Atlama tuşu: sürüşü geçip doğrudan orman ağzına
+    skip() {
+        if (this.phase !== 'drive' || this.caption || this.fadingOut) return;
+        this.phase = 'enter';
+        this.timer = 0;
+        this.fadingOut = true;
+        Sfx.token();
     }
 
     stepParticles() {
@@ -644,7 +595,7 @@ export class DriveScene {
     drawCar() {
         if (this.hurt > 0 && Math.floor(this.frame / 4) % 2 === 0) return;
         const art = driveArt();
-        const braking = this.phase !== 'drive' || this.speed < 2;
+        const braking = this.speed < 2;
         const img = braking ? art.playerCar.brake : art.playerCar.normal;
         const x = this.carX() + Math.round(this.steer * 8);
         this.lcImg(img, x, CAR_Y + 16, img.width);
@@ -696,13 +647,19 @@ export class DriveScene {
         ctx.fillStyle = '#6fbf6a';
         ctx.fillRect(bx, by, Math.round(bw * Math.min(1, this.progress / this.course.length)), 14);
 
+        const skipText = this.gamepad?.connected ? DRIVE_TEXT.skipPad : DRIVE_TEXT.skipKeys;
+        const sw = measurePixelText(skipText, 2);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+        ctx.fillRect(12, H - 44, sw + 24, 32);
+        drawPixelText(ctx, skipText, 24, H - 36, { scale: 2, color: '#cbd5e1' });
+
         if (this.frame < this.hintUntil && this.intro === 0 && !this.caption) {
             const text = this.gamepad?.connected ? DRIVE_TEXT.hintPad : DRIVE_TEXT.hintKeys;
             const w = measurePixelText(text, 2);
             const x = Math.round((W - w) / 2 / 4) * 4;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
-            ctx.fillRect(x - 12, H - 44, w + 24, 32);
-            drawPixelText(ctx, text, x, H - 36, { scale: 2, color: '#e2e8f0' });
+            ctx.fillRect(x - 12, H - 88, w + 24, 32);
+            drawPixelText(ctx, text, x, H - 80, { scale: 2, color: '#e2e8f0' });
         }
     }
 }

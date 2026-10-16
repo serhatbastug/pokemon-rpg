@@ -1385,7 +1385,7 @@ async function main() {
     for (const i of [0, 1, 2]) { const p = standAt(camp.CHOP_TREES[i]); await campAt(p.x, p.y); await wait(1000); await campFlush(); }
     await shot('00f2-agac-devrildi');
     await page.evaluate(() => { const j = window.__camp.fredJob; j.hits = 11; j.cd = 1; });
-    await page.waitForFunction(() => window.__camp.fredJob.done, { timeout: 6000 }).catch(() => {});
+    await page.waitForFunction(() => window.__camp.fredJob.done, { timeout: 20000 }).catch(() => {});
     await wait(1500); await campFlush(); await wait(1500);
     const evening = await campState();
     check('Kulube: odun (Fred dahil 4) + su bitince aksam, ates gorevi',

@@ -645,3 +645,19 @@ export function drawChoppedLog(ctx, x, y) {
     blk(ctx, x - PX * 4, y - PX * 2, PX, PX * 2, '#c9a06a');
     for (let i = 0; i < 5; i++) dot(ctx, x + (hash(i, 1, 3) - 0.5) * 36, y + hash(i, 2, 4) * 8, '#c9a06a');
 }
+
+// Fred'in tuttuğu balık (başının üstünde kısa süre gösterilir)
+export function drawFish(ctx, x, y) {
+    blk(ctx, x - PX * 4, y, PX * 8, PX * 3, '#7fb0c8');
+    blk(ctx, x - PX * 4, y, PX * 8, PX, '#b7dbe8');
+    blk(ctx, x - PX * 4, y + PX * 2, PX * 8, PX, '#4a7890');
+    blk(ctx, x + PX * 4, y - PX, PX * 2, PX * 5, '#5a90a8');
+    blk(ctx, x - PX * 3, y + PX, PX, PX, '#1a1c20');
+}
+
+// Fred'in omzundaki kütük (yığına taşırken)
+export function drawCarriedLog(ctx, x, y) {
+    blk(ctx, x - PX * 5, y, PX * 10, PX * 3, WOOD.base);
+    blk(ctx, x - PX * 5, y, PX * 10, PX, WOOD.hi);
+    blk(ctx, x + PX * 5, y, PX, PX * 3, '#c9a06a');
+}

@@ -78,7 +78,7 @@ export const BARREL = { x: 1416, y: 304, w: 44, h: 48 };       // su fıçısı
 export const BARREL_SPOT = { x: 1440, y: 372, r: 62 };
 export const POND = { x: 2010, y: 380, w: 250, h: 108 };      // gölet (yürünmez)
 export const POND_SPOT = { x: 2135, y: 522, r: 74 };           // suyun kenarı
-export const FRED_FISH = { x: 2050, y: 520 };                  // Fred olta atarken durduğu yer
+export const FRED_FISH = { x: 2050, y: 506 };                  // Fred olta atarken durduğu yer
 export const BUSHES = [
     { x: 430, y: 440 }, { x: 580, y: 500 }, { x: 1760, y: 500 }, { x: 1890, y: 350 }
 ];
@@ -235,7 +235,11 @@ function buildYardTrees() {
         place(x, 196 + rand() * 56, rand() < 0.5 ? 'huge' : 'tall');
     }
     // Alt kenar: alçak çalılar
-    for (let x = 20; x < YARD.w - 10; x += 66 + rand() * 30) place(x, 556, 'small');
+    // (Gölün önü açık kalır: Harry ve Fred orada durur, çalı örtmesin)
+    for (let x = 20; x < YARD.w - 10; x += 66 + rand() * 30) {
+        if (x > POND.x - 90 && x < POND.x + POND.w + 60) continue;
+        place(x, 556, 'small');
+    }
     trees.sort((a, b) => a.y - b.y);
     return trees;
 }

@@ -138,3 +138,16 @@ export const LINES = {
         { speaker: 'biz', text: 'Yatağı bomboş. Battaniye de soğumuş.' }
     ]
 };
+
+// Fred'in işini yaparken kendi kendine söylediği kısa sözler (konuşma penceresi
+// açmaz, başının üstünde küçük balon olarak çıkar).
+export const FRED_CHATTER = {
+    chop: ['Hadi bakalım...', 'Biraz daha!', 'İnatçı ağaç!', 'Bir daha...'],
+    carry: ['Ağır, ağır.', 'Yığına gidiyor.', 'Bunu da koyayım.'],
+    fish: ['Sessiz bir göl...', 'Bugün balıklar tembel.', 'Bir tane daha gelsin.'],
+    idle: ['Hava güzel.', 'Odun yeter gibi.', 'Etraf çok sakin.'],
+    evening: ['Ateş iyi geldi.', 'Yarın da böyle olsun.'],
+    praise: ['Güzel vuruş!', 'Sağlam ağaçmış!'],
+    bite: ['Isırdı!', 'Geldi geldi!'],
+    caught: ['Yakaladım!']
+};

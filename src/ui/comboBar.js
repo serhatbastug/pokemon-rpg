@@ -101,6 +101,23 @@ const ICONS = {
         ctx.fillRect(cx + PX * 2, cy + PX * 2, PX, PX);
     },
 
+    // Gölge adımı: iki karanlık siluet ve arasında iz
+    shadowstep: (ctx, cx, cy) => {
+        ctx.fillStyle = '#0b0618';
+        ctx.fillRect(cx - PX * 6, cy - PX * 3, PX * 4, PX * 6);
+        ctx.fillStyle = '#4a2a82';
+        ctx.fillRect(cx - PX * 5, cy - PX * 2, PX * 2, PX * 4);
+        ctx.fillStyle = '#7a4fc0';
+        ctx.fillRect(cx - PX, cy - PX, PX, PX);
+        ctx.fillRect(cx + PX, cy, PX, PX);
+        ctx.fillStyle = '#0b0618';
+        ctx.fillRect(cx + PX * 2, cy - PX * 3, PX * 4, PX * 6);
+        ctx.fillStyle = '#4a2a82';
+        ctx.fillRect(cx + PX * 3, cy - PX * 2, PX * 2, PX * 4);
+        ctx.fillStyle = '#f6efff';
+        ctx.fillRect(cx + PX * 3, cy - PX * 2, PX, PX);
+    },
+
     // Buz yolu: zeminde ilerleyen bir şerit, ucunda büyüyen kristal. Diğer
     // üç simge bir NESNE gösteriyor (birikinti, kol, gövde); bu bir YÖN
     // gösteriyor - hamlenin kendisi zaten "bir yere doğru uzamak".

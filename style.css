@@ -154,8 +154,8 @@ body.battle-active {
 
 .character-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1.2rem;
     padding: 0.5rem 0;
 }
 

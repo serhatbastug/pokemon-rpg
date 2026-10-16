@@ -13,6 +13,7 @@
 // kütleyi yeniden hesaplamanın anlamı yok.
 
 import { PX, newCanvas, blk, dot, hash } from '../pixel/pixelDraw.js';
+import { shadowSprite, drawShadowWisps, SHADOW_P } from './shadowArt.js';
 
 // --- Ortak çizim parçaları ---
 
@@ -627,7 +628,7 @@ const E_ARM_TOP = 4;
 function paintFigure(ctx, ox, oy, { mode = 'electro', armRaise = 0, headTilt = 0, hug = 0, manPalette = 'a', hideArm = 0 } = {}) {
     const on = mode === 'electro';
     const P = ELECTRO_P;
-    const H = manPalette === 'c' ? HUMAN_C : manPalette === 'd' ? HUMAN_D : HUMAN_P;
+    const H = manPalette === 'c' ? HUMAN_C : manPalette === 'd' ? HUMAN_D : manPalette === 'e' ? HUMAN_E : HUMAN_P;
     const X = (col) => ox + col * PX;
     const Y = (row) => oy + row * PX;
     const cx = X(E_CX);
@@ -970,6 +971,18 @@ const HUMAN_D = {
     y: '#22303a'
 };
 
+// Beşinci adam: gölgenin taşıyıcısı. Öncekilerden ayrı biri olmalı: kızıl saç,
+// soluk ten, koyu erik rengi kapüşonlu mont.
+const HUMAN_E = {
+    k: '#1c1426',
+    h: '#a8512f',           // kızıl
+    s: '#f2d2bf',
+    S: '#d1a58d',
+    c: '#4a3b5c',           // erik rengi mont
+    C: '#33283f',
+    y: '#2a2235'
+};
+
 // Gövdenin yarı genişliği (sütun cinsinden), satır satır. FORMÜLLE DEĞİL
 // ELLE yazılı: tasarım sayfasındaki biçim bir kalp/kalkan - üstte iki
 // yuvarlak omuz, ortada bir çentik, altta sivri uç. Sinüs eğrisi bunu
@@ -1273,7 +1286,8 @@ export const FIGHTER_SPRITES = {
     virus: virusSprite,
     antivirus: antivirusSprite,
     electro: electroSprite,
-    ice: iceSprite
+    ice: iceSprite,
+    shadow: shadowSprite
 };
 
 // ================= SALDIRI ANİMASYONLARI =================
@@ -1291,7 +1305,7 @@ export const FIGHTER_SPRITES = {
 
 // dir çarpanı olanlar karakterin baktığı yöne göre eğilir; atılmalar dünya
 // yönünde olduğu için çarpılmaz.
-const DIR_POSES = new Set(['punch', 'blob', 'grab', 'beam', 'sword']);
+const DIR_POSES = new Set(['punch', 'blob', 'grab', 'beam', 'sword', 'shade']);
 
 // Sıfırdan bire çıkıp geri inen yumuşak eğri: uzuvun uzayıp toplanması.
 const swell = (t) => Math.sin(Math.max(0, Math.min(1, t)) * Math.PI);
@@ -1340,6 +1354,12 @@ const POSES = {
     clone: (t) => ({ flash: 0.45 * phase(t, 0.1, 0.35) * (1 - phase(t, 0.35, 0.7)) }),
     // Buz yolu: kütle çöküp soğuğu YERE veriyor
     path: (t) => ({ dy: Math.round(swell(phase(t, 0, 0.6)) * 3) * PX }),
+    // Gölge topu: kapüşon geriye çekilip topu fırlatıyor
+    shade: (t) => ({ lean: -PX * 3 * swell(t), dy: -PX * swell(phase(t, 0.2, 0.7)) }),
+    // Gölge sürüsü: kütle yükselip dağılıyor, parlama yarım
+    swarm: (t) => ({ dy: -Math.round(swell(phase(t, 0, 0.5)) * 3) * PX, flash: 0.4 * phase(t, 0.35, 0.55) * (1 - phase(t, 0.55, 1)) }),
+    // Gölge adımı: bir an siliniyor, yeni yerde yerine oturuyor
+    shadowstep: (t) => ({ fade: t }),
     dashUp: (t) => ({ dy: -PX * 2 * (1 - t) }),
     dashLeft: (t) => ({ lean: -PX * 6 * (1 - t) }),
     dashRight: (t) => ({ lean: PX * 6 * (1 - t) })
@@ -1641,7 +1661,52 @@ function icePour(ctx, x, footY, t, dir) {
         put(x + dir * (i * PX * 4), footY - hh, PX * 3, hh, i % 2 ? P.pale : P.frost);
     }
 }
+// Gölge topu: kapüşonun önünde toplanan mor ışık
+function shadeMuzzle(ctx, x, footY, t, dir) {
+    const f = swell(phase(t, 0, 0.7));
+    if (f <= 0.05) return;
+    const mx = x + dir * PX * 12;
+    const my = footY - PX * 30;
+    const r = Math.max(1, Math.round(f * 3)) * PX;
+    blk(ctx, mx - r, my - r, r * 2, r * 2, SHADOW_P.deep);
+    blk(ctx, mx - r + PX, my - r + PX, r * 2 - PX * 2, r * 2 - PX * 2, SHADOW_P.body);
+    blk(ctx, mx - PX, my - PX, PX * 2, PX * 2, SHADOW_P.eye);
+    for (let i = 0; i < 4; i++) {
+        blk(ctx, mx - dir * PX * (2 + i * 2), my + PX * (i % 2 ? 1 : -1), PX, PX, i % 2 ? SHADOW_P.light : SHADOW_P.mid);
+    }
+}
+
+// Gölge sürüsü: başın çevresinde dönen küçük karanlık küreler, sonra dağılıyor
+function shadowSwarm(ctx, x, footY, t) {
+    const f = phase(t, 0.1, 0.85);
+    if (f <= 0 || f >= 1) return;
+    const cy = footY - PX * 34;
+    for (let i = 0; i < 6; i++) {
+        const a = (Math.PI * 2 * i) / 6 + f * 3.2;
+        const d = PX * (7 + f * 10);
+        const bx = Math.round((x + Math.cos(a) * d) / PX) * PX;
+        const by = Math.round((cy + Math.sin(a) * d * 0.6) / PX) * PX;
+        blk(ctx, bx - PX, by - PX, PX * 3, PX * 3, SHADOW_P.deep);
+        blk(ctx, bx, by, PX, PX, i % 2 ? SHADOW_P.glow : SHADOW_P.light);
+    }
+}
+
+// Gölge adımı: ayaklardan yükselen koyu duman
+function shadowPuff(ctx, x, footY, t) {
+    const f = swell(t);
+    if (f <= 0.05) return;
+    for (let i = 0; i < 12; i++) {
+        const k = i / 12;
+        const bx = Math.round((x + (hash(i, 1, 17) - 0.5) * PX * 20) / PX) * PX;
+        const by = Math.round((footY - PX * (4 + k * 26 * f)) / PX) * PX;
+        blk(ctx, bx, by, PX * 2, PX * 2, i % 3 === 0 ? SHADOW_P.light : SHADOW_P.dark);
+    }
+}
+
 const OVERLAYS = {
+    shade: (ctx, x, footY, t, dir) => shadeMuzzle(ctx, x, footY, t, dir),
+    swarm: (ctx, x, footY, t) => shadowSwarm(ctx, x, footY, t),
+    shadowstep: (ctx, x, footY, t) => shadowPuff(ctx, x, footY, t),
     punch: (ctx, x, footY, t, dir) => virusPunchArm(ctx, x, footY, t, dir),
     blob: (ctx, x, footY, t) => coralMuzzle(ctx, x, footY, t),
     burst: (ctx, x, footY, t) => coralBurstSpikes(ctx, x, footY, t),
@@ -1693,7 +1758,9 @@ export const MUZZLES = {
     virus: { dx: 0, dy: -PX * 34, mirror: true },
     // Buzun kırığı SAVURAN ELDEN çıkıyor: kol yay çizdiği için el, atış
     // anında (t≈0.55) omuzun bir tık önünde ve altında oluyor.
-    ice: { dx: PX * 10, dy: -PX * 30, mirror: true }
+    ice: { dx: PX * 10, dy: -PX * 30, mirror: true },
+    // Gölgenin topu kapüşonun önünden çıkıyor, uzuvdan değil
+    shadow: { dx: PX * 12, dy: -PX * 30, mirror: true }
 };
 
 export function muzzleOf(key, x, footY, dir = 1) {
@@ -1716,7 +1783,7 @@ export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
     // ICE-VİRÜS'ün ayağı yok: kütle yerin üstünde SÜZÜLÜYOR. Yavaş bir iniş
     // çıkış olmadan yüzen bir gövde havada asılı kalmış gibi duruyor. Kaydırma
     // PX'in katı - ara değerler piksel ızgarasını titretiyor.
-    const bob = key === 'ice' ? Math.round(Math.sin(frame * 0.045)) * PX : 0;
+    const bob = key === 'ice' || key === 'shadow' ? Math.round(Math.sin(frame * 0.045)) * PX : 0;
     const py = Math.round(y - sprite.oy) + Math.round((shape?.dy || 0) / PX) * PX + bob;
 
     ctx.save();
@@ -1740,6 +1807,12 @@ export function drawFighter(ctx, key, x, y, frame = 0, pose = null) {
         // karakterin saldırısı sessiz olamaz.
         const boost = pose && (pose.id === 'beam' || pose.id === 'orb' || pose.id === 'blink') ? 2.4 : 1;
         drawElectroSparks(ctx, Math.round(x), Math.round(y), frame, boost);
+    }
+
+    if (key === 'shadow') {
+        // Duman her zaman dağılıyor; saldırırken çoğalıyor
+        const boost = pose && (pose.id === 'swarm' || pose.id === 'shadowstep') ? 1.8 : 1;
+        drawShadowWisps(ctx, Math.round(x), Math.round(y), frame, boost);
     }
 
     if (key === 'ice') {

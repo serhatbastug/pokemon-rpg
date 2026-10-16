@@ -34,11 +34,13 @@ import {
     antivirusSprite, virusSprite,
     FIGURE_SIZE, CARRIER_SIZE, VIRUS_SIZE, VIRUS_EYES
 } from './fighterArt.js';
+import { paintIntroShadow, drawShadowWisps, SHADOW_P } from './shadowArt.js';
 
 export const INTRO_FRAMES = 260;              // ELECTRO-VİRÜS
 export const ANTIVIRUS_INTRO_FRAMES = 240;
 export const VIRUS_INTRO_FRAMES = 270;
 export const ICE_INTRO_FRAMES = 250;
+export const SHADOW_INTRO_FRAMES = 240;
 
 const span = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
 const easeOut = (k) => 1 - (1 - k) * (1 - k);
@@ -630,6 +632,82 @@ export class IceIntro extends BaseIntro {
     }
 }
 
+// ================= GÖLGE-VİRÜS =================
+//
+// BEŞİNCİ adam: kızıl saçlı, erik rengi kapüşonlu. Başını eğip kendi gölgesine
+// bakıyor. Gölge ayaklarının altında YAYILIYOR (yerde koyu bir havuz), sonra
+// havuzdan yukarı, bacaklarından başına doğru TIRMANIYOR ve adamı örtüyor.
+// Dörtte ikisi adamı üstten ya da alttan örter; burada dönüşüm YERDEN geliyor,
+// çünkü gölge hep yerdedir. Kapüşon en son kapanıyor ve iki göz yanıyor.
+const S_LOOK = [0.10, 0.26];
+const S_POOL = [0.22, 0.52];
+const S_CLIMB = [0.48, 0.88];
+
+// Ayaklarının altında genişleyen koyu havuz: kenarı mor, içi simsiyah
+function shadowPool(ctx, x, footY, k, unit, frame) {
+    if (k <= 0) return;
+    ctx.save();
+    const rx = Math.round(k * 20);
+    const rows = [[-2, 0.55], [-1, 0.85], [0, 1], [1, 0.85], [2, 0.55]];
+    for (const [dy, f] of rows) {
+        const w = Math.round(rx * f);
+        const y = footY + dy * unit;
+        ctx.fillStyle = SHADOW_P.deep;
+        ctx.fillRect(Math.round(x - w * unit), Math.round(y), Math.round(w * 2 * unit), unit);
+        // Kenarda mor halka: her karede biraz kıpırdıyor
+        const wob = hash(dy, Math.floor(frame / 4), 7) < 0.5 ? 1 : 0;
+        ctx.fillStyle = SHADOW_P.body;
+        ctx.fillRect(Math.round(x - w * unit), Math.round(y), unit, unit);
+        ctx.fillRect(Math.round(x + (w - 1) * unit), Math.round(y), unit, unit);
+        if (wob && w > 4) {
+            ctx.fillStyle = SHADOW_P.light;
+            ctx.fillRect(Math.round(x - (w - 2) * unit), Math.round(y), unit, unit);
+        }
+    }
+    ctx.restore();
+}
+
+export class ShadowIntro extends BaseIntro {
+    constructor(opts) {
+        // erase: gölge kütlesi adamdan geniş; cephenin gerisinde adam silinsin
+        super({ ...opts, size: FIGURE_SIZE, reveal: 'bottom', erase: true });
+        this.key = 'shadow';
+        this.frontColors = [SHADOW_P.light, SHADOW_P.glow];
+    }
+
+    get frames() {
+        return SHADOW_INTRO_FRAMES;
+    }
+
+    state(t) {
+        return {
+            t,
+            pool: span(t, S_POOL[0], S_POOL[1]),
+            // Dönüşüm yerden yukarı KADEMELİ tırmanıyor
+            turn: span(t, S_CLIMB[0], S_CLIMB[1]),
+            // Adam gölgesine bakıyor; kapüşon kapanınca baş toparlanıyor
+            headTilt: span(t, S_LOOK[0], S_LOOK[1]) - span(t, 0.84, 0.94),
+            shake: 0
+        };
+    }
+
+    paintMan(octx, s) {
+        return paintIntroFigure(octx, this.figW / 2, this.figH,
+            { mode: 'man', manPalette: 'e', hug: 0, headTilt: s.headTilt });
+    }
+
+    paintVirus(octx, s) {
+        paintIntroShadow(octx, this.figW / 2, this.figH, { headTilt: s.headTilt });
+    }
+
+    overlay(ctx, s, geo) {
+        shadowPool(ctx, geo.drawX, geo.drawFootY, s.pool, geo.unit, this.frame);
+        if (s.turn > 0.04) {
+            drawShadowWisps(ctx, geo.drawX, geo.drawFootY, this.frame, 0.4 + s.turn * 1.4, geo.unit);
+        }
+    }
+}
+
 // Kadrodaki 'intro' anahtarının karşılığı. Ayrı bir kayıt olarak duruyor ki
 // tarayıcısız veri testi de anahtarların karşılığı var mı diye bakabilsin
 // (sınıfın kendisi tuval istiyor, node'da kurulamıyor).
@@ -637,7 +715,8 @@ export const INTROS = {
     virus: VirusIntro,
     electro: ElectroIntro,
     antivirus: AntivirusIntro,
-    ice: IceIntro
+    ice: IceIntro,
+    shadow: ShadowIntro
 };
 
 // Bu oyuncunun girişi varsa örneğini üretir

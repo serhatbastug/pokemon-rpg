@@ -317,6 +317,62 @@ export const ABILITIES = {
             maxClimb: 460,
             animFrames: 26
         }
+    },
+
+    // ---- GÖLGE-VİRÜS: kovalayan toplar, rakibin arkasına düşen adım ----
+    //
+    // Kimliği "kaçsan da gelir": normal topu da özeli de rakibe doğru KIVRILIYOR
+    // (homing), signature ise rakibin ARKASINA ışınlıyor ve oraya vuruyor.
+    // Bu yüzden hepsi yumuşak: toplar yavaş, kıvrılma sınırlı (dönüş hızı
+    // küçük) - zıplayan ya da bloklayan oyuncu yine de kurtulabiliyor.
+    shadow: {
+        basic: {
+            id: 'shade',
+            name: 'GÖLGE TOPU',
+            kind: 'shot',
+            icon: 'shade',
+            cooldown: 34,
+            // Anti-virüsün topundan yavaş ve biraz zayıf; karşılığında dönüyor.
+            damage: 6,
+            speed: 8,
+            radius: 8,
+            life: 110,
+            homing: 0.035,
+            animFrames: 16
+        },
+        special: {
+            id: 'swarm',
+            name: 'GÖLGE SÜRÜSÜ',
+            kind: 'burst',
+            icon: 'swarm',
+            cooldown: 540,
+            // Altı küçük küre her yöne açılıyor, sonra rakibe kıvrılıyor.
+            // Anti'nin saçılmasının tersi: oradaki toplar düz gidiyor, boşluktan
+            // geçiliyor; buradakiler sonunda rakibi buluyor ama tek tek zayıf.
+            count: 6,
+            damage: 5,
+            speed: 6,
+            radius: 8,
+            life: 150,
+            homing: 0.045,
+            animFrames: 26
+        },
+        signature: {
+            id: 'shadowstep',
+            name: 'GÖLGE ADIMI',
+            kind: 'blink',
+            icon: 'shadowstep',
+            padCombo: ['l1', 'triangle'],
+            keySlot: 'attack',
+            cooldown: 300,
+            // Elektronun ışınlanması rastgele yere düşer; buradaki rakibin
+            // ARKASINA düşüyor ve orada bir kez vuruyor. Bloklayan rakip
+            // vuruşu savar (takeDamage'in normal kuralı).
+            target: 'enemy',
+            behind: 96,
+            damage: 9,
+            animFrames: 16
+        }
     }
 
 };

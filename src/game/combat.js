@@ -121,6 +121,7 @@ export class Combat {
             kind: 'basic',
             owner: player,
             life: ability.life,
+            homing: ability.homing || 0,
             seed: Math.floor(Math.random() * 1000)
         });
     }
@@ -141,6 +142,7 @@ export class Combat {
                 kind: 'special',
                 owner: player,
                 life: ability.life,
+                homing: ability.homing || 0,
                 seed: i * 37
             });
         }
@@ -467,6 +469,7 @@ export class Combat {
 
     blink(player, ability) {
         const { canvas } = this.game;
+        if (ability.target === 'enemy') return this.shadowStep(player, ability);
         this.game.effects.createExplosion(player.x, player.y, '#ffe66d');
         player.x = ability.margin + Math.random() * (canvas.width - ability.margin * 2);
         player.y = player.groundY;
@@ -475,7 +478,42 @@ export class Combat {
         this.game.effects.createExplosion(player.x, player.y, '#7dd3fc');
     }
 
+    // Gölge adımı: rakibin ARKASINA düşer (baktığı yönün tersi) ve orada bir kez
+    // vurur. Rakip bloklarsa takeDamage vuruşu kendi kuralıyla savar.
+    shadowStep(player, ability) {
+        const { canvas, effects } = this.game;
+        const enemy = this.game.getEnemyOf(player);
+        const color = player.fighter.themeColor;
+        effects.createExplosion(player.x, player.y, color);
+        if (!enemy || enemy.isDead) return;
+        const behind = enemy.dir ? -enemy.dir : 1;
+        const x = enemy.x + behind * ability.behind;
+        player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, x));
+        player.y = enemy.y;
+        player.vx = 0;
+        player.vy = 0;
+        player.dir = enemy.x >= player.x ? 1 : -1;
+        effects.createExplosion(player.x, player.y, color);
+        enemy.takeDamage(ability.damage, { kind: 'basic', from: player });
+    }
+
     // ---- yürütme ----
+
+    // Kovalayan top: hızı değişmeden yönü rakibe doğru en çok e.homing radyan
+    // dönüyor. Küçük bir değer: zıplayan ya da yön değiştiren oyuncu kurtulur.
+    steer(e) {
+        const enemy = this.game.getEnemyOf(e.owner);
+        if (!enemy || enemy.isDead) return;
+        const speed = Math.hypot(e.vx, e.vy) || 1;
+        const cur = Math.atan2(e.vy, e.vx);
+        const want = Math.atan2(enemy.y - e.y, enemy.x - e.x);
+        let diff = want - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turn = Math.max(-e.homing, Math.min(e.homing, diff));
+        e.vx = Math.cos(cur + turn) * speed;
+        e.vy = Math.sin(cur + turn) * speed;
+    }
 
     hitsPlayer(e, player) {
         if (!player || player.isDead || player === e.owner) return false;
@@ -499,6 +537,7 @@ export class Combat {
                 case 'shot':
                 case 'mass': {
                     if (e.gravity) e.vy += e.gravity;
+                    if (e.homing) this.steer(e);
                     e.x += e.vx;
                     e.y += e.vy;
                     e.life--;
@@ -682,6 +721,7 @@ export class Combat {
     // Küçük, biçimsiz, hızlı: gövde bir blok, kenarlarında düzensiz çentikler.
     drawShot(ctx, e) {
         const r = Math.round(e.r / PX) * PX;
+        if (e.owner?.fighter?.id === 'shadow') return this.drawShadeOrb(ctx, e, r);
         ctx.fillStyle = '#7f2a20';
         ctx.fillRect(e.x - r, e.y - r, r * 2, r * 2);
         ctx.fillStyle = '#f2795c';
@@ -691,6 +731,26 @@ export class Combat {
         ctx.fillRect(e.x - r + PX * ((s % 2) + 1), e.y - r, PX, PX);
         ctx.fillRect(e.x + r - PX, e.y + PX * ((s >> 1) % 2), PX, PX);
         ctx.fillRect(e.x - r, e.y - PX * ((s >> 2) % 2), PX, PX);
+    }
+
+    // Gölge topu: mor-siyah, her karede kenarları titreyen duman küresi
+    drawShadeOrb(ctx, e, r) {
+        const t = this.game.frame;
+        ctx.fillStyle = '#0b0618';
+        ctx.fillRect(e.x - r, e.y - r, r * 2, r * 2);
+        ctx.fillStyle = '#4a2a82';
+        ctx.fillRect(e.x - r + PX, e.y - r + PX, r * 2 - PX * 2, r * 2 - PX * 2);
+        ctx.fillStyle = '#c77dff';
+        ctx.fillRect(e.x - PX, e.y - PX, PX * 2, PX * 2);
+        // Arkasında sürüklenen duman
+        const dx = e.vx >= 0 ? -1 : 1;
+        for (let i = 1; i <= 3; i++) {
+            ctx.globalAlpha = 0.6 - i * 0.15;
+            ctx.fillStyle = i % 2 ? '#32195a' : '#7a4fc0';
+            const jit = Math.round((hash(e.seed, t + i, 3) - 0.5) * 2) * PX;
+            ctx.fillRect(Math.round((e.x + dx * (r + i * PX * 2)) / PX) * PX, Math.round((e.y - PX + jit) / PX) * PX, PX * 2, PX * 2);
+        }
+        ctx.globalAlpha = 1;
     }
 
     // Beyaz elektrik kütlesi: köşeleri kesilmiş bir yığın, kenarları her

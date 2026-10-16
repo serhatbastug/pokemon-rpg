@@ -87,10 +87,10 @@ async function main() {
     // Kadro ağdan gelmiyor: dördü de elle çizilmiş, kartlar anında hazır
     await page.waitForSelector('.char-card', { timeout: 10000 });
     const cardCount = await page.$$eval('.char-card', els => els.length);
-    check('Dort dovuscu karti hazir', cardCount === 4, `${cardCount} kart`);
+    check('Bes dovuscu karti hazir', cardCount === 5, `${cardCount} kart`);
     const cardNames = await page.$$eval('.char-class', els => els.map(e => e.textContent));
-    check('Kadro VIRUS, ANTI-VIRUS, ELECTRO-VIRUS, ICE-VIRUS',
-        cardNames.join(',') === 'VİRÜS,ANTİ-VİRÜS,ELECTRO-VİRÜS,ICE-VİRÜS', cardNames.join(','));
+    check('Kadro VIRUS, ANTI-VIRUS, ELECTRO-VIRUS, ICE-VIRUS, GOLGE-VIRUS',
+        cardNames.join(',') === 'VİRÜS,ANTİ-VİRÜS,ELECTRO-VİRÜS,ICE-VİRÜS,GÖLGE-VİRÜS', cardNames.join(','));
 
     // --- Ana menü sahnesi ---
     // Menü artık gezilebilir bir piksel sahne; karakter seçimine ancak
@@ -610,7 +610,7 @@ async function main() {
     await shot('01-secim-ekrani');
 
     // --- Karakter seçimi kolla: imleç, ÇARPI ile aç, DAİRE ile kapat ---
-    await page.waitForFunction(() => document.querySelectorAll('.char-card').length === 4, { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelectorAll('.char-card').length === 5, { timeout: 10000 });
     await wait(200);
     const padHintOn = await page.evaluate(() => ({
         hint: !document.getElementById('pad-hint').classList.contains('hidden'),
@@ -1328,6 +1328,52 @@ async function main() {
     }));
     check('CARPI savas sonunda yeniden baslatiyor',
         restarted.kapandi && restarted.calisiyor && restarted.can > 0, JSON.stringify(restarted));
+
+    // --- GOLGE-VIRUS: kovalayan top, surusu, rakibin arkasina adim ---
+    const golge = await page.evaluate(() => {
+        const { FIGHTERS } = window.__fighters;
+        const f = (id) => FIGHTERS.find(x => x.id === id);
+        const g = window.__game;
+        g.start(f('shadow'), f('virus'));
+        for (let i = 0; i < 1500 && (g.intro || g.introQueue.length); i++) g.update();
+        const out = { intro: !!g.intro, p1: g.p1.fighter.id };
+
+        // Top: dogru ucuyor ve rakibin yuksekligine DOGRU KIVRILIYOR
+        g.combat.reset();
+        g.p1.x = 300; g.p2.x = 900;
+        g.p1.y = g.p1.groundY; g.p2.y = g.p2.groundY - 140;
+        g.p1.dir = 1;
+        g.p1.cooldowns.shade = 0;
+        g.p1.useAbility('basic');
+        const shot = g.combat.entities.find(e => e.type === 'shot');
+        const y0 = shot.y;
+        for (let i = 0; i < 30; i++) g.combat.update();
+        out.homing = { y0, y1: shot.y, hedefY: g.p2.y, kivrildi: shot.y < y0 - 5 };
+
+        // Surusu: 6 kure, hepsi homing
+        g.combat.reset();
+        g.p1.cooldowns.swarm = 0;
+        g.p1.useAbility('special');
+        const kureler = g.combat.entities.filter(e => e.type === 'shot');
+        out.surusu = { adet: kureler.length, homing: kureler.every(e => e.homing > 0) };
+
+        // Gölge adımı: rakibin ARKASINA düşüyor ve vuruyor
+        g.combat.reset();
+        g.p1.x = 200; g.p2.x = 800; g.p2.dir = 1;     // rakip sağa bakıyor: arkası SOL
+        g.p1.y = g.p1.groundY; g.p2.y = g.p2.groundY;
+        const can0 = g.p2.hp;
+        g.p2.invulnerable = false; g.p2.invulnFrames = 0;
+        g.p1.cooldowns.shadowstep = 0;
+        g.p1.useAbility('signature');
+        out.adim = { x: Math.round(g.p1.x), rakipX: g.p2.x, hasar: can0 - g.p2.hp };
+        return out;
+    });
+    check('Golge arenaya cikiyor', !golge.intro && golge.p1 === 'shadow', JSON.stringify(golge));
+    check('Golge topu rakibin yuksekligine dogru kivriliyor', golge.homing.kivrildi, JSON.stringify(golge.homing));
+    check('Golge surusu 6 kovalayan kure cikariyor', golge.surusu.adet === 6 && golge.surusu.homing, JSON.stringify(golge.surusu));
+    check('Golge adimi rakibin arkasina dusup vuruyor',
+        golge.adim.x < golge.adim.rakipX && golge.adim.rakipX - golge.adim.x < 150 && golge.adim.hasar > 0, JSON.stringify(golge.adim));
+    await shot('03c-golge-virus');
 
     // Avci kulubesi bolumu: patikadan acikliga, kulube, yataklar, gorevler, gece, Fred yok
     const camp = await import('../src/adventure/campLayout.js');

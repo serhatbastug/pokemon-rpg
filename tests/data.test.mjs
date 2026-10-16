@@ -21,9 +21,9 @@ function check(name, condition, detail = '') {
 const { FIGHTERS, fighterById } = await import('../src/game/fighters.js');
 const { FIGHTER_SPRITES } = await import('../src/game/fighterArt.js');
 
-check('kadroda dört dövüşçü var', FIGHTERS.length === 4, FIGHTERS.map(f => f.id).join(','));
-check('kadro virüs, anti-virüs, elektro-virüs ve ice-virüs',
-    FIGHTERS.map(f => f.id).join(',') === 'virus,antivirus,electro,ice');
+check('kadroda beş dövüşçü var', FIGHTERS.length === 5, FIGHTERS.map(f => f.id).join(','));
+check('kadro virüs, anti-virüs, elektro-virüs, ice-virüs ve gölge-virüs',
+    FIGHTERS.map(f => f.id).join(',') === 'virus,antivirus,electro,ice,shadow');
 check('dövüşçü kimlikleri benzersiz', new Set(FIGHTERS.map(f => f.id)).size === FIGHTERS.length);
 check('her dövüşçünün çizimi var',
     FIGHTERS.every(f => typeof FIGHTER_SPRITES[f.id] === 'function'),
@@ -54,7 +54,7 @@ check('karşılığı olup kadroda kullanılmayan giriş yok',
 check('her dövüşçünün girişi kendi anahtarını taşıyor',
     FIGHTERS.every(f => f.intro === f.id), FIGHTERS.map(f => `${f.id}:${f.intro}`).join(' '));
 const introFrames = [intro.INTRO_FRAMES, intro.ANTIVIRUS_INTRO_FRAMES,
-    intro.VIRUS_INTRO_FRAMES, intro.ICE_INTRO_FRAMES];
+    intro.VIRUS_INTRO_FRAMES, intro.ICE_INTRO_FRAMES, intro.SHADOW_INTRO_FRAMES];
 check('giriş animasyonları 3-6 saniye arası',
     introFrames.every(n => n >= 180 && n <= 360), introFrames.join(' / '));
 check('bilinmeyen dövüşçü için null', fighterById('yok-boyle-biri') === null);

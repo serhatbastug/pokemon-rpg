@@ -55,6 +55,19 @@ export const FIGHTERS = [
         description: 'Yayılmayı yavaşlatan değil DURDURAN sap. Taşıyıcısından geriye bir ' +
             'gövde bile kalmamış: yerin biraz üstünde süzülen, iki gözü yanan bir buz ' +
             'kütlesi. Kolları kılıç, kendisi iki kişi - hangisinin asıl olduğu belli değil.'
+    },
+    {
+        id: 'shadow',
+        name: 'GÖLGE-VİRÜS',
+        themeColor: '#8a5bd6',
+        // Kadronun en kırılgan hızlısı: anti kadar ince değil ama ondan daha az
+        // can. Dengesi hamlelerinde: topları rakibi KOVALIYOR, adımı rakibin
+        // ARKASINA düşüyor (bkz. abilities.js).
+        stats: { hp: 105, speed: 5.2 },
+        intro: 'shadow',
+        description: 'Işığı yutan taşıyıcı. Kapüşonun içi bomboş, yalnızca iki göz yanıyor; ' +
+            'beli aşağısı ayak yerine dumana dağılıyor. Topları kaçsan da peşinden gelir, ' +
+            'kendisi bir an siliniyor ve rakibinin arkasında beliriyor.'
     }
 ];
 

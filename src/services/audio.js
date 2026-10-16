@@ -10,6 +10,8 @@ let musicGain = null;
 let enabled = true;
 let musicTimer = null;
 let currentTrack = null;
+let musicEnabled = true;
+try { musicEnabled = localStorage.getItem('musicOff') !== '1'; } catch (e) { /* özel pencere */ }
 
 function ensureContext() {
     if (ctx) return ctx;
@@ -21,9 +23,14 @@ function ensureContext() {
     master.gain.value = 0.35;
     master.connect(ctx.destination);
 
+    // Müzik: daha kısık ve yumuşak (tiz kısmı kesilir); yorucu olmasın
     musicGain = ctx.createGain();
-    musicGain.gain.value = 0.18;
-    musicGain.connect(master);
+    musicGain.gain.value = musicEnabled ? 0.10 : 0;
+    const soften = ctx.createBiquadFilter();
+    soften.type = 'lowpass';
+    soften.frequency.value = 1300;
+    musicGain.connect(soften);
+    soften.connect(master);
     return ctx;
 }
 
@@ -163,8 +170,8 @@ export const Sfx = {
     // Konusma: dublaj yok, harf harf yazilirken cikan kisa "bit" sesi.
     // Perde konusana gore degisiyor, yoksa herkes ayni karakter gibi duyuluyor.
     talk: (pitch = 1) => blip({
-        type: 'square', from: 640 * pitch, to: 540 * pitch,
-        duration: 0.04, volume: 0.10
+        type: 'triangle', from: 520 * pitch, to: 450 * pitch,
+        duration: 0.05, volume: 0.07
     }),
 
     // --- Prolog 3: kusatma ---
@@ -216,16 +223,61 @@ export const Sfx = {
 const TRACKS = {
     forest: { root: 196, scale: [0, 3, 5, 7, 10], tempo: 300, wave: 'triangle' },
     shadow: { root: 147, scale: [0, 2, 3, 7, 8], tempo: 360, wave: 'triangle' },
-    boss: { root: 110, scale: [0, 1, 5, 6, 7], tempo: 200, wave: 'square' },
+    boss: { root: 110, scale: [0, 1, 5, 6, 7], tempo: 280, wave: 'triangle', rest: 0.3 },
     town: { root: 262, scale: [0, 4, 7, 9, 11], tempo: 330, wave: 'triangle' },
     // Harabe şehir: ağır, boşluklu, uyumsuz. Notalar arası uzun sessizlik.
     ruin: { root: 131, scale: [0, 1, 5, 6, 8], tempo: 620, wave: 'triangle' },
     // Kusatma: hizli, alcak, uyumsuz
-    siege: { root: 110, scale: [0, 1, 6, 7, 8], tempo: 190, wave: 'square' },
+    siege: { root: 110, scale: [0, 1, 6, 7, 8], tempo: 270, wave: 'triangle', rest: 0.3 },
     // Kanalizasyon: kusatmadan da hizli ve daha alcak. Kosu durmuyor,
     // muzik de durmamali; notalar dar araliktan cikmiyor - burasi kapali.
-    sewer: { root: 98, scale: [0, 1, 3, 6, 7], tempo: 150, wave: 'square' }
+    sewer: { root: 98, scale: [0, 1, 3, 6, 7], tempo: 240, wave: 'triangle', rest: 0.3 }
 };
+
+// Müzik her çalışta aynı beş notayı döndürmesin: parça başına sabit tohumdan
+// 64 adımlık bir cümle üretilir (rastgele yürüyüş + sessiz adımlar), her turda
+// başka bir yarım ton kayar. Böylece ses uzun süre dinlenince de yormaz.
+function trackSeed(name) {
+    let h = 7;
+    for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return h;
+}
+
+function buildPhrase(track, name) {
+    let seed = trackSeed(name);
+    const rand = () => {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        return seed / 4294967296;
+    };
+    const rest = track.rest ?? 0.38;
+    const notes = [];
+    let idx = 0;
+    for (let i = 0; i < 64; i++) {
+        idx = Math.max(0, Math.min(track.scale.length - 1, idx + Math.floor(rand() * 3) - 1));
+        const silent = i % 8 !== 0 && rand() < rest;
+        notes.push(silent ? null : { semitone: track.scale[idx], octave: rand() < 0.25 ? 2 : 1 });
+    }
+    return notes;
+}
+
+const TURN_SHIFT = [0, 0, -2, 3, 0, -5];
+
+export function setMusicEnabled(value) {
+    musicEnabled = value;
+    try { localStorage.setItem('musicOff', value ? '0' : '1'); } catch (e) { /* önemli değil */ }
+    if (musicGain) musicGain.gain.value = value ? 0.10 : 0;
+}
+
+export function isMusicEnabled() {
+    return musicEnabled;
+}
+
+// M tuşu: müziği aç/kapat (efektler ve konuşma sesleri kalır)
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey) setMusicEnabled(!musicEnabled);
+    });
+}
 
 export function playMusic(name) {
     if (currentTrack === name) return;
@@ -234,18 +286,22 @@ export function playMusic(name) {
     if (!track || !ensureContext() || !enabled) return;
 
     currentTrack = name;
+    const phrase = buildPhrase(track, name);
     let step = 0;
 
     const tick = () => {
         if (!enabled || currentTrack !== name) return;
-        const semitone = track.scale[step % track.scale.length];
-        const octave = step % 8 < 4 ? 1 : 2;
-        const freq = track.root * Math.pow(2, semitone / 12) * octave;
+        const pos = step % phrase.length;
+        const turn = Math.floor(step / phrase.length);
+        const note = phrase[pos];
+        const shift = TURN_SHIFT[turn % TURN_SHIFT.length];
 
-        // Melodi
-        blipMusic(freq, track.wave, track.tempo / 1000 * 0.9, 0.28);
-        // Her dört adımda bir bas
-        if (step % 4 === 0) blipMusic(track.root / 2, 'square', track.tempo / 1000 * 1.6, 0.22);
+        if (note) {
+            const freq = track.root * Math.pow(2, (note.semitone + shift) / 12) * note.octave;
+            blipMusic(freq, track.wave, track.tempo / 1000 * 1.1, 0.22);
+        }
+        // Her sekiz adımda bir uzun, kısık bas
+        if (pos % 8 === 0) blipMusic(track.root / 2 * Math.pow(2, shift / 12), 'triangle', track.tempo / 1000 * 3, 0.2);
 
         step++;
     };

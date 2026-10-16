@@ -20,6 +20,7 @@ import { DriveScene } from './adventure/DriveScene.js';
 import { ForestMouthScene } from './adventure/ForestMouthScene.js';
 import { CampScene } from './adventure/CampScene.js';
 import { SettingsMenu } from './ui/settings.js';
+import { ExitConfirm } from './ui/exitConfirm.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
@@ -70,16 +71,18 @@ function returnToMenu() {
 // Harry'yi yürüttüğümüz 3/4 görünümlü sahne (adventure/).
 // Ayarlar ekranı: L / OPTIONS (müzik açık-kapalı, müzik ve efekt sesi)
 new SettingsMenu({ gamepad });
+// Çıkış onayı: oynarken DAİRE / Esc ile yanlışlıkla çıkılmasın
+const exitConfirm = new ExitConfirm({ gamepad });
 
 const comic = new ComicScene({
     canvas: document.getElementById('comicCanvas'),
     input,
     gamepad,
-    onExit: () => {
+    onExit: () => exitConfirm.ask(() => {
         comic.stop();
         showMenuScreen();
         menu.start();
-    },
+    }),
     onFinish: () => {
         comic.stop();
         startAdventure();
@@ -95,7 +98,7 @@ const adventure = new AdventureScene({
     canvas: document.getElementById('adventureCanvas'),
     input,
     gamepad,
-    onExit: () => backToMenu(),
+    onExit: () => exitConfirm.ask(backToMenu),
     // Bölüm 1 bitince "O GECE" bölümü, o bitince araba sahnesi gelir
     onFinish: (entry) => {
         adventure.stop();
@@ -108,7 +111,7 @@ const drive = new DriveScene({
     canvas: document.getElementById('adventureCanvas'),
     input,
     gamepad,
-    onExit: () => backToMenu(),
+    onExit: () => exitConfirm.ask(backToMenu),
     onFinish: () => {
         drive.stop();
         startForestMouth();
@@ -120,7 +123,7 @@ const forestMouth = new ForestMouthScene({
     canvas: document.getElementById('adventureCanvas'),
     input,
     gamepad,
-    onExit: () => backToMenu(),
+    onExit: () => exitConfirm.ask(backToMenu),
     onFinish: () => {
         forestMouth.stop();
         startCamp();
@@ -132,7 +135,7 @@ const camp = new CampScene({
     canvas: document.getElementById('adventureCanvas'),
     input,
     gamepad,
-    onExit: () => backToMenu(),
+    onExit: () => exitConfirm.ask(backToMenu),
     onFinish: () => backToMenu()
 });
 

@@ -389,8 +389,27 @@ async function main() {
     check('Oynanis bitince araba sahnesi basliyor',
         await page.evaluate(() => window.__drive.running && !window.__adventure.running && window.__drive.phase === 'drive'));
     await shot('00d6-araba');
+    // Cikis onayi: Esc soru sorar, oyun donar; Esc ikinci kez vazgecer (sahne kalir)
     await page.keyboard.press('Escape');
-    await wait(400);
+    await wait(300);
+    const askOpen = await page.evaluate(() => ({
+        shown: !document.getElementById('exit-confirm').classList.contains('hidden'),
+        running: window.__drive.running
+    }));
+    await shot('00d7-cikis-onayi');
+    await page.keyboard.press('Escape');
+    await wait(300);
+    const askCancelled = await page.evaluate(() => ({
+        shown: !document.getElementById('exit-confirm').classList.contains('hidden'),
+        running: window.__drive.running
+    }));
+    check('Cikis onayi: Esc soru soruyor, ikinci Esc vazgeciriyor, sahne kaliyor',
+        askOpen.shown && askOpen.running && !askCancelled.shown && askCancelled.running, JSON.stringify({ askOpen, askCancelled }));
+    await page.keyboard.press('Escape');
+    await wait(300);
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('Enter');
+    await wait(500);
     const afterPlay = await page.evaluate(() => ({
         menu: window.__menu.running,
         adventure: window.__adventure.running || window.__drive.running,
@@ -465,9 +484,12 @@ async function main() {
     await page.waitForFunction(() => window.__adventure.running, { timeout: 8000 });
     check('Bolum secme: oynanis girisi dogrudan oynanisi aciyor',
         await page.evaluate(() => !document.getElementById('adventure-screen').classList.contains('hidden')));
-    // Esc ile ana menuye
+    // Esc + onay ile ana menuye
     await page.keyboard.press('Escape');
-    await wait(400);
+    await wait(300);
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('Enter');
+    await wait(500);
     check('Oynanis: Esc ana menuye donduruyor',
         await page.evaluate(() => window.__menu.running && !window.__adventure.running));
 

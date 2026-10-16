@@ -230,6 +230,9 @@ export class GamepadManager {
         while (this.slots.length < pads.length) this.slots.push(new PadSlot());
         if (this.slots.length > pads.length) this.slots.length = pads.length;
 
+        // Duraklama durumu poll başında sabitlenir: bir pencereyi kapatan basış aynı
+        // karede sahneye de ulaşıp oyundan çıkarmasın.
+        const pausedNow = isPaused();
         for (let i = 0; i < pads.length; i++) {
             const slot = this.slots[i];
             const fresh = slot.apply(pads[i]);
@@ -242,7 +245,7 @@ export class GamepadManager {
 
             for (const name of fresh) {
                 for (const handler of this.rawHandlers) handler(i, name);
-                if (isPaused()) continue;
+                if (pausedNow) continue;
                 for (const handler of this.slotHandlers) handler(i, name);
                 if (i === 0) for (const handler of this.handlers) handler(name);
             }

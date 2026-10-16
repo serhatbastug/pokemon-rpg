@@ -8,7 +8,7 @@
 import {
     getAudioSettings, setMusicOn, setMusicVolume, setSfxVolume, unlockAudio, Sfx
 } from '../services/audio.js';
-import { setPaused } from '../core/pause.js';
+import { currentModal, setModal } from '../core/pause.js';
 
 const STEP = 0.1;
 const ROWS = ['music-on', 'music-vol', 'sfx-vol'];
@@ -74,9 +74,10 @@ export class SettingsMenu {
     }
 
     show() {
+        if (currentModal()) return;
         unlockAudio();
         this.open = true;
-        setPaused(true);
+        setModal('settings');
         this.index = 0;
         this.overlay.classList.remove('hidden');
         this.refresh();
@@ -84,7 +85,7 @@ export class SettingsMenu {
 
     close() {
         this.open = false;
-        setPaused(false);
+        setModal(null);
         this.overlay.classList.add('hidden');
     }
 

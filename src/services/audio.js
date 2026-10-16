@@ -292,6 +292,9 @@ const FILE_TRACKS = {
     // Ana menü ve araba sürüşü aynı ailenin parçaları (aynı ses dünyası)
     town: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
     siege: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
+    // Çizgi roman 3 (sağlık ocağı) ve 4 (karantina): merak uyandıran gizem parçaları
+    mystery: { src: 'assets/audio/quantum-stone.ogg', volume: 0.9 },
+    quarantine: { src: 'assets/audio/unsolved-investigation.ogg', volume: 0.7 },
     boss: { src: 'assets/audio/Chase.ogg', volume: 0.28 },
     sewer: { src: 'assets/audio/Chase.ogg', volume: 0.28 }
 };

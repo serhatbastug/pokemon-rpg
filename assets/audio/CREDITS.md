@@ -4,3 +4,5 @@
 - **Post-Apocalyptic Morning / Afternoon / Night** - MintoDog - https://opengameart.org/node/178490 (CC0)
 
 Dosyalar OpenGameArt'tan indirildi, değiştirilmedi.
+- **Quantum Stone** - zesona - https://opengameart.org/content/quantum-stone (CC0)
+- **Unsolved Investigation** - isaiah658 - https://opengameart.org/content/unsolved-investigation (CC0)

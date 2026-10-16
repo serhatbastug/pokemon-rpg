@@ -21,6 +21,7 @@
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
+import { isPaused } from '../core/pause.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
 import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { hash } from '../pixel/pixelDraw.js';
@@ -812,6 +813,7 @@ export class AdventureScene {
     // --- Adım ---
 
     step() {
+        if (isPaused()) return;
         this.frame++;
         if (this.intro > 0) this.intro--;
         this.gamepad?.poll();

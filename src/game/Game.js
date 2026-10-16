@@ -1,4 +1,5 @@
 import { Player } from './Player.js';
+import { isPaused } from '../core/pause.js';
 import { EffectsManager } from './effects.js';
 import { Combat } from './combat.js';
 import { randomArena, ledgesOf } from './arenas.js';
@@ -245,6 +246,7 @@ export class Game {
     }
 
     update() {
+        if (isPaused()) return;
         if (this.isGameOver) return;
 
         const { ctx, canvas, effects } = this;

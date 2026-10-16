@@ -193,6 +193,7 @@ const manager = Object.create(GamepadManager.prototype);
 manager.slots = [];
 manager.handlers = [];
 manager.slotHandlers = [];
+manager.rawHandlers = [];
 manager.connected = true;
 manager.allPads = () => twoPads;
 

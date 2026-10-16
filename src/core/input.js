@@ -1,5 +1,6 @@
 // Klavye durumu takibi. Oyun mantığı tuşları yalnızca bu sınıf üzerinden okur.
 import { setDevice } from './device.js';
+import { isPaused } from './pause.js';
 
 export class InputManager {
     constructor() {
@@ -18,7 +19,7 @@ export class InputManager {
     }
 
     isDown(code) {
-        return !!this.keys[code];
+        return !isPaused() && !!this.keys[code];
     }
 
     onKeyDown(handler) {

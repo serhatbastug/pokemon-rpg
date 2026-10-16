@@ -138,6 +138,31 @@
             </div>
         </section>
 
+        <!-- Ayarlar: L / OPTIONS ile açılır (müzik, müzik sesi, efekt sesi) -->
+        <section id="settings" class="pixel-overlay hidden">
+            <div class="pixel-modal settings-modal">
+                <p class="pixel-title">AYARLAR</p>
+                <div class="settings-row" data-row="music-on">
+                    <span class="settings-label">MÜZİK</span>
+                    <button id="settings-music-toggle" class="pixel-btn settings-toggle">AÇIK</button>
+                </div>
+                <div class="settings-row" data-row="music-vol">
+                    <span class="settings-label">MÜZİK SESİ</span>
+                    <input id="settings-music-vol" type="range" min="0" max="100" step="10" value="70">
+                    <span id="settings-music-vol-value" class="settings-value">%70</span>
+                </div>
+                <div class="settings-row" data-row="sfx-vol">
+                    <span class="settings-label">EFEKT SESİ</span>
+                    <input id="settings-sfx-vol" type="range" min="0" max="100" step="10" value="70">
+                    <span id="settings-sfx-vol-value" class="settings-value">%70</span>
+                </div>
+                <div class="pixel-actions">
+                    <button id="settings-close" class="pixel-btn ghost">KAPAT</button>
+                </div>
+                <p class="pixel-foot">Yön tuşları: seç / ayarla &middot; Enter / ÇARPI: müziği aç-kapat &middot; L / OPTIONS / Esc: kapat</p>
+            </div>
+        </section>
+
         <!-- Macera kapısının onay penceresi (piksel diyalog kutusu) -->
         <section id="start-prompt" class="pixel-overlay hidden">
             <div class="pixel-modal">

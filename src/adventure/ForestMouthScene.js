@@ -11,6 +11,7 @@
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
+import { isPaused } from '../core/pause.js';
 import { treeSpriteFor } from '../pixel/trees.js';
 import { hash, PX } from '../pixel/pixelDraw.js';
 import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
@@ -155,6 +156,7 @@ export class ForestMouthScene {
     // --- Adım ---
 
     step() {
+        if (isPaused()) return;
         this.frame++;
         if (this.intro > 0) this.intro--;
         this.dialogue.step();

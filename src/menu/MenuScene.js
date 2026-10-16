@@ -6,6 +6,7 @@
 //             karakter seçimine gidilir
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
+import { isPaused } from '../core/pause.js';
 import { drawMenuAvatar } from '../world/menuAvatarSprite.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
@@ -165,6 +166,7 @@ export class MenuScene {
     }
 
     step() {
+        if (isPaused()) return;
         this.frame++;
         if (this.intro > 0) this.intro--;
 

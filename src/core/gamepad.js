@@ -21,6 +21,7 @@
 // kalır. Menü ve prolog sahneleri tek kolla oynandığı için 1. kolu okuyor.
 
 import { setDevice } from './device.js';
+import { isPaused } from './pause.js';
 
 export const BUTTONS = {
     cross: 0,
@@ -157,6 +158,7 @@ export class GamepadManager {
         this.connected = false;
         this.handlers = [];       // (tuş) -> ...   yalnızca 1. kol
         this.slotHandlers = [];   // (yuva, tuş) -> ...   her kol
+        this.rawHandlers = [];    // (yuva, tuş) -> ...   duraklamada da çalışır (ayarlar ekranı)
 
         this.scanCountdown = 0;    // kol yokken bir sonraki taramaya kalan kare
 
@@ -239,6 +241,8 @@ export class GamepadManager {
             if (fresh.length > 0 || slot.state.magnitude > 0.4) setDevice('gamepad');
 
             for (const name of fresh) {
+                for (const handler of this.rawHandlers) handler(i, name);
+                if (isPaused()) continue;
                 for (const handler of this.slotHandlers) handler(i, name);
                 if (i === 0) for (const handler of this.handlers) handler(name);
             }
@@ -251,6 +255,7 @@ export class GamepadManager {
     }
 
     stickAt(index) {
+        if (isPaused()) return NEUTRAL;
         return this.slots[index]?.state || NEUTRAL;
     }
 
@@ -265,7 +270,7 @@ export class GamepadManager {
     }
 
     isDownAt(index, name) {
-        return !!this.slots[index]?.held.has(name);
+        return !isPaused() && !!this.slots[index]?.held.has(name);
     }
 
     // Bir tuşa basıldığı anda çağrılır (handler'a tuş adı gelir). Yalnızca
@@ -276,6 +281,11 @@ export class GamepadManager {
 
     // Hangi kolda olursa olsun bir tuşa basıldığı anda çağrılır (handler'a
     // yuva sırası ve tuş adı gelir). İki kişilik arena bunu kullanıyor.
+    // Duraklamada bile çağrılır: ayarlar ekranı kolu buradan dinler.
+    onRawButtonDown(handler) {
+        this.rawHandlers.push(handler);
+    }
+
     onSlotButtonDown(handler) {
         this.slotHandlers.push(handler);
     }

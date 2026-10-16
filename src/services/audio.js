@@ -11,8 +11,19 @@ let enabled = true;
 let musicTimer = null;
 let currentTrack = null;
 const MUSIC_GAIN = 0.10;
-let musicEnabled = true;
-try { musicEnabled = localStorage.getItem('musicOff') !== '1'; } catch (e) { /* özel pencere */ }
+let sfxGain = null;
+
+// Ayarlar ekranı: müzik açık/kapalı, müzik sesi, efekt sesi. 0..1; varsayılan
+// ses 0.7 = şimdiye kadarki seviye (volumeScale 1), 1.0 = 1.4 kat.
+const DEFAULT_VOLUME = 0.7;
+const settings = { musicOn: true, musicVol: DEFAULT_VOLUME, sfxVol: DEFAULT_VOLUME };
+try {
+    Object.assign(settings, JSON.parse(localStorage.getItem('audioSettings') || '{}'));
+} catch (e) { /* özel pencere ya da bozuk kayıt */ }
+
+function volumeScale(v) {
+    return Math.max(0, Math.min(1, v)) / DEFAULT_VOLUME;
+}
 
 function ensureContext() {
     if (ctx) return ctx;
@@ -24,9 +35,14 @@ function ensureContext() {
     master.gain.value = 0.35;
     master.connect(ctx.destination);
 
+    // Efektler (tık, konuşma, vuruş) ayrı bir bus'tan geçer: ses ayarı müzikten bağımsız
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = volumeScale(settings.sfxVol);
+    sfxGain.connect(master);
+
     // Müzik: daha kısık ve yumuşak (tiz kısmı kesilir); yorucu olmasın
     musicGain = ctx.createGain();
-    musicGain.gain.value = musicEnabled ? MUSIC_GAIN : 0;
+    musicGain.gain.value = settings.musicOn ? MUSIC_GAIN * volumeScale(settings.musicVol) : 0;
     const soften = ctx.createBiquadFilter();
     soften.type = 'lowpass';
     soften.frequency.value = 1300;
@@ -73,7 +89,7 @@ function blip({ type = 'square', from, to = from, duration = 0.12, volume = 0.5,
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
     osc.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxGain);
     osc.start(start);
     osc.stop(start + duration + 0.02);
 }
@@ -103,7 +119,7 @@ function noise({ duration = 0.2, volume = 0.4, filterFrom = 2000, filterTo = 200
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxGain);
     source.start(start);
 }
 
@@ -265,21 +281,35 @@ const TURN_SHIFT = [0, 0, -2, 3, 0, -5];
 
 // Müzik kazancını tek yerden uygular: sentez yolu musicGain, dosya yolu fileBus
 function applyMusicGain() {
-    if (musicGain) musicGain.gain.value = musicEnabled ? MUSIC_GAIN : 0;
-    if (fileBus) fileBus.gain.value = musicEnabled ? (FILE_TRACKS[currentTrack]?.volume ?? 0) : 0;
+    const scale = settings.musicOn ? volumeScale(settings.musicVol) : 0;
+    if (musicGain) musicGain.gain.value = MUSIC_GAIN * scale;
+    if (fileBus) fileBus.gain.value = (FILE_TRACKS[currentTrack]?.volume ?? 0) * scale;
 }
 
-function setMusicEnabled(value) {
-    musicEnabled = value;
-    try { localStorage.setItem('musicOff', value ? '0' : '1'); } catch (e) { /* önemli değil */ }
+function saveSettings() {
+    try { localStorage.setItem('audioSettings', JSON.stringify(settings)); } catch (e) { /* önemli değil */ }
+}
+
+export function getAudioSettings() {
+    return { ...settings };
+}
+
+export function setMusicOn(value) {
+    settings.musicOn = value;
+    saveSettings();
     applyMusicGain();
 }
 
-// M tuşu: müziği aç/kapat (efektler ve konuşma sesleri kalır)
-if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', (e) => {
-        if (e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey) setMusicEnabled(!musicEnabled);
-    });
+export function setMusicVolume(value) {
+    settings.musicVol = Math.max(0, Math.min(1, value));
+    saveSettings();
+    applyMusicGain();
+}
+
+export function setSfxVolume(value) {
+    settings.sfxVol = Math.max(0, Math.min(1, value));
+    saveSettings();
+    if (sfxGain) sfxGain.gain.value = volumeScale(settings.sfxVol);
 }
 
 // Telifsiz (CC0) gerçek müzik dosyaları: assets/audio/ (kaynaklar CREDITS.md'de).

@@ -1156,3 +1156,57 @@ canvas {
 .chapter-btn {
     text-align: left;
 }
+
+/* ---- Ayarlar ekranı ---- */
+.settings-modal {
+    max-width: 560px;
+}
+
+.settings-row {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr 3.4rem;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.6rem;
+    text-align: left;
+    border: 3px solid transparent;
+}
+
+.settings-row.selected {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.settings-label,
+.settings-value {
+    font-family: 'Press Start 2P', 'Space Grotesk', monospace;
+    font-size: 0.65rem;
+    color: #f8fafc;
+}
+
+.settings-value {
+    text-align: right;
+    color: #fbbf24;
+}
+
+.settings-row input[type="range"] {
+    width: 100%;
+    accent-color: #4ade80;
+}
+
+.settings-toggle {
+    grid-column: 2 / 4;
+    justify-self: start;
+    padding: 0.5rem 1.2rem;
+}
+
+.settings-toggle.off {
+    background: #f87171;
+    box-shadow: 0 0 0 4px #450a0a, 0 6px 0 4px #991b1b;
+}
+
+.settings-modal .pixel-foot {
+    line-height: 1.8;
+    margin-top: 1rem;
+}

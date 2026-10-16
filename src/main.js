@@ -18,6 +18,7 @@ import { ComicScene } from './comic/ComicScene.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
 import { DriveScene } from './adventure/DriveScene.js';
 import { ForestMouthScene } from './adventure/ForestMouthScene.js';
+import { SettingsMenu } from './ui/settings.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
 import { ABILITIES } from './game/abilities.js';
@@ -66,6 +67,9 @@ function returnToMenu() {
 
 // PROLOG: çizgi roman (7 bölüm). Bitince OYNANIŞ başlıyor: laboratuvarda
 // Harry'yi yürüttüğümüz 3/4 görünümlü sahne (adventure/).
+// Ayarlar ekranı: L / OPTIONS (müzik açık-kapalı, müzik ve efekt sesi)
+new SettingsMenu({ gamepad });
+
 const comic = new ComicScene({
     canvas: document.getElementById('comicCanvas'),
     input,

@@ -399,6 +399,35 @@ async function main() {
     check('Araba sahnesinde Esc ana menuye donduruyor',
         afterPlay.menu && !afterPlay.adventure && afterPlay.screen, JSON.stringify(afterPlay));
 
+    // Ayarlar ekrani: L ile acilir, oyunu dondurur, ses ayarlari degisir, L ile kapanir
+    await page.keyboard.press('KeyL');
+    await wait(200);
+    const settingsOpen = await page.evaluate(() => ({
+        shown: !document.getElementById('settings').classList.contains('hidden'),
+        rows: document.querySelectorAll('#settings .settings-row').length
+    }));
+    check('Ayarlar: L ile aciliyor, uc satir var', settingsOpen.shown && settingsOpen.rows === 3, JSON.stringify(settingsOpen));
+    await shot('00e-ayarlar');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowRight');
+    await wait(150);
+    const changed = await page.evaluate(() => ({
+        music: document.getElementById('settings-music-toggle').textContent,
+        musicVol: document.getElementById('settings-music-vol').value,
+        sfxVol: document.getElementById('settings-sfx-vol').value
+    }));
+    check('Ayarlar: muzik kapanir, muzik sesi azalir, efekt sesi artar',
+        changed.music === 'KAPALI' && changed.musicVol === '60' && changed.sfxVol === '80', JSON.stringify(changed));
+    await page.keyboard.press('Enter');   // geri ac: sonraki testler etkilenmesin
+    await page.keyboard.press('KeyL');
+    await wait(150);
+    check('Ayarlar: L ile kapaniyor',
+        await page.evaluate(() => document.getElementById('settings').classList.contains('hidden')));
+    await page.evaluate(() => localStorage.removeItem('audioSettings'));
+
     // Bolum seciminde oynanis girisi var ve dogrudan oynanisi aciyor
     await page.evaluate(() => { window.__menu.player.x = 500; window.__menu.player.y = 250; });
     await page.keyboard.press('KeyF');

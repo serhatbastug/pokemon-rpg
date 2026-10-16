@@ -9,6 +9,7 @@
 // yazıyı tamamlar, sonra kareyi ilerletir. ESC / DAİRE prologu bırakır.
 
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
+import { isPaused } from '../core/pause.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { VOICE_PITCH } from '../adventure/dialogue.js';
 import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
@@ -123,6 +124,7 @@ export class ComicScene {
     }
 
     step() {
+        if (isPaused()) return;
         this.frame++;
         this.gamepad?.poll();
         this.player.step();

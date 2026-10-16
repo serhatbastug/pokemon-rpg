@@ -18,6 +18,7 @@ import { ComicScene } from './comic/ComicScene.js';
 import { AdventureScene } from './adventure/AdventureScene.js';
 import { DriveScene } from './adventure/DriveScene.js';
 import { ForestMouthScene } from './adventure/ForestMouthScene.js';
+import { CampScene } from './adventure/CampScene.js';
 import { SettingsMenu } from './ui/settings.js';
 import { INTRO_FRAMES, ANTIVIRUS_INTRO_FRAMES, VIRUS_INTRO_FRAMES } from './game/fighterIntro.js';
 import { FIGHTERS } from './game/fighters.js';
@@ -120,8 +121,25 @@ const forestMouth = new ForestMouthScene({
     input,
     gamepad,
     onExit: () => backToMenu(),
+    onFinish: () => {
+        forestMouth.stop();
+        startCamp();
+    }
+});
+
+// AVCI KULÜBESİ: patika, kulübe, birkaç günlük hayatta kalma, Fred'in kayboluşu
+const camp = new CampScene({
+    canvas: document.getElementById('adventureCanvas'),
+    input,
+    gamepad,
+    onExit: () => backToMenu(),
     onFinish: () => backToMenu()
 });
+
+function startCamp() {
+    showAdventureScreen();
+    camp.start();
+}
 
 function startForestMouth() {
     showAdventureScreen();
@@ -142,6 +160,7 @@ function backToMenu() {
     adventure.stop();
     drive.stop();
     forestMouth.stop();
+    camp.stop();
     showMenuScreen();
     menu.start();
 }
@@ -153,7 +172,8 @@ const chapterSelect = new ChapterSelect({
         menu.stop();
         // Sayı = çizgi roman bölümü, metin = oynanış girişi
         if (typeof chapter === 'string') {
-            startAdventure(chapter);
+            if (chapter === 'kulube') startCamp();
+            else startAdventure(chapter);
             return;
         }
         showComicScreen();
@@ -214,6 +234,7 @@ window.__comic = comic;
 window.__adventure = adventure;
 window.__drive = drive;
 window.__forestMouth = forestMouth;
+window.__camp = camp;
 window.__chapterSelect = chapterSelect;
 window.__gamepad = gamepad;
 window.__padMenu = padMenu;

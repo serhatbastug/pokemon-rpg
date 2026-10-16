@@ -1294,6 +1294,64 @@ async function main() {
     check('CARPI savas sonunda yeniden baslatiyor',
         restarted.kapandi && restarted.calisiyor && restarted.can > 0, JSON.stringify(restarted));
 
+    // Avci kulubesi bolumu: patikadan acikliga, kulube, yataklar, gunler, gece, Fred yok
+    await page.evaluate(() => {
+        window.__menu.stop();
+        for (const id of ['menu-screen', 'comic-screen', 'selection-screen', 'battle-screen']) document.getElementById(id).classList.add('hidden');
+        document.getElementById('adventure-screen').classList.remove('hidden');
+        window.__camp.start();
+    });
+    const campFlush = async () => {
+        for (let i = 0; i < 300; i++) {
+            const busy = await page.evaluate(() => {
+                const c = window.__camp;
+                if (c.dialogue.active) c.dialogue.advance();
+                return !!(c.seq || c.dialogue.active || c.curtain > 0.02 || c.curtainTarget > 0);
+            });
+            if (!busy) break;
+            await wait(50);
+        }
+    };
+    const campAt = (x, y) => page.evaluate((a) => { const c = window.__camp; c.player.x = a[0]; c.player.y = a[1]; c.action(); }, [x, y]);
+    const campState = () => page.evaluate(() => ({ area: window.__camp.area, phase: window.__camp.phase, day: window.__camp.day, wood: window.__camp.wood }));
+    await wait(1200);
+    await page.evaluate(() => { window.__camp.player.x = 760; window.__camp.player.y = 360; });
+    const campTalked = await page.waitForFunction(() => window.__camp.dialogue.active, { timeout: 5000 }).then(() => true, () => false);
+    check('Kulube: yol ayriminda konusma basliyor', campTalked);
+    await campFlush();
+    await page.evaluate(() => { window.__camp.player.x = 3170; window.__camp.player.y = 350; });
+    await wait(300); await campFlush(); await wait(300);
+    const atYard = await campState();
+    check('Kulube: patikanin sonunda acikliga geciliyor', atYard.area === 'yard' && atYard.phase === 'toCabin', JSON.stringify(atYard));
+    await campAt(500, 300); await wait(300); await campFlush(); await wait(300);
+    check('Kulube: kapidan iceri girilince yataklari hazirla gorevi', (await campState()).phase === 'beds');
+    await shot('00f-kulube-ic');
+    await campAt(130, 310); await campFlush();
+    await campAt(870, 310); await campFlush();
+    check('Kulube: iki yatak hazirlaninca uyku gorevi', (await campState()).phase === 'sleep');
+    await campAt(870, 310); await campFlush(); await wait(300);
+    const day2 = await campState();
+    check('Kulube: uyuyunca 2. gun, odun gorevi', day2.day === 2 && day2.phase === 'wood', JSON.stringify(day2));
+    await campAt(500, 500); await campFlush(); await wait(300);
+    for (const [x, y] of [[118, 500], [330, 530], [636, 520]]) { await campAt(x, y); await wait(900); await campFlush(); }
+    await wait(1200);
+    const evening = await campState();
+    check('Kulube: 3 odun kesilince aksam, ates gorevi', evening.phase === 'fire' && evening.wood === 3, JSON.stringify(evening));
+    await campAt(790, 460); await campFlush(); await wait(300);
+    check('Kulube: ates yakilinca eve girip uyuma gorevi', (await campState()).phase === 'toBed');
+    await shot('00g-kulube-ates');
+    await page.evaluate(() => window.__camp.jump('night'));
+    await wait(400);
+    for (const [x, y] of [[210, 396], [790, 460], [96, 440]]) { await campAt(x, y); await campFlush(); }
+    check('Kulube: gece uc yer aranir, Fred yok, odasina git gorevi', (await campState()).phase === 'fredRoom');
+    await campAt(500, 300); await wait(300); await campFlush(); await wait(300);
+    await campAt(130, 310); await wait(400);
+    await page.evaluate(() => { const c = window.__camp; while (c.dialogue.active) c.dialogue.advance(); });
+    for (let i = 0; i < 6; i++) { await page.evaluate(() => { const c = window.__camp; if (c.dialogue.active) c.dialogue.advance(); }); await wait(200); }
+    await wait(1500);
+    check('Kulube: Fred odasinda yok, bolum sona eriyor', (await campState()).phase === 'ending');
+    await page.evaluate(() => { window.__camp.stop(); });
+
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));
 

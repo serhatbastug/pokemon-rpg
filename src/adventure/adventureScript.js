@@ -8,7 +8,8 @@
 
 export const PLAY_ENTRIES = [
     { id: 'kapidaki-ses', title: 'KAPIDAKİ SES', label: 'OYNANIŞ' },
-    { id: 'o-gece', title: 'O GECE', label: 'OYNANIŞ' }
+    { id: 'o-gece', title: 'O GECE', label: 'OYNANIŞ' },
+    { id: 'kulube', title: 'AVCI KULÜBESİ', label: 'OYNANIŞ' }
 ];
 
 // Ekranın sol üstünde duran görev satırı

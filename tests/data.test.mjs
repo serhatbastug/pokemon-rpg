@@ -842,6 +842,77 @@ check('oynanış: görünüşler tanımlı (Harry, Fred, yardımcılar, Andrew)'
     ['harry', 'fred', 'saglikli0', 'saglikli1', 'saglikli2', 'andrew'].every(k => LOOKS[k]));
 check('oynanış: NPC görünüşleri tanımlı', Object.values(lab.NPCS).every(n => LOOKS[n.who]));
 
+// ---- Avcı kulübesi bölümü ----
+const camp = await import('../src/adventure/campLayout.js');
+const campScript = await import('../src/adventure/campScript.js');
+
+function collectLines(node, out = []) {
+    if (Array.isArray(node)) node.forEach(n => collectLines(n, out));
+    else if (node && typeof node === 'object') {
+        if (node.speaker && node.text) out.push(node);
+        else Object.values(node).forEach(n => collectLines(n, out));
+    }
+    return out;
+}
+const campLines = collectLines(campScript.LINES);
+check('kulübe: replik sayısı ve her replik konuşan + metin içeriyor',
+    campLines.length >= 25 && campLines.every(l => l.speaker && l.text.length > 0), String(campLines.length));
+check('kulübe: her konuşanın ses perdesi tanımlı', campLines.every(l => VOICE_PITCH[l.speaker]),
+    [...new Set(campLines.map(l => l.speaker))].join(','));
+const campText = [
+    ...campLines.map(l => l.text), ...Object.values(campScript.OBJECTIVES),
+    ...Object.values(campScript.LABELS), ...Object.values(campScript.CAPTIONS), ...script.PLAY_ENTRIES.map(e => e.title)
+];
+const campMissing = campText.flatMap(t => missingGlyphs(t));
+check('kulübe: bütün yazılar piksel yazı tipinde çizilebiliyor', campMissing.length === 0, campMissing.join(''));
+check('kulübe: üç yol ayrımı ve üç ayrım repliği', camp.JUNCTIONS.length === 3 && campScript.LINES.junction.length === 3);
+check('kulübe: patika baştan sona yürünebilir', (() => {
+    for (let x = camp.TRAIL.startX; x <= camp.TRAIL.endX; x += 6) {
+        if (camp.blocked('trail', x, camp.trailCenter(x))) return false;
+    }
+    return true;
+})());
+check('kulübe: yan patikalar yürünebilir ve ucu kütükle kapalı', camp.JUNCTIONS.every(j => {
+    const top = camp.trailCenter(j.x) - camp.TRAIL.halfH - j.len;
+    return camp.trailWalkable(j.x, top + 24) && !camp.trailWalkable(j.x, top - 12);
+}));
+
+// Bir alanda başlangıçtan hedeflere yürünebiliyor mu (ızgara taraması)
+function campReach(area, start, targets, r = 60) {
+    const STEP = 8;
+    const key = (x, y) => x + ',' + y;
+    const seen = new Set([key(start.x, start.y)]);
+    const queue = [[start.x, start.y]];
+    const found = targets.map(() => false);
+    while (queue.length) {
+        const [x, y] = queue.shift();
+        targets.forEach((t, i) => { if (Math.hypot(x - t.x, y - t.y) <= (t.r || r)) found[i] = true; });
+        for (const [dx, dy] of [[STEP, 0], [-STEP, 0], [0, STEP], [0, -STEP]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx > 1000 || ny > 560 || seen.has(key(nx, ny)) || camp.blocked(area, nx, ny)) continue;
+            seen.add(key(nx, ny));
+            queue.push([nx, ny]);
+        }
+    }
+    return found;
+}
+const yardStart = { x: 60, y: 410 };
+check('kulübe: açıklıkta başlangıç boş', !camp.blocked('yard', yardStart.x, yardStart.y));
+const yardTargets = [
+    { ...camp.YARD_DOOR },
+    { x: camp.FIRE_PIT.x, y: camp.FIRE_PIT.y + 30, r: 78 },
+    ...camp.SEARCH_SPOTS,
+    ...camp.CHOP_TREES.map(t => ({ x: t.x, y: t.y + 14, r: 62 }))
+];
+const yardFound = campReach('yard', yardStart, yardTargets);
+check('kulübe: açıklıkta kapı, ateş, arama noktaları ve bütün odun ağaçlarına varılıyor',
+    yardFound.every(Boolean), JSON.stringify(yardFound));
+const cabinFound = campReach('cabin', { x: camp.CABIN_EXIT.x, y: camp.CABIN_EXIT.y - 40 }, [
+    camp.SPOTS_IN.fredBed, camp.SPOTS_IN.harryBed, camp.CABIN_EXIT
+]);
+check('kulübe: içeride iki yatağa ve çıkışa varılıyor', cabinFound.every(Boolean), JSON.stringify(cabinFound));
+check('kulübe: odun hedefi günlere yetiyor', camp.CHOP_TREES.length >= Math.max(...Object.values(campScript.WOOD_GOAL)));
+
 // ---- Özet ----
 console.log(`\n===== ${passed}/${passed + failures.length} veri testi geçti =====`);
 if (failures.length) {

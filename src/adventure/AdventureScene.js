@@ -247,7 +247,7 @@ export class AdventureScene {
                     if (this.walkToward(a, w.to, w.speed || 2.6)) a.moving = false;
                     else done = false;
                 }
-                seq.playerWalk = true;
+                seq.playerWalk = s.walkAll.some(w => w.id === 'player');
                 if (!done) return;
                 seq.playerWalk = false;
             } else if (s.walk) {

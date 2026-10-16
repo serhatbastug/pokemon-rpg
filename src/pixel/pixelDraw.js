@@ -38,3 +38,13 @@ export function hash(x, y, salt = 0) {
     const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
     return n - Math.floor(n);
 }
+
+// Sabit tohumlu rastgele sayı üreteci (0..1): sahneler her açılışta aynı çıksın
+export function mulberry32(seed) {
+    return function () {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}

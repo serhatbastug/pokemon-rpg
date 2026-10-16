@@ -1,11 +1,10 @@
 // Araba sahnesi: laboratuvar çöktükten sonra Harry arabayı sürer. Arkadan,
 // eğik (yükseltilmiş) bir açıyla yola bakılır; araba sol/sağ gider, yoldaki
 // engellerden (terk edilmiş arabalar, enkaz, enfekte yayalar) kaçmak oyuncuya
-// kalmış. Üç can: üçüncü çarpışmada yol baştan. Yolun sonunda orman başlar;
-// araba durur, diğer sağlıklılar şehirdeki sığınağa gider, Harry ile Fred
-// ormana yürür.
+// kalmış. Üç can: üçüncü çarpışmada yol baştan. Yol bitince (ya da K ile atlayınca)
+// araba ormanın ağzına süzülür, ekran kararır; devamı ForestMouthScene'de.
 //
-//   drive -> (yol biter) stop -> exitCar -> talk -> leave -> fade
+//   drive -> (yol biter ya da atla) enter -> fade
 //
 // Yol sahte perspektifle çizilir: z = oyuncudan uzaklık, t = 1/(1+z/F) hem
 // ekran y'sini hem ölçeği verir. Engeller yol boyunca (d) önceden dizilir.
@@ -13,14 +12,11 @@
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { drawPixelText, measurePixelText } from '../pixel/pixelFont.js';
-import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { hash } from '../pixel/pixelDraw.js';
-import { Dialogue, VOICE_PITCH } from './dialogue.js';
 import { drawPerson } from './charSprites.js';
-import { drawPortrait, PORTRAIT } from './portraits.js';
 import { treeSpriteFor } from '../pixel/trees.js';
 import { driveArt } from './driveArt.js';
-import { DRIVE, DRIVE_LINES, DRIVE_TEXT, buildCourse } from './driveScript.js';
+import { DRIVE, DRIVE_TEXT, buildCourse } from './driveScript.js';
 
 const W = 1000, H = 560;
 const HORIZON = 200;
@@ -29,9 +25,8 @@ const FOCAL = 260;
 const ROAD_HALF_MIN = 40, ROAD_HALF_GAIN = 360;
 const LANE_SCALE = 0.8;          // lat 1 = yol yarı genişliğinin %80'i
 const FADE_FRAMES = 70;
-const BUBBLE_SCALE = 2;
-const BUBBLE_MAX_W = 460;
 const INTRO_FRAMES = 40;
+const ENTER_FRAMES = 110;         // ormanın ağzına süzülme süresi (kare)
 
 const tOf = (z) => 1 / (1 + z / FOCAL);
 const yOf = (t) => HORIZON + (CAR_Y - HORIZON) * t;
@@ -48,7 +43,6 @@ export class DriveScene {
         this.running = false;
         this.course = buildCourse();
         this.initLow();
-        this.dialogue = new Dialogue({ onBeep: (who) => Sfx.talk(VOICE_PITCH[who] || 1) });
 
         input.onKeyDown(e => {
             if (!this.running) return;
@@ -77,9 +71,7 @@ export class DriveScene {
         this.caption = null;
         this.restart();
         this.phase = 'drive';
-        this.people = [];
         this.timer = 0;
-        this.dialogue.cut();
     }
 
     // Yolun başına dön (can bitince)
@@ -135,7 +127,6 @@ export class DriveScene {
         this.gamepad?.poll();
         if (this.shake > 0) this.shake--;
         this.curtain += Math.sign(this.curtainTarget - this.curtain) * Math.min(0.03, Math.abs(this.curtainTarget - this.curtain));
-        this.dialogue.step();
 
         if (this.phase === 'drive') this.stepDrive();
         else this.stepAfter();
@@ -197,10 +188,7 @@ export class DriveScene {
             }
         }
 
-        if (this.progress >= this.course.length) {
-            this.phase = 'enter';
-            this.timer = 0;
-        }
+        if (this.progress >= this.course.length) this.beginEnter();
     }
 
     crash() {
@@ -238,14 +226,18 @@ export class DriveScene {
         this.speed = Math.max(3, this.speed - 0.03);
         this.progress += this.speed;
         this.lat += (0 - this.lat) * 0.03;
-        if (this.timer === 110) this.fadingOut = true;
+        if (this.timer === ENTER_FRAMES) this.fadingOut = true;
+    }
+
+    beginEnter() {
+        this.phase = 'enter';
+        this.timer = 0;
     }
 
     // Atlama tuşu: sürüşü geçip doğrudan orman ağzına
     skip() {
         if (this.phase !== 'drive' || this.caption || this.fadingOut) return;
-        this.phase = 'enter';
-        this.timer = 0;
+        this.beginEnter();
         this.fadingOut = true;
         Sfx.token();
     }
@@ -271,10 +263,11 @@ export class DriveScene {
         const lc = this.low.getContext('2d');
         lc.imageSmoothingEnabled = false;
         const raw = lc.fillRect.bind(lc);
+        // Dönüşüm hep sabit 1/4 ölçek; kutuları piksel ızgarasına oturtup en az
+        // 1 piksel çizer.
         lc.fillRect = (x, y, w, h) => {
-            const m = lc.getTransform();
-            let x0 = m.a * x + m.e, x1 = m.a * (x + w) + m.e;
-            let y0 = m.d * y + m.f, y1 = m.d * (y + h) + m.f;
+            let x0 = x * 0.25, x1 = (x + w) * 0.25;
+            let y0 = y * 0.25, y1 = (y + h) * 0.25;
             if (x0 > x1) [x0, x1] = [x1, x0];
             if (y0 > y1) [y0, y1] = [y1, y0];
             const X0 = Math.round(x0), Y0 = Math.round(y0);
@@ -283,12 +276,13 @@ export class DriveScene {
             if (X1 <= X0 || Y1 <= Y0) return;
             lc.setTransform(1, 0, 0, 1, 0, 0);
             raw(X0, Y0, X1 - X0, Y1 - Y0);
-            lc.setTransform(m);
+            lc.setTransform(0.25, 0, 0, 0.25, 0, 0);
         };
         this.lc = lc;
         this.tmp = document.createElement('canvas');
         this.tmp.width = 12;
         this.tmp.height = 16;
+        this.tctx = this.tmp.getContext('2d');
     }
 
     // Sprite'ı sol-üst köşesi (birim) ve genişliğiyle (birim) piksel ızgarasına basar
@@ -296,10 +290,9 @@ export class DriveScene {
         const lc = this.lc;
         const w = Math.max(1, Math.round(widthUnits / 4));
         const h = Math.max(1, Math.round(w * img.height / img.width));
-        const m = lc.getTransform();
         lc.setTransform(1, 0, 0, 1, 0, 0);
         lc.drawImage(img, Math.round(left / 4), Math.round(top / 4), w, h);
-        lc.setTransform(m);
+        lc.setTransform(0.25, 0, 0, 0.25, 0, 0);
     }
 
     // Ortası x, tabanı bottom (birim) olacak şekilde
@@ -344,7 +337,6 @@ export class DriveScene {
             ctx.fillRect(0, 0, W, H);
         }
         this.drawHud();
-        this.drawBubble();
         this.drawCaption();
 
         let veil = 0;
@@ -526,7 +518,6 @@ export class DriveScene {
             list.push({ z, draw: () => this.drawObstacle(o, z) });
         }
         list.push({ z: 0, draw: () => this.drawCar() });
-        for (const p of this.people) list.push({ z: -(p.y - CAR_Y) / 10 - 1, draw: () => this.drawGuy(p) });
         list.sort((a, b) => b.z - a.z);
         for (const item of list) item.draw();
 
@@ -545,7 +536,7 @@ export class DriveScene {
 
     // Küçük tuvale bir kişi çizer (1 sprite pikseli = 1 piksel), sonra ölçekleyip basar
     drawSpriteGuy(x, y, who, dir, moving, scaleK, opts = {}) {
-        const tctx = this.tmp.getContext('2d');
+        const tctx = this.tctx;
         tctx.clearRect(0, 0, 12, 16);
         drawPerson(tctx, 6, 16, who, dir, moving, this.frame, 1, opts);
         this.lcImg(this.tmp, x, y, 48 * scaleK);
@@ -577,21 +568,6 @@ export class DriveScene {
         this.lcImg(img, x, y + 8 * t, img.width * t);
     }
 
-    drawGuy(p) {
-        const ctx = this.lc;
-        const k = Math.max(0.3, Math.min(1, (p.y - HORIZON) / (CAR_Y - HORIZON)));
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle = '#10181c';
-        ctx.fillRect(Math.round(p.x - 24 * k), Math.round(p.y - 4), 48 * k, 8);
-        ctx.globalAlpha = 1;
-        this.drawSpriteGuy(p.x, p.y + this.bob(p), p.who, p.dir, p.moving, k * 1.15);
-    }
-
-    bob(p) {
-        if (!this.dialogue.active || this.dialogue.finishedTyping) return 0;
-        return this.dialogue.speaker === p.speaker && Math.floor(this.frame / 5) % 2 === 0 ? -4 : 0;
-    }
-
     drawCar() {
         if (this.hurt > 0 && Math.floor(this.frame / 4) % 2 === 0) return;
         const art = driveArt();
@@ -599,20 +575,6 @@ export class DriveScene {
         const img = braking ? art.playerCar.brake : art.playerCar.normal;
         const x = this.carX() + Math.round(this.steer * 8);
         this.lcImg(img, x, CAR_Y + 16, img.width);
-    }
-
-    drawBubble() {
-        const { dialogue, ctx } = this;
-        if (!dialogue.active || !dialogue.visibleText) return;
-        const sp = dialogue.speaker;
-        const who = this.people.find(p => p.speaker === sp);
-        const ax = who ? who.x : W / 2;
-        const ay = who ? who.y - 74 : 300;
-        const lines = wrapPixelText(dialogue.visibleText, BUBBLE_MAX_W, BUBBLE_SCALE);
-        drawSpeechBubble(ctx, ax, ay, lines, { scale: BUBBLE_SCALE, viewLeft: 0, viewW: W });
-        const left = sp === 'biz';
-        drawPortrait(ctx, sp, left ? 16 : W - PORTRAIT.w - 16, H - PORTRAIT.h - 16,
-            { talking: !dialogue.finishedTyping, tick: this.frame });
     }
 
     drawCaption() {

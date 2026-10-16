@@ -1,28 +1,17 @@
-// Macera modunun ilk sahnesi: şehrin kenarı ve ormanın girişi.
-// Burada DOM/canvas yok - sadece sayılar, böylece çizimden bağımsız test
-// edilebilir (tests/data.test.mjs).
-//
-// Dünya ekrandan geniştir; kamera antrenörü takip eder:
-//
-//   0 ------------------ 900 --- 1010 ------------------------ 2400
-//   |     ŞEHİR           | boşluk |     DAR ORMAN KORİDORU     |
-//   | binalar, asfalt yol |        | yüksek ağaçlar, kıvrılan   |
-//   | kaldırım, çim şerit |        | ince patika                |
-//
-// Antrenör şehirde ormanın girişine yakın bir noktada başlar. Boşluktan
-// geçene kadar kamera sabittir; geçince ekran onunla birlikte sağa kayar.
+// Orman ağzı sahnesinin yerleşimi: solda harabe şehir (asfalt yol, kaldırım,
+// binalar), sağda ağaç duvarı, duvarda dar bir boşluk, ardında kıvrılan orman
+// koridoru. DOM/canvas yok - yalnızca sayılar. Çizimi forestArt.js,
+// sahneyi ForestMouthScene.js yürütüyor.
 
-import { PX } from '../pixel/pixelDraw.js';
+import { PX, mulberry32 } from '../pixel/pixelDraw.js';
 import { TREE_SIZES, treeBase } from '../pixel/trees.js';
 
-export { PX };
 
 export const WORLD = { w: 2400, h: 560 };
 export const VIEW = { w: 1000, h: 560 };
 
 export const PLAYER_BOX = { w: 28, h: 16 };
 export const PLAYER_SPEED = 3.2;
-export const PLAYER_SCALE = 4;
 export const START = { x: 760, y: 320 };
 
 // Mekan adı: ormana girince ekranda beliren yazı
@@ -111,7 +100,7 @@ export function corridorAt(x) {
 }
 
 // Tek bir noktanın yürünebilirliği. Sahnenin bütün çarpışma mantığı budur.
-export function walkableAt(x, y) {
+function walkableAt(x, y) {
     if (x < 12 || x > WORLD.w - 12 || y < 0 || y > WORLD.h) return false;
     if (inObstacle(x, y)) return false;
 
@@ -135,58 +124,7 @@ export function blocked(x, y) {
     return points.some(([px, py]) => !walkableAt(px, py));
 }
 
-export function inGap(x, y) {
-    return x >= GAP.x0 && x <= GAP.x1 && y >= GAP.top && y <= GAP.bottom;
-}
-
-export function inForest(x) {
-    return x >= FOREST.x0;
-}
-
-// --- Yanımızdaki sağlıklılar ---
-// Prolog 3'te acil çıkıştan geçirdiğimiz BEŞ kişi rögardan bizimle çıkıyor.
-// Ormanın ağzında onlar da yeşilleniyor; hepsini vurup ormana SON SAĞLIKLI
-// İNSAN olarak giriyoruz. Sayı prolog 3'le aynı olmak zorunda.
-export const COMPANION_COUNT = 5;
-
-// Rögardan çıkınca dizildikleri yerler (deliğin çevresi)
-export const COMPANION_STARTS = [
-    { x: 700, y: 364 },
-    { x: 626, y: 344 },
-    { x: 766, y: 382 },
-    { x: 648, y: 412 },
-    { x: 730, y: 424 }
-];
-
-// Ormanın ağzında durdukları yerler: yeşillendikleri ve vurulduğumuz an
-export const COMPANION_STAND = [
-    { x: 766, y: 392 },
-    { x: 812, y: 356 },
-    { x: 846, y: 404 },
-    { x: 800, y: 302 },
-    { x: 862, y: 318 }
-];
-
-// Oyuncu bu çizgiyi geçince ormanın ağzına varılmış sayılır: arkadakiler
-// durur ve yeşillenmeye başlar.
-export const FOREST_MOUTH_X = 858;
-
-// --- Silah ---
-// Prolog 3'teki parçalayıcı silah elimizde. Virüsü öldürmüyor, dağıtıyor.
-export const BULLET_SPEED = 9;
-export const BULLET_LIFE = 80;
-export const FIRE_COOLDOWN = 14;
-
 // --- Ağaçlar ---
-// Sabit tohumlu üreteç: sahne her açılışta birebir aynı çıkar.
-function mulberry32(seed) {
-    return function () {
-        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-}
 
 // Bir ağacın dibi yürünebilir alana taşıyor mu?
 function baseBlocksPath(tree) {
@@ -276,4 +214,3 @@ function buildTrees() {
 }
 
 export const TREES = buildTrees();
-export { TREE_SIZES, treeBase };

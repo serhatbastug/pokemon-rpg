@@ -12,7 +12,7 @@
 import { FRAME_RATE, SCROLL_KEYS } from '../config/settings.js';
 import { Sfx, unlockAudio, playMusic, stopMusic } from '../services/audio.js';
 import { treeSpriteFor } from '../pixel/trees.js';
-import { hash } from '../pixel/pixelDraw.js';
+import { hash, PX } from '../pixel/pixelDraw.js';
 import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
@@ -21,7 +21,7 @@ import { drawPortrait, PORTRAIT } from './portraits.js';
 import { driveArt } from './driveArt.js';
 import { DRIVE_LINES } from './driveScript.js';
 import {
-    WORLD, VIEW, PX, LOCATION_NAME, CITY, GAP, TREES, WRECKS, ALLEY, CAR_LANE, corridorAt, FOREST
+    WORLD, VIEW, LOCATION_NAME, CITY, GAP, TREES, WRECKS, ALLEY, CAR_LANE, corridorAt, FOREST
 } from './forestLayout.js';
 import { bakeGround, lampSprite, wreckSprite, witherCanvas } from './forestArt.js';
 

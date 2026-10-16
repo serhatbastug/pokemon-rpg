@@ -10,6 +10,7 @@ let musicGain = null;
 let enabled = true;
 let musicTimer = null;
 let currentTrack = null;
+const MUSIC_GAIN = 0.10;
 let musicEnabled = true;
 try { musicEnabled = localStorage.getItem('musicOff') !== '1'; } catch (e) { /* özel pencere */ }
 
@@ -25,7 +26,7 @@ function ensureContext() {
 
     // Müzik: daha kısık ve yumuşak (tiz kısmı kesilir); yorucu olmasın
     musicGain = ctx.createGain();
-    musicGain.gain.value = musicEnabled ? 0.10 : 0;
+    musicGain.gain.value = musicEnabled ? MUSIC_GAIN : 0;
     const soften = ctx.createBiquadFilter();
     soften.type = 'lowpass';
     soften.frequency.value = 1300;
@@ -262,15 +263,16 @@ function buildPhrase(track, name) {
 
 const TURN_SHIFT = [0, 0, -2, 3, 0, -5];
 
-export function setMusicEnabled(value) {
-    musicEnabled = value;
-    try { localStorage.setItem('musicOff', value ? '0' : '1'); } catch (e) { /* önemli değil */ }
-    if (musicGain) musicGain.gain.value = value ? 0.10 : 0;
-    if (fileBus) fileBus.gain.value = value ? (FILE_TRACKS[currentTrack]?.volume ?? 0.5) : 0;
+// Müzik kazancını tek yerden uygular: sentez yolu musicGain, dosya yolu fileBus
+function applyMusicGain() {
+    if (musicGain) musicGain.gain.value = musicEnabled ? MUSIC_GAIN : 0;
+    if (fileBus) fileBus.gain.value = musicEnabled ? (FILE_TRACKS[currentTrack]?.volume ?? 0) : 0;
 }
 
-export function isMusicEnabled() {
-    return musicEnabled;
+function setMusicEnabled(value) {
+    musicEnabled = value;
+    try { localStorage.setItem('musicOff', value ? '0' : '1'); } catch (e) { /* önemli değil */ }
+    applyMusicGain();
 }
 
 // M tuşu: müziği aç/kapat (efektler ve konuşma sesleri kalır)
@@ -283,37 +285,65 @@ if (typeof window !== 'undefined') {
 // Telifsiz (CC0) gerçek müzik dosyaları: assets/audio/ (kaynaklar CREDITS.md'de).
 // Dosyası olan parçalar bunlarla çalar; yüklenemezse yukarıdaki sentez müzik
 // devreye girer.
-// volume: dosyanın kendi sesi çok yüksek (RMS ~0.2); efektlerle dengeli olsun
-// diye hedef seviye ~0.05'e göre ölçeklendi (0.05 / dosya RMS'i).
-const FILE_TRACKS = {
-    shadow: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.26 },
-    ruin: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
-    forest: { src: 'assets/audio/a-path-somewhere.ogg', volume: 1.1 },
-    // Gece sahnesi (oynanış 2. bölüm)
+// Her dosyanın kendi sesi çok yüksek (RMS 0.1-0.25); efektlerle dengeli olsun diye
+// hedef seviye ~0.05'e göre ölçeklendi (volume = 0.05 / dosya RMS'i).
+const FILES = {
+    morning: { src: 'assets/audio/post-apocalyptic_morning_bpm80_0.ogg', volume: 0.26 },
+    afternoon: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
     night: { src: 'assets/audio/post-apocalyptic_night_bpm80_0.ogg', volume: 0.21 },
-    // Çizgi roman 5-7: her bölüm başka parça, art arda aynısı çalmasın
-    week: { src: 'assets/audio/a-path-somewhere.ogg', volume: 1.1 },
-    experiment: { src: 'assets/audio/suspicious-loop.ogg', volume: 0.85 },
-    pill: { src: 'assets/audio/un-understandable.ogg', volume: 1.7 },
-    // Ana menü ve araba sürüşü aynı ailenin parçaları (aynı ses dünyası)
-    town: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
-    siege: { src: 'assets/audio/post-apocalyptic_afternoon_bpm85_0.ogg', volume: 0.29 },
-    // Çizgi roman 3 (sağlık ocağı) ve 4 (karantina): merak uyandıran gizem parçaları
-    mystery: { src: 'assets/audio/quantum-stone.ogg', volume: 0.9 },
-    quarantine: { src: 'assets/audio/unsolved-investigation.ogg', volume: 0.7 },
-    boss: { src: 'assets/audio/Chase.ogg', volume: 0.28 },
-    sewer: { src: 'assets/audio/Chase.ogg', volume: 0.28 }
+    path: { src: 'assets/audio/a-path-somewhere.ogg', volume: 1.1 },
+    suspicious: { src: 'assets/audio/suspicious-loop.ogg', volume: 0.85 },
+    unund: { src: 'assets/audio/un-understandable.ogg', volume: 1.7 },
+    quantum: { src: 'assets/audio/quantum-stone.ogg', volume: 0.9 },
+    unsolved: { src: 'assets/audio/unsolved-investigation.ogg', volume: 0.7 },
+    chase: { src: 'assets/audio/Chase.ogg', volume: 0.28 },
+    // 2 kişilik oyna: eğlenceli chiptune savaş parçaları (her maçta biri)
+    charge: { src: 'assets/audio/charge.ogg', volume: 0.34 },
+    battle8: { src: 'assets/audio/battle-loop-8bit.ogg', volume: 0.47 },
+    chiptune: { src: 'assets/audio/chiptune-battle.ogg', volume: 0.32 }
 };
+
+// Parça adı -> dosya. Ardışık sahnelerde aynı parça çalmasın diye çeşitli.
+const FILE_TRACKS = {
+    shadow: FILES.morning,               // laboratuvar
+    ruin: FILES.night,                   // harabe şehir, cadde
+    night: FILES.night,                  // oynanış: O GECE
+    forest: FILES.path,
+    week: FILES.path,                    // çizgi roman 5
+    experiment: FILES.suspicious,        // çizgi roman 6
+    pill: FILES.unund,                   // çizgi roman 7
+    town: FILES.afternoon,               // ana menü
+    siege: FILES.afternoon,              // araba sürüşü
+    mystery: FILES.quantum,              // çizgi roman 3: sağlık ocağı
+    quarantine: FILES.unsolved,          // çizgi roman 4: karantina
+    boss: FILES.chase,                   // kovalamaca
+    sewer: FILES.chase,
+    arenaA: FILES.charge,
+    arenaB: FILES.battle8,
+    arenaC: FILES.chiptune
+};
+
+// Her 2 kişilik maçta sırayla bir sonraki parça (art arda aynısı çalmasın)
+const ARENA_TRACKS = ['arenaA', 'arenaB', 'arenaC'];
+let arenaNext = Math.floor(Math.random() * ARENA_TRACKS.length);
+export function playArenaMusic() {
+    playMusic(ARENA_TRACKS[arenaNext++ % ARENA_TRACKS.length]);
+}
 
 let fileAudio = null;
 let fileNode = null;
 let fileBus = null;
 
+// Eski parçanın öğesini ve düğümünü bırakır (her sahne geçişinde sızmasın)
 function stopFileMusic() {
     if (!fileAudio) return;
     const old = fileAudio;
     fileAudio = null;
     old.pause();
+    fileNode?.disconnect();
+    fileNode = null;
+    old.removeAttribute('src');
+    old.load();
 }
 
 function playFileMusic(name, def) {
@@ -323,7 +353,6 @@ function playFileMusic(name, def) {
         fileBus = context.createGain();
         fileBus.connect(master);
     }
-    fileBus.gain.value = musicEnabled ? def.volume : 0;
     const audio = new Audio(def.src);
     audio.loop = true;
     audio.crossOrigin = 'anonymous';
@@ -337,12 +366,12 @@ function playFileMusic(name, def) {
         }
     });
     try {
-        const node = context.createMediaElementSource(audio);
-        node.connect(fileBus);
-        fileNode = node;
+        fileNode = context.createMediaElementSource(audio);
+        fileNode.connect(fileBus);
     } catch (e) {
         return false;
     }
+    applyMusicGain();
     audio.play().catch(() => {});
     return true;
 }

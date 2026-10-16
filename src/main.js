@@ -1,3 +1,4 @@
+import { playArenaMusic } from './services/audio.js';
 // Uygulama giriş noktası: modülleri kurar ve birbirine bağlar.
 //
 // Oyunun iki parçası var: ana menü sahnesinden açılan PROLOG (çizgi roman)
@@ -80,6 +81,9 @@ const comic = new ComicScene({
     }
 });
 
+// Bölüm bitince sıradaki sahne (tabloda yoksa araba sürüşü)
+const CHAPTER_NEXT = { 'kapidaki-ses': () => startAdventure('o-gece') };
+
 // OYNANIŞ: prolog bitince ya da bölüm seçme penceresinden doğrudan açılır.
 // Bitince (ya da Esc / DAİRE) ana menüye dönülür; devamı sıradaki iş.
 const adventure = new AdventureScene({
@@ -90,8 +94,7 @@ const adventure = new AdventureScene({
     // Bölüm 1 bitince "O GECE" bölümü, o bitince araba sahnesi gelir
     onFinish: (entry) => {
         adventure.stop();
-        if (entry === 'kapidaki-ses') startAdventure('o-gece');
-        else startDrive();
+        (CHAPTER_NEXT[entry] || startDrive)();
     }
 });
 
@@ -238,6 +241,7 @@ function startMatch(ai) {
 
     padMenu.stop();   // taramayı savaş döngüsü devralıyor
     showBattleScreen();
+    playArenaMusic();
     game.start(p1, p2, { ai });
 }
 
@@ -250,5 +254,6 @@ document.getElementById('restart-btn').addEventListener('click', () => {
     const { p1, p2 } = characterSelect.getSelection();
     // Yeniden başlatırken mod korunuyor: yapay zekâya karşı oynayan oyuncu
     // ÇARPI'ya basınca kendini iki kişilik maçta bulmasın.
+    playArenaMusic();
     game.start(p1, p2, { ai: game.aiLevel });
 });

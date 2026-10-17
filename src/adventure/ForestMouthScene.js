@@ -16,6 +16,7 @@ import { treeSpriteFor } from '../pixel/trees.js';
 import { hash, PX } from '../pixel/pixelDraw.js';
 import { drawSpeechBubble, wrapPixelText } from '../pixel/speech.js';
 import { drawLocationTitle } from '../pixel/screenText.js';
+import { Voice } from '../services/voice.js';
 import { Dialogue, VOICE_PITCH } from './dialogue.js';
 import { drawPerson } from './charSprites.js';
 import { drawPortrait, PORTRAIT } from './portraits.js';
@@ -46,7 +47,7 @@ export class ForestMouthScene {
         this.onExit = onExit || (() => {});
         this.onFinish = onFinish || (() => {});
         this.running = false;
-        this.dialogue = new Dialogue({ onBeep: (who) => Sfx.talk(VOICE_PITCH[who] || 1) });
+        this.dialogue = new Dialogue({ onBeep: (who) => Sfx.talk(VOICE_PITCH[who] || 1), ...Voice.hooks });
 
         input.onKeyDown(e => {
             if (!this.running) return;

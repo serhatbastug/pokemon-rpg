@@ -1,0 +1,1010 @@
+[
+ {
+  "id": "doktor-01",
+  "speaker": "doktor",
+  "text": "Çok hızlı yayılıyor ve şu ana kadar aşısı yok.",
+  "voiced": false
+ },
+ {
+  "id": "doktor-02",
+  "speaker": "doktor",
+  "text": "En kötüsü de hiçbir belirti vermiyor.",
+  "voiced": false
+ },
+ {
+  "id": "doktor-03",
+  "speaker": "doktor",
+  "text": "Bir kameradan bu görüntü çıkmış.",
+  "voiced": false
+ },
+ {
+  "id": "hasta-01",
+  "speaker": "hasta",
+  "text": "Peki neye benziyor?",
+  "voiced": false
+ },
+ {
+  "id": "doktor-04",
+  "speaker": "doktor",
+  "text": "Henüz bilinmiyor. Hala araştırılıyor.",
+  "voiced": false
+ },
+ {
+  "id": "hasta-02",
+  "speaker": "hasta",
+  "text": "Nereden çıktı bu? Bana nasıl bulaştı?",
+  "voiced": false
+ },
+ {
+  "id": "doktor-05",
+  "speaker": "doktor",
+  "text": "Tahlillerinde bir şey çıktı.",
+  "voiced": false
+ },
+ {
+  "id": "doktor-06",
+  "speaker": "doktor",
+  "text": "V-986 isimli yeni bir virüs.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-01",
+  "speaker": "arkadas",
+  "text": "Duyurduk ama kimse dinlemiyor Harry. Karantinaya girmek istemiyorlar.",
+  "voiced": false
+ },
+ {
+  "id": "biz-01",
+  "speaker": "biz",
+  "text": "Fred, V-986 diye yeni bir virüs çıkmış, duydun mu?",
+  "voiced": false
+ },
+ {
+  "id": "biz-02",
+  "speaker": "biz",
+  "text": "O zaman virüsü daha yakından tanımamız lazım, Fred.",
+  "voiced": false
+ },
+ {
+  "id": "biz-03",
+  "speaker": "biz",
+  "text": "Ben bilgi toplamaya başlıyorum.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-02",
+  "speaker": "arkadas",
+  "text": "En kötüsü belirtisi olmaması. Ortaya çıktığında çok geç olabilir.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-03",
+  "speaker": "arkadas",
+  "text": "Duydum Harry. Çok hızlı yayılıyormuş, aşısı da yokmuş.",
+  "voiced": false
+ },
+ {
+  "id": "biz-04",
+  "speaker": "biz",
+  "text": "Haklısın Fred. Belirti çıkmadan herkesi uyarmalıyız.",
+  "voiced": false
+ },
+ {
+  "id": "biz-05",
+  "speaker": "biz",
+  "text": "Hemen duyuruyu yapalım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-04",
+  "speaker": "arkadas",
+  "text": "Bence insanları karantinaya girmeye çağırmalıyız, Harry.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-05",
+  "speaker": "arkadas",
+  "text": "Bize yeterince yardım etti. Daha fazla araştırmaya gerek yok.",
+  "voiced": false
+ },
+ {
+  "id": "biz-06",
+  "speaker": "biz",
+  "text": "Hücreye yerleşiyor, durmadan çoğalıyor, beyne de ulaşıyor. Yok edemeyiz.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-06",
+  "speaker": "arkadas",
+  "text": "Yok edemesek de yavaşlatabiliriz. Bir şey geliştirelim Harry.",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-0-01",
+  "speaker": "saglikli-0",
+  "text": "Çağrınızı duyduk. Size nasıl yardımcı olabiliriz?",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-07",
+  "speaker": "arkadas",
+  "text": "Hoş geldiniz. Her el bize lazım.",
+  "voiced": false
+ },
+ {
+  "id": "profesor-01",
+  "speaker": "profesor",
+  "text": "Saat oldukça geç olmuş.",
+  "voiced": false
+ },
+ {
+  "id": "profesor-02",
+  "speaker": "profesor",
+  "text": "Bugünlük bu kadar yeter, testleri daha sonra yaparım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-07",
+  "speaker": "biz",
+  "text": "Gönüllümüz masada. Örnekleri alalım Fred.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-08",
+  "speaker": "arkadas",
+  "text": "Hazırım Harry. Başlıyoruz.",
+  "voiced": false
+ },
+ {
+  "id": "biz-08",
+  "speaker": "biz",
+  "text": "Hap hazır Fred. Etkiyi azaltıyor ama yok etmiyor.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-09",
+  "speaker": "arkadas",
+  "text": "Yavaşlatması bile bir şey. Herkese dağıtalım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-09",
+  "speaker": "biz",
+  "text": "O bir gönüllüydü Fred, bir deney malzemesi değil.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-10",
+  "speaker": "arkadas",
+  "text": "Biliyorum. Ama dışarıda binlercesi var.",
+  "voiced": false
+ },
+ {
+  "id": "biz-10",
+  "speaker": "biz",
+  "text": "Yine de bu kadar kolay geçiştirme.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-11",
+  "speaker": "arkadas",
+  "text": "Geçiştirmiyorum Harry. Zamanımız yok.",
+  "voiced": false
+ },
+ {
+  "id": "profesor-03",
+  "speaker": "profesor",
+  "text": "İşte, tarifteki ile aynı yaptım. Umarım bu işe yarar.",
+  "voiced": false
+ },
+ {
+  "id": "biz-11",
+  "speaker": "biz",
+  "text": "Etkiyi uzatmalıyım...",
+  "voiced": false
+ },
+ {
+  "id": "hasta-03",
+  "speaker": "hasta",
+  "text": "Merhaba... Gönüllü olmak için geldim.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-12",
+  "speaker": "arkadas",
+  "text": "Hoş geldiniz. Harry, gönüllümüz geldi.",
+  "voiced": false
+ },
+ {
+  "id": "hasta-04",
+  "speaker": "hasta",
+  "text": "Laboratuvar gönüllü enfekte arıyormuş...",
+  "voiced": false
+ },
+ {
+  "id": "hasta-05",
+  "speaker": "hasta",
+  "text": "Belki buraya gitsem iyi olabilir.",
+  "voiced": false
+ },
+ {
+  "id": "biz-12",
+  "speaker": "biz",
+  "text": "Fred, silahın ilerlemesi nasıl?",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-13",
+  "speaker": "arkadas",
+  "text": "Parçalar tamam. Hedefleme kısmı hala eksik.",
+  "voiced": false
+ },
+ {
+  "id": "biz-13",
+  "speaker": "biz",
+  "text": "Çalışmaya devam edelim. Başka çaremiz yok.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-14",
+  "speaker": "arkadas",
+  "text": "Hedefleme ayarı bitmeden hiçbir şey yapamayız.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-15",
+  "speaker": "arkadas",
+  "text": "Bu ses ne?",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-1-01",
+  "speaker": "saglikli-1",
+  "text": "Biri kapıya vuruyor!",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-0-02",
+  "speaker": "saglikli-0",
+  "text": "Şu saatte kim olabilir...",
+  "voiced": false
+ },
+ {
+  "id": "biz-14",
+  "speaker": "biz",
+  "text": "Kıpırdamayın. Ben bakacağım.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-01",
+  "speaker": "andrew",
+  "text": "Lütfen! Kapıyı açın, yardıma ihtiyacım var!",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-16",
+  "speaker": "arkadas",
+  "text": "Enfekte biri. Açmayalım Harry.",
+  "voiced": false
+ },
+ {
+  "id": "biz-15",
+  "speaker": "biz",
+  "text": "Hiçbir hastane açık değil Fred. En azından dinleyelim.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-17",
+  "speaker": "arkadas",
+  "text": "Harry, emin misin?",
+  "voiced": false
+ },
+ {
+  "id": "biz-16",
+  "speaker": "biz",
+  "text": "Eminim. Açıyorum.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-02",
+  "speaker": "andrew",
+  "text": "Girebilir miyim? Lütfen.",
+  "voiced": false
+ },
+ {
+  "id": "biz-17",
+  "speaker": "biz",
+  "text": "Gir. Çabuk ol.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-03",
+  "speaker": "andrew",
+  "text": "Teşekkür ederim. Buranın profesörleriyle konuşmak istiyorum.",
+  "voiced": false
+ },
+ {
+  "id": "biz-18",
+  "speaker": "biz",
+  "text": "Biziz. Seni dinliyoruz.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-04",
+  "speaker": "andrew",
+  "text": "Kendimi berbat hissediyorum.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-05",
+  "speaker": "andrew",
+  "text": "Biliyorum, doktor değilsiniz. Ama hiçbir hastane açık değildi.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-06",
+  "speaker": "andrew",
+  "text": "Son zamanlarda çok sayıda ölüm olduğunu duydum. Açıkçası bundan endişe duyuyorum.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-07",
+  "speaker": "andrew",
+  "text": "Bir de doktorum, bu virüsle ilgili bir mutasyonum olduğunu söylemişti.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-08",
+  "speaker": "andrew",
+  "text": "Maalesef doktorum hayatını kaybetti.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-09",
+  "speaker": "andrew",
+  "text": "Bu yüzden size yardımcı olabileceğimi düşündüm.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-18",
+  "speaker": "arkadas",
+  "text": "Mutasyon mu? Bu virüs hücre içinde saniyede 10 bölünme yapıyor, biliyor musun?",
+  "voiced": false
+ },
+ {
+  "id": "andrew-10",
+  "speaker": "andrew",
+  "text": "Saniyede on... Saatte otuz altı bin. Bu yüzden bu kadar acele ediyorsunuz.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-19",
+  "speaker": "arkadas",
+  "text": "Hesabı nasıl bu kadar çabuk yaptın?",
+  "voiced": false
+ },
+ {
+  "id": "biz-19",
+  "speaker": "biz",
+  "text": "Mutasyonu inceleyelim. Önce bir DNA örneği almamız lazım.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-11",
+  "speaker": "andrew",
+  "text": "Tabii. Kolumdan alabilirsiniz.",
+  "voiced": false
+ },
+ {
+  "id": "biz-20",
+  "speaker": "biz",
+  "text": "Bir damla yeter. Dur biraz.",
+  "voiced": false
+ },
+ {
+  "id": "biz-21",
+  "speaker": "biz",
+  "text": "Aldım. Hemen mikroskoba bakıyorum.",
+  "voiced": false
+ },
+ {
+  "id": "biz-22",
+  "speaker": "biz",
+  "text": "Dizilimi tarayalım. Üç anormallik arayacağım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-20",
+  "speaker": "arkadas",
+  "text": "Sonuncusu çok tehlikeli Harry. Onu serbest bırakamayız.",
+  "voiced": false
+ },
+ {
+  "id": "biz-23",
+  "speaker": "biz",
+  "text": "Cam odaya alalım. Ama ona kötü davranmayacağız.",
+  "voiced": false
+ },
+ {
+  "id": "biz-24",
+  "speaker": "biz",
+  "text": "Andrew, seni izolasyon odasındaki cam hücreye alacağız. Güvenlik için.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-12",
+  "speaker": "andrew",
+  "text": "Anlıyorum. Gerekirse beni kullanın, yeter ki bir çare bulun.",
+  "voiced": false
+ },
+ {
+  "id": "biz-25",
+  "speaker": "biz",
+  "text": "Yıllardır kimse girmedi buraya. Hücre hala çalışıyor.",
+  "voiced": false
+ },
+ {
+  "id": "biz-26",
+  "speaker": "biz",
+  "text": "İyi. Andrew'ı oraya alalım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-21",
+  "speaker": "arkadas",
+  "text": "Kilitlendi.",
+  "voiced": false
+ },
+ {
+  "id": "biz-27",
+  "speaker": "biz",
+  "text": "Deneylerimize onunla devam edeceğiz.",
+  "voiced": false
+ },
+ {
+  "id": "ses-01",
+  "speaker": "ses",
+  "text": "Seni bu duruma kim düşürdü?",
+  "voiced": false
+ },
+ {
+  "id": "andrew-13",
+  "speaker": "andrew",
+  "text": "Ne? Sen de kimsin? Bu ses nereden geliyor?",
+  "voiced": false
+ },
+ {
+  "id": "ses-02",
+  "speaker": "ses",
+  "text": "Ben seni buradan kurtarabilecek tek güçüm.",
+  "voiced": false
+ },
+ {
+  "id": "ses-03",
+  "speaker": "ses",
+  "text": "Tabii beni kullanmayı becerebilirsen.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-14",
+  "speaker": "andrew",
+  "text": "İçimde gelişen organizma... Sen bir mutasyonsun. Profesörler senden bahsetmişti.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-15",
+  "speaker": "andrew",
+  "text": "Sen benim ailemi öldürdün! Yani beni bu duruma sen düşürdün!",
+  "voiced": false
+ },
+ {
+  "id": "ses-04",
+  "speaker": "ses",
+  "text": "Seni bu duruma ben düşürmedim. Ben sadece içindeki bir canlıyım, fazlası değil.",
+  "voiced": false
+ },
+ {
+  "id": "ses-05",
+  "speaker": "ses",
+  "text": "Bunu bu virüsü oluşturan kişi yaptı. Yani seni buraya tıkan kişi, yani Fred yaptı!",
+  "voiced": false
+ },
+ {
+  "id": "andrew-16",
+  "speaker": "andrew",
+  "text": "Bunun doğru olduğu ne malum? Belki yalan söylüyorsun.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-17",
+  "speaker": "andrew",
+  "text": "Ayrıca ben sadece onlara yardım ediyorum. Eminim işleri bittiğinde beni buradan çıkaracaklar.",
+  "voiced": false
+ },
+ {
+  "id": "ses-06",
+  "speaker": "ses",
+  "text": "Bana güvenmek zorundasın. Fred virüsü yaparken son malzemeyi yanlış ekledi.",
+  "voiced": false
+ },
+ {
+  "id": "ses-07",
+  "speaker": "ses",
+  "text": "Bu da mutasyonu, yani beni oluşturdu. Fred hatasını ancak ertesi gün fark etti.",
+  "voiced": false
+ },
+ {
+  "id": "ses-08",
+  "speaker": "ses",
+  "text": "Onca insan arasından bizi bulmaları oldukça zor olacaktı. Tabii sen buraya kendi isteğinle gelmeseydin.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-18",
+  "speaker": "andrew",
+  "text": "Sadece yardım istemek için buraya gelmiştim.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-19",
+  "speaker": "andrew",
+  "text": "Ayrıca sen neden benim buradan çıkmamı istiyorsun? Anlattıkların bir pencereden bakınca mantıklı, ama aynı zamanda saçma.",
+  "voiced": false
+ },
+ {
+  "id": "ses-09",
+  "speaker": "ses",
+  "text": "Bu mutasyon yalnızca sende var. Bu fırsatı değerlendirmelisin Andrew.",
+  "voiced": false
+ },
+ {
+  "id": "ses-10",
+  "speaker": "ses",
+  "text": "Ailenin gerçek katilini bulmak istemiyor musun? Yoksa burada öylece mi bekleyeceksin?",
+  "voiced": false
+ },
+ {
+  "id": "andrew-20",
+  "speaker": "andrew",
+  "text": "Ah, evet. İntikamı alacağım. Ne yapmamı istiyorsun?",
+  "voiced": false
+ },
+ {
+  "id": "ses-11",
+  "speaker": "ses",
+  "text": "Sadece kontrolü bana bırak. Gerisini ben hallederim.",
+  "voiced": false
+ },
+ {
+  "id": "biz-28",
+  "speaker": "biz",
+  "text": "Işıklar gitti... Andrew? İyi misin?",
+  "voiced": false
+ },
+ {
+  "id": "biz-29",
+  "speaker": "biz",
+  "text": "Bu... Bu da ne böyle?!",
+  "voiced": false
+ },
+ {
+  "id": "biz-30",
+  "speaker": "biz",
+  "text": "Fred! Burayı hemen terk etmeliyiz!",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-22",
+  "speaker": "arkadas",
+  "text": "Ne oldu? Neden bu kadar telaşlısın?",
+  "voiced": false
+ },
+ {
+  "id": "biz-31",
+  "speaker": "biz",
+  "text": "Andrew artık Andrew değil! Hemen çıkmalıyız!",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-23",
+  "speaker": "arkadas",
+  "text": "Bu ses de ne?!",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-24",
+  "speaker": "arkadas",
+  "text": "Harry! Yardım et! Bırak beni!",
+  "voiced": false
+ },
+ {
+  "id": "biz-32",
+  "speaker": "biz",
+  "text": "Bir pil... Yeter mi bilmiyorum ama deneyeceğim.",
+  "voiced": false
+ },
+ {
+  "id": "andrew-21",
+  "speaker": "andrew",
+  "text": "Aaah... Başım... Ne oldu bana?",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-25",
+  "speaker": "arkadas",
+  "text": "Ah... Andrew...",
+  "voiced": false
+ },
+ {
+  "id": "biz-33",
+  "speaker": "biz",
+  "text": "Fred! Dayan, yanındayım!",
+  "voiced": false
+ },
+ {
+  "id": "biz-34",
+  "speaker": "biz",
+  "text": "Bu onu bir süre oyalar. Haydi gidelim.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-26",
+  "speaker": "arkadas",
+  "text": "Geriye hiçbir şey kalmasın.",
+  "voiced": false
+ },
+ {
+  "id": "biz-35",
+  "speaker": "biz",
+  "text": "Fred, çabuk! Her yer çöküyor!",
+  "voiced": false
+ },
+ {
+  "id": "biz-36",
+  "speaker": "biz",
+  "text": "Zeka merkezlerinde olağanüstü artış. Diğer enfektelerin tam tersi.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-27",
+  "speaker": "arkadas",
+  "text": "Kas dokusu normalin çok üstünde. Gücü insanüstü.",
+  "voiced": false
+ },
+ {
+  "id": "biz-37",
+  "speaker": "biz",
+  "text": "Bu... içinde ayrı bir organizma gelişiyor. Kendi aklı var.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-28",
+  "speaker": "arkadas",
+  "text": "Yol ikiye ayrılıyor Harry. Hangisinden gidiyoruz?",
+  "voiced": false
+ },
+ {
+  "id": "biz-38",
+  "speaker": "biz",
+  "text": "Ana patikadan devam edelim. Yan yollar daha derine gidiyor.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-29",
+  "speaker": "arkadas",
+  "text": "Bu ağaçları daha önce gördüm gibi geliyor.",
+  "voiced": false
+ },
+ {
+  "id": "biz-39",
+  "speaker": "biz",
+  "text": "Hepsi birbirine benziyor. Gözünü açık tut.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-30",
+  "speaker": "arkadas",
+  "text": "Şuradaki iz... Bir yere çıkıyor olmalı.",
+  "voiced": false
+ },
+ {
+  "id": "biz-40",
+  "speaker": "biz",
+  "text": "Duman yok, ses yok. Yine de bakalım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-41",
+  "speaker": "biz",
+  "text": "Bir kulübe... Işık yok.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-31",
+  "speaker": "arkadas",
+  "text": "Eski bir avcı kulübesi gibi. İçeri bakalım mı?",
+  "voiced": false
+ },
+ {
+  "id": "biz-42",
+  "speaker": "biz",
+  "text": "Kimse yok. Uzun zamandır kullanılmamış.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-32",
+  "speaker": "arkadas",
+  "text": "Bize yeter. İki yatak hazırlayalım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-43",
+  "speaker": "biz",
+  "text": "Sen şu odayı al, ben öbürünü.",
+  "voiced": false
+ },
+ {
+  "id": "biz-44",
+  "speaker": "biz",
+  "text": "Fred'in yatağı hazır.",
+  "voiced": false
+ },
+ {
+  "id": "biz-45",
+  "speaker": "biz",
+  "text": "Benimki de tamam.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-33",
+  "speaker": "arkadas",
+  "text": "Yarın ilk iş odun. Geceleri soğuk olur.",
+  "voiced": false
+ },
+ {
+  "id": "biz-46",
+  "speaker": "biz",
+  "text": "Haklısın. İyi geceler Fred.",
+  "voiced": false
+ },
+ {
+  "id": "biz-47",
+  "speaker": "biz",
+  "text": "Günaydın Fred.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-34",
+  "speaker": "arkadas",
+  "text": "Günaydın. Bugün hem odun hem su lazım. Ben uzaktaki bir ağacı devireyim.",
+  "voiced": false
+ },
+ {
+  "id": "biz-48",
+  "speaker": "biz",
+  "text": "Ben de suyu getiririm. Sonra odunu bölüşürüz.",
+  "voiced": false
+ },
+ {
+  "id": "biz-49",
+  "speaker": "biz",
+  "text": "Balta eski ama iş görür.",
+  "voiced": false
+ },
+ {
+  "id": "biz-50",
+  "speaker": "biz",
+  "text": "Bu kadar yeter. Akşam oluyor, ateş yakalım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-35",
+  "speaker": "arkadas",
+  "text": "Güzel. Çok uzun zamandır bir ateş görmemiştim.",
+  "voiced": false
+ },
+ {
+  "id": "biz-51",
+  "speaker": "biz",
+  "text": "Küçük tutalım. Bizi kimse görmesin.",
+  "voiced": false
+ },
+ {
+  "id": "biz-52",
+  "speaker": "biz",
+  "text": "Yeter bugünlük. İçeri girelim.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-36",
+  "speaker": "arkadas",
+  "text": "Dün gece iyi uyudum. Sanki hiçbir şey olmamış gibi.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-37",
+  "speaker": "arkadas",
+  "text": "Bugün gölde balık tutacağım. Sen odun kes, biraz da yemiş topla.",
+  "voiced": false
+ },
+ {
+  "id": "biz-53",
+  "speaker": "biz",
+  "text": "Olur. Akşam hep birlikte yemek yeriz.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-38",
+  "speaker": "arkadas",
+  "text": "Harry... Sence diğerleri iyi mi?",
+  "voiced": false
+ },
+ {
+  "id": "biz-54",
+  "speaker": "biz",
+  "text": "Umarım. Şimdilik biz hayattayız.",
+  "voiced": false
+ },
+ {
+  "id": "biz-55",
+  "speaker": "biz",
+  "text": "Su soğuk ve temiz. Fıçıya götüreyim.",
+  "voiced": false
+ },
+ {
+  "id": "biz-56",
+  "speaker": "biz",
+  "text": "Fıçı doldu. Birkaç gün yeter.",
+  "voiced": false
+ },
+ {
+  "id": "biz-57",
+  "speaker": "biz",
+  "text": "Bunlar yenir gibi. Birkaç tane toplayayım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-39",
+  "speaker": "arkadas",
+  "text": "Devrildi! Sen de kendi payını kes Harry.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-40",
+  "speaker": "arkadas",
+  "text": "Şu ağaç benim. Tam sağlam bir gövde.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-41",
+  "speaker": "arkadas",
+  "text": "Dev ağacı indirdim. Sıra sende.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-42",
+  "speaker": "arkadas",
+  "text": "Göl balık dolu. Akşama yemek çıkar, görürsün.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-43",
+  "speaker": "arkadas",
+  "text": "Bir balık yakaladım. Yemişlerle güzel bir çorba olur.",
+  "voiced": false
+ },
+ {
+  "id": "biz-58",
+  "speaker": "biz",
+  "text": "Uzun zamandır sıcak yemek yemedik. Kokusu bile iyi.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-44",
+  "speaker": "arkadas",
+  "text": "Afiyet olsun Harry.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-45",
+  "speaker": "arkadas",
+  "text": "Odun yığını az kalmış. Dikkatli kullanalım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-46",
+  "speaker": "arkadas",
+  "text": "Balta eski ama keskin. Sen kes, ben taşırım.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-47",
+  "speaker": "arkadas",
+  "text": "Burası sessiz. Fazla sessiz.",
+  "voiced": false
+ },
+ {
+  "id": "biz-59",
+  "speaker": "biz",
+  "text": "Bir ses mi geldi... Fred?",
+  "voiced": false
+ },
+ {
+  "id": "biz-60",
+  "speaker": "biz",
+  "text": "Cevap yok. Dışarıya bakayım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-61",
+  "speaker": "biz",
+  "text": "Odun yığınının yanında yok. Fred!",
+  "voiced": false
+ },
+ {
+  "id": "biz-62",
+  "speaker": "biz",
+  "text": "Ateş çoktan sönmüş. Buradan kimse geçmemiş.",
+  "voiced": false
+ },
+ {
+  "id": "biz-63",
+  "speaker": "biz",
+  "text": "Patikada iz yok. Fred! Duyuyor musun?",
+  "voiced": false
+ },
+ {
+  "id": "biz-64",
+  "speaker": "biz",
+  "text": "Hiçbir yerde yok...",
+  "voiced": false
+ },
+ {
+  "id": "biz-65",
+  "speaker": "biz",
+  "text": "Kesin uyuya kalmıştır. Gidip onu uyandırayım.",
+  "voiced": false
+ },
+ {
+  "id": "biz-66",
+  "speaker": "biz",
+  "text": "Fred...?",
+  "voiced": false
+ },
+ {
+  "id": "biz-67",
+  "speaker": "biz",
+  "text": "Yatağı bomboş. Battaniye de soğumuş.",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-0-03",
+  "speaker": "saglikli-0",
+  "text": "Şehirde gizli bir sığınak var. Biz oraya gidiyoruz.",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-1-02",
+  "speaker": "saglikli-1",
+  "text": "Orada bizim gibi başka sağlıklı insanlar da var.",
+  "voiced": false
+ },
+ {
+  "id": "saglikli-2-01",
+  "speaker": "saglikli-2",
+  "text": "Kendinize dikkat edin.",
+  "voiced": false
+ },
+ {
+  "id": "biz-68",
+  "speaker": "biz",
+  "text": "Siz gidin. Fred ile ben ormana gidiyoruz.",
+  "voiced": false
+ },
+ {
+  "id": "arkadas-48",
+  "speaker": "arkadas",
+  "text": "Umarım yolumuz yeniden kesişir.",
+  "voiced": false
+ }
+]

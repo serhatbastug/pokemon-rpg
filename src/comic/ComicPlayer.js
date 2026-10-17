@@ -14,6 +14,7 @@
 // F / ÇARPI her an basılabilir: balon yazılıyorsa önce yazıyı tamamlar,
 // balon bittiyse sonraki kareye geçer. Sinematik akış oyuncunun elinde.
 
+import { Voice } from '../services/voice.js';
 import { Dialogue } from '../adventure/dialogue.js';
 
 export const IN_FRAMES = 14;      // karenin açılma süresi
@@ -23,7 +24,7 @@ export class ComicPlayer {
     constructor(panels, { onBeep, onPanel } = {}) {
         this.panels = panels;
         this.onPanel = onPanel || (() => {});
-        this.dialogue = new Dialogue({ onBeep });
+        this.dialogue = new Dialogue({ onBeep, ...Voice.hooks });
         this.index = -1;
         this.frame = 0;
         this.running = false;

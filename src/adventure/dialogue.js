@@ -14,8 +14,13 @@ const HOLD_BASE = 46;           // yazı bitince ekranda kalma süresi (kare)
 const HOLD_PER_CHAR = 1.1;
 
 export class Dialogue {
-    constructor({ onBeep } = {}) {
+    // onLine(line) / onStop(): seslendirme bağlantısı (services/voice.js)
+    // voiceActive(): satırı bir ses dosyası okuyorsa true, "bıt" sesi susar
+    constructor({ onBeep, onLine, onStop, voiceActive } = {}) {
         this.onBeep = onBeep || (() => {});
+        this.onLine = onLine || (() => {});
+        this.onStop = onStop || (() => {});
+        this.voiceActive = voiceActive || (() => false);
         this.lines = [];
         this.index = -1;
         this.revealed = 0;
@@ -39,8 +44,10 @@ export class Dialogue {
         if (this.index >= this.lines.length) {
             this.running = false;
             this.line = null;
+            this.onStop();
         } else {
             this.line = this.lines[this.index];
+            this.onLine(this.line);
         }
     }
 
@@ -48,6 +55,7 @@ export class Dialogue {
     cut() {
         this.running = false;
         this.line = null;
+        this.onStop();
     }
 
     get active() {
@@ -85,7 +93,7 @@ export class Dialogue {
             // Boşlukta ses çıkmasın: konuşma sürekli bir vızıltıya dönüyor
             if (after > before && after % BEEP_EVERY === 0) {
                 const ch = this.line.text[after - 1];
-                if (ch && ch !== ' ') this.onBeep(this.line.speaker);
+                if (ch && ch !== ' ' && !this.voiceActive()) this.onBeep(this.line.speaker);
             }
             return;
         }

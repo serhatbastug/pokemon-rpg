@@ -210,6 +210,27 @@ export class CharacterSelect {
         this.overlay.querySelector('.select-hero-btn')?.click();
     }
 
+    // Seçilen iki dövüşçüyü unutur; ekran ilk açıldığı haline döner
+    reset() {
+        this.selectionTurn = 1;
+        this.player1Selected = null;
+        this.player2Selected = null;
+        this.grid.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected-p1', 'selected-p2'));
+        this.clearFocus();
+        this.closeModal();
+
+        const p1 = this.status.querySelector('.p1-status-badge');
+        p1.textContent = 'Oyuncu 1: Seçim Yapıyor...';
+        p1.classList.remove('selected');
+        const p2 = this.status.querySelector('.p2-status-badge');
+        p2.textContent = 'Oyuncu 2: Beklemede...';
+        p2.classList.remove('selected');
+
+        for (const btn of this.startButtons) btn.classList.add('not-ready');
+        const hint = document.getElementById('mode-hint');
+        if (hint) hint.textContent = 'İki dövüşçü seçin: ilki sizin, ikincisi rakibiniz.';
+    }
+
     getSelection() {
         return { p1: this.player1Selected, p2: this.player2Selected };
     }

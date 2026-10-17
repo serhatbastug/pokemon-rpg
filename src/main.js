@@ -277,10 +277,13 @@ function startMatch(ai) {
 document.getElementById('start-battle-btn').addEventListener('click', () => startMatch(null));
 document.getElementById('start-ai-btn').addEventListener('click', () => startMatch(aiLevelKey));
 
-// SAVAŞ BİTTİ penceresinden ana menüye dön (Esc de aynı işi yapar)
+// SAVAŞ BİTTİ penceresinden iki kişilik karakter seçimine dön (Esc de aynı işi
+// yapar). Seçimler sıfırlanır; ana menüye ekranın kendi "Ana Menü" düğmesiyle çıkılır.
 document.getElementById('gameover-menu-btn').addEventListener('click', () => {
     hideGameOver();
-    returnToMenu();
+    characterSelect.reset();
+    showSelectionScreen();
+    padMenu.start('selection');
 });
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && !document.getElementById('gameover-screen').classList.contains('hidden')) {

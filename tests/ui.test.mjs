@@ -1483,11 +1483,12 @@ async function main() {
     await wait(400);
     const backToMain = await page.evaluate(() => ({
         gameover: !document.getElementById('gameover-screen').classList.contains('hidden'),
-        menu: window.__menu.running,
-        menuScreen: !document.getElementById('menu-screen').classList.contains('hidden')
+        selectionScreen: !document.getElementById('selection-screen').classList.contains('hidden'),
+        p1: window.__characterSelect.getSelection().p1,
+        p2: window.__characterSelect.getSelection().p2
     }));
-    check('Savas bitince ANA MENUYE DON dugmesi ana menuyu aciyor',
-        gameoverShown && !backToMain.gameover && backToMain.menu && backToMain.menuScreen, JSON.stringify({ gameoverShown, backToMain }));
+    check('Savas bitince ANA MENUYE DON dugmesi 2 kisilik secime donuyor, secimler sifirlaniyor',
+        gameoverShown && !backToMain.gameover && backToMain.selectionScreen && !backToMain.p1 && !backToMain.p2, JSON.stringify({ gameoverShown, backToMain }));
 
     check('Konsol hatasi yok', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
     check('Basarisiz istek yok', failedUrls.length === 0, failedUrls.slice(0, 3).join(' | '));

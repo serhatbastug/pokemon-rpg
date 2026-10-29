@@ -5,3 +5,6 @@ Thumbs.db
 
 # Araclarin urettigi referans kareler: gerektiginde yeniden uretiliyor
 tools/shots/
+
+# API anahtarlari (git'e girmesin)
+.env

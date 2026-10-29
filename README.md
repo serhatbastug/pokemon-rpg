@@ -8,6 +8,11 @@ sanatıdır.
 
 ## Çalıştırma
 
+Oyun çevrimiçi olarak https://serhatbastug.github.io/pokemon-rpg/ adresinde
+oynanabilir (`master`'a her push'ta `.github/workflows/pages.yml` ile güncellenir).
+
+Yerelde çalıştırmak için:
+
 ES modülleri `file://` üzerinden çalışmaz; yerel bir HTTP sunucusu gerekir:
 
 ```
